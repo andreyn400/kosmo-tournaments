@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  /* ---- Accent (indigo) ---- */
+  --color-accent: #5b5ef4;
+  --color-accent-hover: #4847d4;
+  --color-accent-soft: #eef0ff;
+
+  /* ---- Semantic ---- */
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-info: #0ea5e9;
+  --color-info-soft: #f0f9ff;
+
+  /* ---- Borders ---- */
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+
+  /* ---- Surfaces & text ---- */
+  --color-surface: #ffffff;
+  --color-subtle: #f8f9fb;
+  --color-hover: #f1f5f9;
+  --color-page: #f0f2f5;
+  --color-muted: #6b7280;
+  --color-fade: #9ca3af;
+  --color-secondary: #374151;
+
+  /* Remap Tailwind `bg-black` / `text-black` to deep slate-gray for a less
+     harsh feel. Consistent with design spec's --text-primary. */
+  --color-black: #111827;
+
+  /* ---- Typography ---- */
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+
+  /* ---- Radii ---- */
+  --radius-card: 0.75rem;
+  --radius-button: 0.5rem;
+}
+
+:root {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-secondary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+}

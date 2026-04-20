@@ -1,0 +1,195 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+
+const MONTHS_RU = [
+  "Январь",
+  "Февраль",
+  "Март",
+  "Апрель",
+  "Май",
+  "Июнь",
+  "Июль",
+  "Август",
+  "Сентябрь",
+  "Октябрь",
+  "Ноябрь",
+  "Декабрь",
+];
+
+const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+function toIso(year: number, monthZeroBased: number, day: number): string {
+  const mm = String(monthZeroBased + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
+}
+
+export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
+  const eventSet = useMemo(() => new Set(eventDates), [eventDates]);
+  const today = useMemo(() => new Date(), []);
+  const todayIso = toIso(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const [view, setView] = useState(() => ({
+    year: today.getFullYear(),
+    month: today.getMonth(),
+  }));
+
+  const cells = useMemo(() => {
+    const firstOfMonth = new Date(view.year, view.month, 1);
+    const jsWeekday = firstOfMonth.getDay();
+    const startPad = (jsWeekday + 6) % 7;
+    const daysInMonth = new Date(view.year, view.month + 1, 0).getDate();
+
+    const out: Array<{
+      key: string;
+      day: number | null;
+      iso: string | null;
+      isToday: boolean;
+      hasEvent: boolean;
+    }> = [];
+    for (let i = 0; i < startPad; i++) {
+      out.push({
+        key: `pad-${i}`,
+        day: null,
+        iso: null,
+        isToday: false,
+        hasEvent: false,
+      });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = toIso(view.year, view.month, d);
+      out.push({
+        key: iso,
+        day: d,
+        iso,
+        isToday: iso === todayIso,
+        hasEvent: eventSet.has(iso),
+      });
+    }
+    while (out.length % 7 !== 0) {
+      out.push({
+        key: `tail-${out.length}`,
+        day: null,
+        iso: null,
+        isToday: false,
+        hasEvent: false,
+      });
+    }
+    return out;
+  }, [view, eventSet, todayIso]);
+
+  const prev = () =>
+    setView((v) =>
+      v.month === 0
+        ? { year: v.year - 1, month: 11 }
+        : { year: v.year, month: v.month - 1 },
+    );
+  const next = () =>
+    setView((v) =>
+      v.month === 11
+        ? { year: v.year + 1, month: 0 }
+        : { year: v.year, month: v.month + 1 },
+    );
+  const goToday = () =>
+    setView({ year: today.getFullYear(), month: today.getMonth() });
+
+  const isCurrentMonthView =
+    view.year === today.getFullYear() && view.month === today.getMonth();
+
+  return (
+    <div className="px-3 pb-3 pt-4 border-t border-border">
+      <div className="flex items-center justify-between mb-2.5 px-1">
+        <button
+          type="button"
+          onClick={prev}
+          aria-label="Предыдущий месяц"
+          className="h-6 w-6 inline-flex items-center justify-center rounded text-muted hover:text-black hover:bg-subtle"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={goToday}
+          disabled={isCurrentMonthView}
+          aria-label="К текущему месяцу"
+          className="text-[11px] font-semibold text-black uppercase tracking-wide tabular-nums px-1.5 rounded hover:bg-subtle disabled:hover:bg-transparent disabled:cursor-default"
+        >
+          {MONTHS_RU[view.month]} {view.year}
+        </button>
+        <button
+          type="button"
+          onClick={next}
+          aria-label="Следующий месяц"
+          className="h-6 w-6 inline-flex items-center justify-center rounded text-muted hover:text-black hover:bg-subtle"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-medium text-fade uppercase tracking-wider mb-1">
+        {WEEKDAYS_RU.map((w) => (
+          <span key={w} className="py-0.5">
+            {w}
+          </span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-0.5">
+        {cells.map((cell) => {
+          if (cell.day == null) {
+            return <span key={cell.key} className="h-7" aria-hidden />;
+          }
+          const base =
+            "relative h-7 flex items-center justify-center text-[11px] tabular-nums rounded transition-colors";
+          const tone = cell.isToday
+            ? "bg-accent text-white font-semibold hover:bg-[var(--color-accent-hover)]"
+            : cell.hasEvent
+              ? "text-black font-semibold hover:bg-subtle"
+              : "text-muted hover:bg-subtle";
+          return (
+            <Link
+              key={cell.key}
+              href={`/calendar?view=day&date=${cell.iso}`}
+              className={`${base} ${tone}`}
+              title={cell.hasEvent ? "Есть события" : undefined}
+            >
+              <span>{cell.day}</span>
+              {cell.hasEvent && !cell.isToday ? (
+                <span
+                  aria-hidden
+                  className="absolute bottom-0.5 h-1 w-1 rounded-full bg-accent"
+                />
+              ) : null}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
