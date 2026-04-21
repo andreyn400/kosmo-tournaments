@@ -7,9 +7,9 @@ import type { Pair } from "./algorithms/teamAmericano";
 import { createClient } from "./supabase/server";
 import { listCourtsByIds } from "./queries/courts";
 import type { ScheduledRound } from "./americano";
-import type { Court, Tournament } from "./types";
+import type { Court, Division, Tournament, TournamentFormat } from "./types";
 
-const SUPPORTED_FORMATS = new Set<Tournament["format"]>([
+const SUPPORTED_FORMATS = new Set<TournamentFormat>([
   "americano",
   "round_robin",
   "mexicano",
@@ -22,10 +22,15 @@ export async function startSession(input: {
   sessionId: string;
   playerIds: string[];
   pairs?: ReadonlyArray<Pair>;
+  division?: Division;
 }): Promise<{ firstRoundId: string }> {
-  const { tournament, sessionId, playerIds, pairs } = input;
+  const { tournament, sessionId, playerIds, pairs, division } = input;
 
-  if (!SUPPORTED_FORMATS.has(tournament.format)) {
+  const format: TournamentFormat = division?.format ?? tournament.format;
+  const courtIds = division?.court_ids ?? tournament.court_ids ?? [];
+  const divisionId = division?.id ?? null;
+
+  if (!SUPPORTED_FORMATS.has(format)) {
     throw new Error(
       "Этот формат пока не поддерживается. Доступны: Американо, Круговой, Мексикано, Командное американо, Командное мексикано.",
     );
@@ -36,9 +41,7 @@ export async function startSession(input: {
     );
   }
 
-  const isTeamFormat =
-    tournament.format === "team_americano" ||
-    tournament.format === "team_mexicano";
+  const isTeamFormat = format === "team_americano" || format === "team_mexicano";
 
   if (isTeamFormat) {
     if (!pairs || pairs.length !== playerIds.length / 2) {
@@ -58,7 +61,7 @@ export async function startSession(input: {
   }
 
   const schedule: ScheduledRound[] = (() => {
-    switch (tournament.format) {
+    switch (format) {
       case "round_robin":
         return generateRoundRobinSchedule(playerIds);
       case "mexicano":
@@ -75,7 +78,7 @@ export async function startSession(input: {
   const supabase = await createClient();
   let firstRoundId = "";
 
-  const tournamentCourts = await loadTournamentCourts(tournament);
+  const courts = await loadCourts(courtIds);
 
   for (const [idx, round] of schedule.entries()) {
     const isFirst = idx === 0;
@@ -83,6 +86,7 @@ export async function startSession(input: {
       .from("rounds")
       .insert({
         session_id: sessionId,
+        division_id: divisionId,
         round_number: round.roundNumber,
         status: isFirst ? "in_progress" : "pending",
       })
@@ -93,9 +97,10 @@ export async function startSession(input: {
     if (isFirst) firstRoundId = createdRound.id;
 
     const matchRows = round.matches.map((m) => {
-      const court = tournamentCourts[m.courtIndex] ?? null;
+      const court = courts[m.courtIndex] ?? null;
       return {
         round_id: createdRound.id,
+        division_id: divisionId,
         court_id: court?.id ?? null,
         court_number: court?.number ?? m.courtIndex + 1,
         team1_player1_id: m.team1[0],
@@ -121,7 +126,7 @@ export async function startSession(input: {
   return { firstRoundId };
 }
 
-async function loadTournamentCourts(tournament: Tournament): Promise<Court[]> {
-  if (!tournament.court_ids || tournament.court_ids.length === 0) return [];
-  return await listCourtsByIds(tournament.court_ids);
+async function loadCourts(courtIds: string[]): Promise<Court[]> {
+  if (!courtIds || courtIds.length === 0) return [];
+  return await listCourtsByIds(courtIds);
 }

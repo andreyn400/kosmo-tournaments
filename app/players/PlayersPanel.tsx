@@ -11,13 +11,17 @@ import { Badge } from "@/components/ui/Badge";
 import { PADEL_LEVELS } from "@/lib/constants";
 import type { Player } from "@/lib/types";
 import { createPlayerAction } from "./create-player-action";
+import {
+  PlayerFields,
+  emptyPlayerFormValues,
+  type PlayerFormValues,
+} from "./PlayerFields";
 
 export function PlayersPanel({ players }: { players: Player[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [name, setName] = useState("");
-  const [level, setLevel] = useState("C");
-  const [phone, setPhone] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const [values, setValues] = useState<PlayerFormValues>(emptyPlayerFormValues);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -31,15 +35,17 @@ export function PlayersPanel({ players }: { players: Player[] }) {
     );
   }, [players, query]);
 
+  const setField = (field: keyof PlayerFormValues, value: string) =>
+    setValues((v) => ({ ...v, [field]: value }));
+
   const submit = () => {
     setError(null);
     startTransition(async () => {
-      const res = await createPlayerAction({ name, level, phone });
+      const res = await createPlayerAction(values);
       if (res.error) setError(res.error);
       else {
-        setName("");
-        setLevel("C");
-        setPhone("");
+        setValues(emptyPlayerFormValues);
+        setExpanded(false);
         router.refresh();
       }
     });
@@ -48,16 +54,28 @@ export function PlayersPanel({ players }: { players: Player[] }) {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <Card className="flex flex-col gap-4">
-        <h2 className="font-semibold text-black">Новый игрок</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold text-black">Новый игрок</h2>
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="text-sm text-accent hover:underline"
+          >
+            {expanded ? "Скрыть детали" : "Дополнительно"}
+          </button>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-[1fr_7rem_12rem_auto]">
           <Input
             placeholder="Имя"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={values.name}
+            onChange={(e) => setField("name", e.target.value)}
+            disabled={pending}
           />
           <Select
-            value={level}
-            onChange={(e) => setLevel(e.target.value)}
+            value={values.level}
+            onChange={(e) => setField("level", e.target.value)}
+            disabled={pending}
           >
             {PADEL_LEVELS.map((l) => (
               <option key={l} value={l}>
@@ -67,13 +85,28 @@ export function PlayersPanel({ players }: { players: Player[] }) {
           </Select>
           <Input
             placeholder="Телефон (необязательно)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            value={values.phone}
+            onChange={(e) => setField("phone", e.target.value)}
+            disabled={pending}
           />
-          <Button disabled={pending || !name.trim()} onClick={submit}>
+          <Button disabled={pending || !values.name.trim()} onClick={submit}>
             {pending ? "Сохранение…" : "Добавить"}
           </Button>
         </div>
+
+        {expanded && (
+          <div className="pt-2 border-t border-border">
+            <PlayerFields
+              values={values}
+              onChange={setField}
+              disabled={pending}
+              showName={false}
+              showLevel={false}
+              showPhone={false}
+            />
+          </div>
+        )}
+
         {error ? (
           <div
             role="alert"
@@ -114,7 +147,7 @@ export function PlayersPanel({ players }: { players: Player[] }) {
           />
           {filtered.length === 0 ? (
             <p className="text-sm text-muted">Ничего не найдено.</p>
-            ) : (
+          ) : (
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
               {filtered.map((p) => (
                 <li key={p.id}>

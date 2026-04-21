@@ -11,6 +11,8 @@ import { listSessionsByTournament } from "@/lib/queries/sessions";
 import { getLeagueSeason } from "@/lib/queries/league-seasons";
 import { listRoundsBySession } from "@/lib/queries/rounds";
 import { listMatchesByRound } from "@/lib/queries/matches";
+import { listDivisions } from "@/lib/queries/divisions";
+import { listCourtsByIds } from "@/lib/queries/courts";
 import {
   FORMAT_LABEL_RU,
   STATUS_LABEL_RU,
@@ -27,6 +29,7 @@ import { OpenRegistrationButton } from "./OpenRegistrationButton";
 import { StartTournamentButton } from "./StartTournamentButton";
 import { SessionsList } from "./SessionsList";
 import { DangerZone } from "./DangerZone";
+import { DivisionsPanel } from "./DivisionsPanel";
 
 export default async function TournamentDetailPage({
   params,
@@ -258,6 +261,11 @@ export default async function TournamentDetailPage({
     );
   }
 
+  const [divisions, tournamentCourts] = await Promise.all([
+    listDivisions(id),
+    t.court_ids.length > 0 ? listCourtsByIds(t.court_ids) : Promise.resolve([]),
+  ]);
+
   return (
     <PageShell title={t.name} action={headerAction}>
       <div className="flex flex-col gap-6 max-w-3xl">
@@ -275,7 +283,22 @@ export default async function TournamentDetailPage({
           </Card>
         ) : null}
 
-        {t.status === "in_progress" ? (
+        <Card className="flex flex-col gap-4">
+          <DivisionsPanel
+            tournamentId={t.id}
+            tournamentCourts={tournamentCourts}
+            tournamentDefaults={{
+              format: t.format,
+              scoring_system: t.scoring_system,
+              level_min: t.level_min,
+              level_max: t.level_max,
+              court_ids: t.court_ids,
+            }}
+            divisions={divisions}
+          />
+        </Card>
+
+        {t.status === "in_progress" && divisions.length === 0 ? (
           <Card className="flex flex-col gap-3">
             <h2 className="font-semibold text-black">Турнир идёт</h2>
             <p className="text-sm text-muted">
@@ -300,60 +323,62 @@ export default async function TournamentDetailPage({
           </Card>
         ) : null}
 
-        <Card className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-black">
-              Игроки · {registrations.length}
-              {t.max_players ? ` / ${t.max_players}` : ""}
-            </h2>
-            {t.status === "registration_open" ? (
-              <StartTournamentButton
-                tournamentId={t.id}
-                playerCount={registrations.length}
-              />
-            ) : null}
-          </div>
-
-          {registrations.length === 0 ? (
-            <p className="text-sm text-muted">Игроков пока нет.</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
-              {registrations.map((r, idx) => (
-                <RegistrationRow
-                  key={r.id}
-                  index={idx}
+        {divisions.length === 0 ? (
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-black">
+                Игроки · {registrations.length}
+                {t.max_players ? ` / ${t.max_players}` : ""}
+              </h2>
+              {t.status === "registration_open" ? (
+                <StartTournamentButton
                   tournamentId={t.id}
-                  registrationId={r.id}
-                  player={r.player}
-                  partnerName={
-                    isTeamFormat && r.partner_id
-                      ? (playerNameById.get(r.partner_id) ?? null)
-                      : null
-                  }
-                  canRemove={canAdd}
+                  playerCount={registrations.length}
                 />
-              ))}
-            </ul>
-          )}
-
-          {canAdd ? (
-            <div className="pt-2 border-t border-border">
-              {isTeamFormat ? (
-                <AddPairPanel
-                  tournamentId={t.id}
-                  allPlayers={allPlayers}
-                  registeredIds={registeredIds}
-                />
-              ) : (
-                <AddPlayerPanel
-                  tournamentId={t.id}
-                  allPlayers={allPlayers}
-                  registeredIds={registeredIds}
-                />
-              )}
+              ) : null}
             </div>
-          ) : null}
-        </Card>
+
+            {registrations.length === 0 ? (
+              <p className="text-sm text-muted">Игроков пока нет.</p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
+                {registrations.map((r, idx) => (
+                  <RegistrationRow
+                    key={r.id}
+                    index={idx}
+                    tournamentId={t.id}
+                    registrationId={r.id}
+                    player={r.player}
+                    partnerName={
+                      isTeamFormat && r.partner_id
+                        ? (playerNameById.get(r.partner_id) ?? null)
+                        : null
+                    }
+                    canRemove={canAdd}
+                  />
+                ))}
+              </ul>
+            )}
+
+            {canAdd ? (
+              <div className="pt-2 border-t border-border">
+                {isTeamFormat ? (
+                  <AddPairPanel
+                    tournamentId={t.id}
+                    allPlayers={allPlayers}
+                    registeredIds={registeredIds}
+                  />
+                ) : (
+                  <AddPlayerPanel
+                    tournamentId={t.id}
+                    allPlayers={allPlayers}
+                    registeredIds={registeredIds}
+                  />
+                )}
+              </div>
+            ) : null}
+          </Card>
+        ) : null}
 
         <DangerZone
           tournamentId={t.id}

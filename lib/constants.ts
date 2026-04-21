@@ -1,6 +1,10 @@
 import type {
   CourtStatus,
   CourtSurface,
+  DivisionCategory,
+  DominantHand,
+  Gender,
+  MembershipStatus,
   PadelLevel,
   TournamentFormat,
   TournamentStatus,
@@ -64,4 +68,28 @@ export const COURT_SURFACE_LABEL_RU: Record<CourtSurface, string> = {
 export const COURT_STATUS_LABEL_RU: Record<CourtStatus, string> = {
   active: "Активный",
   maintenance: "На обслуживании",
+};
+
+export const GENDER_LABEL_RU: Record<Gender, string> = {
+  male: "Мужской",
+  female: "Женский",
+  other: "Другой",
+};
+
+export const MEMBERSHIP_LABEL_RU: Record<MembershipStatus, string> = {
+  member: "Член клуба",
+  non_member: "Не член клуба",
+  guest: "Гость",
+};
+
+export const DOMINANT_HAND_LABEL_RU: Record<DominantHand, string> = {
+  right: "Правая",
+  left: "Левая",
+};
+
+export const DIVISION_CATEGORY_LABEL_RU: Record<DivisionCategory, string> = {
+  mens: "Мужчины",
+  womens: "Женщины",
+  mixed: "Микст",
+  open: "Открытый",
 };

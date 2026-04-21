@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { Avatar, OverflowPill } from "@/components/ui/Avatar";
 import { FORMAT_LABEL_RU, STATUS_LABEL_RU } from "@/lib/constants";
 import { formatDateRangeRu, formatTimeRu } from "@/lib/format-date";
 import { statusTone } from "@/lib/status-tone";
@@ -12,13 +13,32 @@ import type { Court, Tournament } from "@/lib/types";
 import { deleteTournamentListAction } from "@/app/delete-tournament-list-action";
 
 const MAX_COURTS_SHOWN = 3;
+const MAX_PLAYERS_SHOWN = 6;
+
+function pluralizeDivisions(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "дивизион";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "дивизиона";
+  return "дивизионов";
+}
+
+type PlayerSummary = {
+  id: string;
+  name: string;
+  photo_url: string | null;
+};
 
 export function TournamentCard({
   tournament,
   courts,
+  players = [],
+  divisionCount = 0,
 }: {
   tournament: Tournament;
   courts: Court[];
+  players?: PlayerSummary[];
+  divisionCount?: number;
 }) {
   const t = tournament;
   const [mode, setMode] = useState<"idle" | "confirming" | "deleted">("idle");
@@ -78,6 +98,8 @@ export function TournamentCard({
 
   const shownCourts = assignedCourts.slice(0, MAX_COURTS_SHOWN);
   const extraCourts = Math.max(0, assignedCourts.length - MAX_COURTS_SHOWN);
+  const shownPlayers = players.slice(0, MAX_PLAYERS_SHOWN);
+  const extraPlayers = Math.max(0, players.length - MAX_PLAYERS_SHOWN);
 
   return (
     <Link
@@ -171,8 +193,27 @@ export function TournamentCard({
               <span aria-hidden>·</span>
               <span>{levelRange}</span>
             </div>
-            {assignedCourts.length > 0 ? (
+            {players.length > 0 ? (
+              <div className="flex items-center pl-2">
+                {shownPlayers.map((p) => (
+                  <div key={p.id} className="-ml-2">
+                    <Avatar name={p.name} photoUrl={p.photo_url} size="xs" />
+                  </div>
+                ))}
+                {extraPlayers > 0 ? (
+                  <div className="-ml-2">
+                    <OverflowPill count={extraPlayers} size="xs" />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {assignedCourts.length > 0 || divisionCount > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5">
+                {divisionCount > 0 ? (
+                  <span className="inline-flex items-center h-6 px-2 rounded-[var(--radius-button)] bg-accent-soft border border-accent/30 text-[11px] font-semibold text-accent uppercase tracking-[0.06em]">
+                    {divisionCount} {pluralizeDivisions(divisionCount)}
+                  </span>
+                ) : null}
                 {shownCourts.map((c) => (
                   <span
                     key={c.id}

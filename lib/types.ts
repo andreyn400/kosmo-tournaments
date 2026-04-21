@@ -42,6 +42,20 @@ export type CourtSurface =
 
 export type CourtStatus = "active" | "maintenance";
 
+export type Gender = "male" | "female" | "other";
+
+export type MembershipStatus = "member" | "non_member" | "guest";
+
+export type DominantHand = "right" | "left";
+
+export type DivisionCategory = "mens" | "womens" | "mixed" | "open";
+
+export type DivisionStatus =
+  | "draft"
+  | "registration_open"
+  | "in_progress"
+  | "completed";
+
 export type ScoringSystem =
   | "points_16"
   | "points_21"
@@ -70,6 +84,12 @@ export interface Player {
   level: PadelLevel;
   elo_rating: number;
   notes: string | null;
+  gender: Gender | null;
+  date_of_birth: string | null;
+  nationality: string | null;
+  photo_url: string | null;
+  membership_status: MembershipStatus;
+  dominant_hand: DominantHand | null;
   created_at: string;
 }
 
@@ -98,10 +118,26 @@ export interface Tournament {
 export interface TournamentRegistration {
   id: string;
   tournament_id: string;
+  division_id: string | null;
   player_id: string;
   partner_id: string | null;
   status: RegistrationStatus;
   registered_at: string;
+}
+
+export interface Division {
+  id: string;
+  tournament_id: string;
+  name: string;
+  category: DivisionCategory;
+  level_min: PadelLevel | null;
+  level_max: PadelLevel | null;
+  max_players: number | null;
+  court_ids: string[];
+  format: TournamentFormat;
+  scoring_system: ScoringSystem;
+  status: DivisionStatus;
+  created_at: string;
 }
 
 export interface TournamentSession {
@@ -116,6 +152,7 @@ export interface TournamentSession {
 export interface Round {
   id: string;
   session_id: string;
+  division_id: string | null;
   round_number: number;
   status: RoundStatus;
 }
@@ -123,6 +160,7 @@ export interface Round {
 export interface Match {
   id: string;
   round_id: string;
+  division_id: string | null;
   court_number: number | null;
   court_id: string | null;
   team1_player1_id: string | null;

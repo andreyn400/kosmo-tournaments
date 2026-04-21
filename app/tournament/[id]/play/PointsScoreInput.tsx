@@ -13,6 +13,7 @@ import { submitScoreAction } from "./submit-score-action";
 
 export function PointsScoreInput({
   tournamentId,
+  divisionId,
   matchId,
   scoringSystem,
   team1Players,
@@ -23,6 +24,7 @@ export function PointsScoreInput({
   editable,
 }: {
   tournamentId: string;
+  divisionId?: string | null;
   matchId: string;
   scoringSystem: ScoringSystem;
   team1Players: string;
@@ -65,6 +67,7 @@ export function PointsScoreInput({
     startTransition(async () => {
       const res = await submitScoreAction({
         tournamentId,
+        divisionId: divisionId ?? null,
         matchId,
         scoringSystem,
         team1Score: a,

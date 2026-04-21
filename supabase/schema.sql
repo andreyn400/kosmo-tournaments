@@ -149,3 +149,47 @@ alter table tournaments
 alter table tournaments
   add constraint duration_hours_range
   check (duration_hours between 1 and 12);
+
+-- ========================================
+-- Phase 6 migrations — extended player profile
+-- ========================================
+
+alter table players add column gender text check (gender in ('male','female','other'));
+alter table players add column date_of_birth date;
+alter table players add column nationality text;
+alter table players add column photo_url text;
+alter table players add column membership_status text
+  check (membership_status in ('member','non_member','guest')) default 'guest';
+alter table players add column dominant_hand text check (dominant_hand in ('right','left'));
+
+-- ========================================
+-- Phase 7 migrations — divisions within tournaments
+-- ========================================
+
+create table divisions (
+  id uuid primary key default gen_random_uuid(),
+  tournament_id uuid references tournaments(id) on delete cascade,
+  name text not null,
+  category text check (category in ('mens','womens','mixed','open')) default 'open',
+  level_min text,
+  level_max text,
+  max_players int,
+  court_ids uuid[] default '{}',
+  format text check (format in ('americano','team_americano','mexicano','team_mexicano','round_robin','escalera')),
+  scoring_system text default 'games_24',
+  status text check (status in ('draft','registration_open','in_progress','completed')) default 'draft',
+  created_at timestamptz default now()
+);
+
+alter table tournament_registrations
+  add column division_id uuid references divisions(id) on delete cascade;
+
+alter table rounds
+  add column division_id uuid references divisions(id) on delete cascade;
+
+alter table matches
+  add column division_id uuid references divisions(id) on delete cascade;
+
+create index idx_tournament_registrations_division on tournament_registrations(division_id);
+create index idx_rounds_division on rounds(division_id);
+create index idx_matches_division on matches(division_id);

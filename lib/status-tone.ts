@@ -1,4 +1,4 @@
-import type { TournamentStatus } from "./types";
+import type { DivisionStatus, TournamentStatus } from "./types";
 
 export type BadgeTone =
   | "status-draft"
@@ -6,7 +6,7 @@ export type BadgeTone =
   | "status-progress"
   | "status-completed";
 
-export function statusTone(status: TournamentStatus): BadgeTone {
+export function statusTone(status: TournamentStatus | DivisionStatus): BadgeTone {
   switch (status) {
     case "draft":
       return "status-draft";

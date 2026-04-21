@@ -17,6 +17,7 @@ import { SetsScoreInput } from "./SetsScoreInput";
 
 export function MatchCard({
   tournamentId,
+  divisionId,
   match,
   playerById,
   courtById,
@@ -24,6 +25,7 @@ export function MatchCard({
   editable,
 }: {
   tournamentId: string;
+  divisionId?: string | null;
   match: Match;
   playerById: Map<string, Player>;
   courtById: Map<string, Court>;
@@ -71,6 +73,7 @@ export function MatchCard({
       {isSets ? (
         <SetsScoreInput
           tournamentId={tournamentId}
+          divisionId={divisionId ?? null}
           matchId={match.id}
           scoringSystem={scoringSystem}
           team1Players={team1Players}
@@ -82,6 +85,7 @@ export function MatchCard({
       ) : (
         <PointsScoreInput
           tournamentId={tournamentId}
+          divisionId={divisionId ?? null}
           matchId={match.id}
           scoringSystem={scoringSystem}
           team1Players={team1Players}

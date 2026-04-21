@@ -651,3 +651,226 @@ Each sub-stage ends with `npm run build` clean + hand-off to user for browser ch
 
 `npm run build` clean before every hand-off. No feature batched with another.
 - [ ] 2D.18 Hand to user for browser verification: create league with 2 dates, run session 1 end-to-end, confirm cumulative leaderboard.
+
+---
+
+# Phase 5 — TV Lobby Display (`/display`)
+
+Dedicated fullscreen page for a TV in the club entrance. Shows everything happening at the club today. No sidebar, no nav chrome — standalone. Auto-refreshes every 30s. Readable from 3m away. No auth required (public display).
+
+This is different from the existing Табло (which shows one tournament's live leaderboard). The lobby display aggregates **all** events for today.
+
+## Scope
+- Three zones: top bar (logo + live clock + date), main content (event cards), bottom ticker (next 7 days).
+- Event cards colored by status: amber СКОРО, green ИДЁТ, gray ЗАВЕРШЁН.
+- For ИДЁТ: pulsing dot + top-3 mini leaderboard.
+- For СКОРО: registered player avatar circles (initials, hash-colored bg).
+- For ЗАВЕРШЁН: winner with 🥇, muted overlay.
+- 2 columns on wide screens, 1 column otherwise.
+- Sidebar nav gets a "📺 Дисплей" link at the bottom, separated by a divider.
+
+## Out of scope
+- Player photos (spec says "initials only for now — photo when available in future").
+- Auth.
+- Realtime subscriptions — `router.refresh()` every 30s is the refresh mechanism.
+
+## 5.1 Data layer
+
+- [ ] 5.1.1 `lib/queries/display.ts` (new) — two functions:
+  - `listTodayDisplayEvents(today: string): Promise<DisplayEvent[]>` — sessions where `session_date = today` + tournament join, AND one-day tournaments where `date_start = today` without a session (draft/registration_open/in_progress). For ИДЁТ events, include matches (for leaderboard) and registered players. For СКОРО events, include registrations (for avatars).
+  - `listUpcomingTickerEvents(today: string, daysAhead = 7): Promise<TickerEvent[]>` — sessions + tournaments in the window `(today, today + 7 days]`, summarized with name, format, date, startTime, courtNumbers.
+- [ ] 5.1.2 Types:
+  ```ts
+  export interface DisplayEvent {
+    key: string;
+    tournamentId: string;
+    sessionId?: string;
+    name: string;
+    format: TournamentFormat;
+    startTime: string | null;
+    status: "upcoming" | "in_progress" | "completed";
+    courtNumbers: number[];
+    registeredPlayers: Array<{ id: string; name: string }>;
+    maxPlayers: number | null;
+    leaderboard?: Array<{ playerId: string; name: string; points: number }>; // top 3 for in_progress
+    winner?: { name: string } | null;
+  }
+  export interface TickerEvent {
+    key: string;
+    name: string;
+    format: TournamentFormat;
+    date: string;
+    startTime: string | null;
+    courtNumbers: number[];
+  }
+  ```
+- [ ] 5.1.3 Status derivation (tournament-level, not session-level):
+  - `upcoming`: tournament.status in {draft, registration_open} OR tournament.status=in_progress but no session is in_progress/completed today yet.
+  - `in_progress`: any session for today has status `in_progress`.
+  - `completed`: tournament.status === "completed", or today's session.status === "completed".
+  - Keep it pragmatic: if there's a session row for today and its status is `in_progress`, use ИДЁТ. If completed → ЗАВЕРШЁН. Otherwise СКОРО.
+- [ ] 5.1.4 Leaderboard for ИДЁТ: fetch completed matches joined through rounds→session, reuse `computeLiveLeaderboard` from `lib/leaderboard.ts` with the tournament's format+scoring. Take top 3.
+
+## 5.2 Route + layout
+
+- [ ] 5.2.1 `app/display/page.tsx` — server component. Fetches `todayIso()` via pure helper; calls `listTodayDisplayEvents` + `listUpcomingTickerEvents`. Passes to `<DisplayClient>`. No PageShell.
+- [ ] 5.2.2 `app/display/DisplayClient.tsx` — client component. Owns:
+  - Live clock via `useEffect` + `setInterval(1000)` — only the clock re-renders, not the whole tree.
+  - Auto-refresh via `useEffect` + `setInterval(30_000)` that calls `router.refresh()` from `useRouter()` — no flash because Next streams the new server render in place.
+  - Receives `events`, `tickerEvents`, `todayIso` as props.
+- [ ] 5.2.3 Layout: no custom `app/display/layout.tsx` needed — root layout already supplies `<html>`/`<body>`. The page's outermost `<div>` sets `min-h-screen bg-[#0a1628] text-white`, overriding the page background.
+- [ ] 5.2.4 Force dynamic rendering: `export const dynamic = "force-dynamic"` on `page.tsx` so `router.refresh()` actually re-fetches.
+
+## 5.3 Components
+
+- [ ] 5.3.1 `app/display/TopBar.tsx` (client child of DisplayClient) — fixed height ~15vh, bg `#0f1923`. Left: logo mark + "KOSMO PADEL". Center: huge clock (text-[6rem] font-bold tabular-nums). Right: weekday + full date.
+- [ ] 5.3.2 `app/display/EventGrid.tsx` — grid of EventCard in a 1/2 column responsive layout (`grid-cols-1 lg:grid-cols-2`). Empty state: centered Kosmo logo + "Сегодня нет запланированных мероприятий".
+- [ ] 5.3.3 `app/display/EventCard.tsx` — the main card. Props: `event: DisplayEvent`. Subcomponents inside:
+  - Status stripe (6px left) with color by status.
+  - Header: event name (text-3xl bold), format badge, time badge.
+  - Middle: court pills row.
+  - Body: switches by status.
+- [ ] 5.3.4 `app/display/UpcomingBody.tsx` — player avatar circles (up to 8 + "+N"), "X / Y игроков зарегистрировано".
+- [ ] 5.3.5 `app/display/LiveBody.tsx` — pulsing green dot next to ИДЁТ badge, mini leaderboard table (#, name, points) for top 3.
+- [ ] 5.3.6 `app/display/CompletedBody.tsx` — winner name big with 🥇, muted overlay.
+- [ ] 5.3.7 `app/display/Avatar.tsx` — circle with initials; bg generated from hash of name; 8 fixed palette colors.
+- [ ] 5.3.8 `app/display/Ticker.tsx` — fixed bottom ~5vh strip. Horizontal scroll animation via CSS `@keyframes` if content exceeds width; static otherwise.
+
+## 5.4 Sidebar update
+
+- [ ] 5.4.1 `components/site/navLinks.ts` — extend `NavLink` type with optional `dividerBefore?: boolean`. Add `{ href: "/display", label: "Дисплей", icon: "📺", dividerBefore: true }` at the end.
+- [ ] 5.4.2 `components/site/SidebarNav.tsx` — render a `<hr className="my-2 border-border" />` (or a styled spacer) before any item with `dividerBefore: true`.
+
+## 5.5 Build + verify
+
+- [ ] 5.5.1 `npm run build` clean, zero TS errors.
+- [ ] 5.5.2 Hand off to user for browser test at `/display`. Expect to iterate before finalizing.
+
+---
+
+# Phase 6 — Extended player profile
+
+Scope: add 6 new player fields (gender, DOB, nationality, photo_url as plain URL, membership status, dominant hand). Update create + edit forms and the profile page. Photo upload via Supabase Storage deferred.
+
+## 6.0 SQL (hand to user first)
+
+- [ ] 6.0.1 Append to `supabase/schema.sql` as a new `-- Phase 6` block. Same SQL given in chat for the user to paste.
+
+## 6.1 Types + labels + queries
+
+- [ ] 6.1.1 `lib/types.ts` — add `Gender`, `MembershipStatus`, `DominantHand` unions; extend `Player` with `gender`, `date_of_birth`, `nationality`, `photo_url`, `membership_status`, `dominant_hand` — all nullable except `membership_status` (non-null with DB default `guest`).
+- [ ] 6.1.2 `lib/constants.ts` — `GENDER_LABEL_RU`, `MEMBERSHIP_LABEL_RU`, `DOMINANT_HAND_LABEL_RU`.
+- [ ] 6.1.3 `lib/queries/players.ts` — extend `createPlayer` to accept new optional fields. Add `updatePlayer(id, input)` that writes all editable columns (not `elo_rating` — ELO changes only via rating history). Level change may later trigger ELO recalculation; for now allow direct edit without ELO change.
+
+## 6.2 Shared form component
+
+- [ ] 6.2.1 `app/players/PlayerFields.tsx` — controlled client component rendering the full field grid (existing 3 + 6 new). Props: values + setters + disabled flag. Used by create and edit.
+
+## 6.3 Create — expanded form
+
+- [ ] 6.3.1 `app/players/PlayersPanel.tsx` — keep minimal quick-add row (name / level / phone / button). Below, collapsible `<details>` "Дополнительно" containing gender, DOB, nationality, email, photo URL, membership, dominant hand, notes. All optional — quick-add still works with just name + level.
+- [ ] 6.3.2 `app/players/create-player-action.ts` — accept + validate new fields. Validate enums (gender, membership_status, dominant_hand). DOB must be valid YYYY-MM-DD if provided. Photo URL: non-empty string if provided, no URL validation beyond that (operator paste).
+
+## 6.4 Edit — new route
+
+- [ ] 6.4.1 `app/players/[id]/edit/page.tsx` — server component, fetches player via `getPlayer`, renders `<PlayerEditForm>` with initial values.
+- [ ] 6.4.2 `app/players/[id]/edit/PlayerEditForm.tsx` — client form using `PlayerFields`, plus Save / Cancel. On submit calls `updatePlayerAction`.
+- [ ] 6.4.3 `app/players/[id]/edit/update-player-action.ts` — server action, validates, calls `updatePlayer`, `revalidatePath("/players")` + `/players/[id]`, redirects to `/players/[id]`.
+
+## 6.5 Profile display
+
+- [ ] 6.5.1 `app/players/[id]/page.tsx` — add photo avatar at top (img if `photo_url`, else hash-colored initials circle reusing display `Avatar` pattern). Show new fields: gender, DOB + computed age, nationality, membership badge, dominant hand. Layout: grid of label/value rows. Add "Редактировать" button linking to `/players/[id]/edit`.
+- [ ] 6.5.2 Helper `ageFromDob(dob)` — simple pure function; returns null if no DOB.
+
+## 6.6 Build + verify
+
+- [ ] 6.6.1 `npm run build` clean.
+- [ ] 6.6.2 Hand off. User runs the SQL in Supabase, then tests create + edit + profile.
+
+---
+
+# Phase 7 — Divisions within tournaments
+
+Scope: one tournament event can host multiple divisions running in parallel — e.g. "Мужчины Д1 Американо" on К1–К2 and "Женщины Американо" on К3–К4. Each division owns its own registrations, format, scoring, courts, bracket, matches, and leaderboard. Tournaments without divisions keep working unchanged (legacy mode).
+
+Design principles:
+- Divisions are **additive**: a tournament either has 0 divisions (legacy single-format play, unchanged) or ≥1 (division mode).
+- `tournament_registrations.division_id`, `rounds.division_id`, `matches.division_id` are nullable for backward compat. Null = legacy/tournament-wide.
+- When divisions exist, tournament-level `format`, `scoring_system`, `court_ids`, `max_players`, `level_min/max` become ignored for play — divisions override. The tournament row still carries them as defaults shown in the division create form.
+- One player ↔ one division per tournament (current `unique(tournament_id, player_id)` kept).
+
+## 7.0 SQL (hand to user first — already done)
+
+- [ ] 7.0.1 `divisions` table created in Supabase.
+- [ ] 7.0.2 `ALTER TABLE` on `tournament_registrations`, `rounds`, `matches` to add nullable `division_id` + indexes.
+- [ ] 7.0.3 Append both SQL blocks to `supabase/schema.sql` as a new `-- Phase 7` section for reproducibility.
+
+## 7.1 Types + constants + queries
+
+- [ ] 7.1.1 `lib/types.ts` — add `DivisionCategory = "mens" | "womens" | "mixed" | "open"`, `DivisionStatus = "draft" | "registration_open" | "in_progress" | "completed"`, and `Division` interface (all columns). Extend `TournamentRegistration`, `Round`, `Match` with optional `division_id: string | null`.
+- [ ] 7.1.2 `lib/constants.ts` — `DIVISION_CATEGORY_LABEL_RU` (mens=Мужчины, womens=Женщины, mixed=Микст, open=Открытый). Reuse existing `STATUS_LABEL_RU` for DivisionStatus (same string set).
+- [ ] 7.1.3 `lib/queries/divisions.ts` — new module:
+  - `listDivisions(tournamentId)` — ordered by `created_at`.
+  - `getDivision(id)`.
+  - `createDivision(input)` — validates format + scoring_system enums; defaults status to `draft`.
+  - `updateDivision(id, input)`.
+  - `deleteDivision(id)` — cascade handles registrations/rounds/matches.
+- [ ] 7.1.4 `lib/queries/registrations.ts` — extend existing functions to accept optional `divisionId` filter. Add `listRegistrationsByDivision(divisionId)`. `createRegistration` takes optional `division_id`. `listRegisteredPlayersByTournaments` stays tournament-wide for home-page avatar row (aggregates across divisions — correct behavior).
+- [ ] 7.1.5 `lib/queries/matches.ts`, `lib/queries/rounds.ts` — add `division_id` filters where bracket generation / results queries occur. Pass through on insert.
+
+## 7.2 Division management UI (on tournament page)
+
+- [ ] 7.2.1 `app/tournament/[id]/page.tsx` — detect `divisions.length > 0`. If zero divisions, render existing legacy UI (registrations + play button). If ≥1 division, render new division-mode UI (see 7.2.2).
+- [ ] 7.2.2 `app/tournament/[id]/DivisionsPanel.tsx` — section listing divisions as cards. Each card: name, category badge, format, level range, court pills, registered/max count, status badge, "Управлять" link → `/tournament/[id]/division/[divisionId]`. Button "+ Добавить дивизион" at top.
+- [ ] 7.2.3 Empty-state promoter: on a fresh tournament (0 registrations, 0 divisions), tournament page shows a callout: "Добавить дивизионы или продолжить как один турнир?" with two buttons. Choosing "Добавить дивизионы" opens the create-division form; otherwise legacy mode remains.
+- [ ] 7.2.4 `app/tournament/[id]/DivisionForm.tsx` (client) — controlled form for create/edit: name, category, level_min/max (reuse existing level selector), format, scoring_system, max_players, court_ids (multi-select from tournament's court_ids, not all courts). Defaults prefilled from tournament's own values on create.
+- [ ] 7.2.5 Server actions: `app/tournament/[id]/division/create-division-action.ts`, `update-division-action.ts`, `delete-division-action.ts`. Each validates + revalidates `/tournament/[id]` and `/display`.
+- [ ] 7.2.6 Guard: can't delete a division that has matches recorded (status `in_progress` or `completed`). Show confirm + clear error.
+
+## 7.3 Per-division registrations
+
+- [ ] 7.3.1 `app/tournament/[id]/division/[divisionId]/page.tsx` — server component. Division detail: header with name + category + format, registrations list, "Начать игру" / "Play" button when eligible.
+- [ ] 7.3.2 Registrations panel: reuse as much of existing `RegistrationsPanel` as possible but scoped to `divisionId`. `createRegistration` passes `division_id`. Enforce division `max_players` cap, then `level_min/max` warning (soft).
+- [ ] 7.3.3 When a tournament has divisions, **remove** the tournament-wide registration form from `app/tournament/[id]/page.tsx` — registrations only happen inside a division.
+
+## 7.4 Per-division bracket generation
+
+- [ ] 7.4.1 `lib/scheduler/*` — audit entry points (`generateAmericano`, `generateMexicano`, etc.). Each scheduler takes `(tournamentId, sessionId, registeredPlayers, courts, format, scoring)`. Refactor: add optional `divisionId` parameter; when present, insert rounds/matches with `division_id` set.
+- [ ] 7.4.2 Scheduling call sites: `app/tournament/[id]/play/*`, any "start tournament" server action — route through `divisionId` when a division is being started.
+- [ ] 7.4.3 Court allocation: scheduler uses the **division's** `court_ids`, not the tournament's. If multiple divisions run simultaneously, prevent double-booking: before generating, check for overlapping courts across other divisions on the same session and warn (don't hard-block — operator may know courts free up in sequence).
+
+## 7.5 Per-division play view
+
+- [ ] 7.5.1 New route `app/tournament/[id]/division/[divisionId]/play/page.tsx` — mirror of `app/tournament/[id]/play/page.tsx` but filtered to one division. Leaderboard uses only this division's matches.
+- [ ] 7.5.2 Scoreboard (`.../play/scoreboard`) — accept optional `?division=<id>` query param; when present, scope all data to that division.
+- [ ] 7.5.3 Legacy play view (`app/tournament/[id]/play`) remains for tournaments with zero divisions. When divisions exist, the tournament-level "Играть" button is hidden/replaced by the per-division link.
+
+## 7.6 Per-division leaderboard + results
+
+- [ ] 7.6.1 `lib/leaderboard.ts` — `computeLiveLeaderboard` already takes `matches` + `players`; no change needed, just pass per-division matches/players in.
+- [ ] 7.6.2 `app/tournament/[id]/results/page.tsx` — when divisions exist, render one results section per division (name heading + table). When no divisions, current single table.
+- [ ] 7.6.3 Rating history (`rating_history`): currently links to `tournament_id` + `session_id`. Leave alone for now — ELO applied per-match is still correct. Later phase may add `division_id` column if needed for per-division rating filtering.
+
+## 7.7 Display page — divisions as separate cards
+
+- [ ] 7.7.1 `lib/queries/display.ts` — `listTodayDisplayEvents` currently emits one `DisplayEvent` per tournament/session. Refactor: when a tournament has divisions, emit one event **per division** (sharing the tournament's session/time). Keys become `d:<divisionId>` to stay unique alongside `s:<sessionId>` and `t:<tournamentId>`.
+- [ ] 7.7.2 `DisplayEvent` gets optional `divisionId: string | null` and the `name` becomes `"Tournament · Division"` (or just division name if visually cleaner — decide in UI review). `registeredPlayers` scoped to the division. `leaderboard` / `winner` computed from division's matches only. `courtNumbers` from division's court_ids.
+- [ ] 7.7.3 `UpcomingBody` / `LiveBody` / `CompletedBody` — no changes; they consume `DisplayEvent` which now represents a division when applicable.
+
+## 7.8 Tournament card (home page) — divisions summary
+
+- [ ] 7.8.1 `components/tournament/TournamentCard.tsx` — when a tournament has divisions, show a small "2 дивизиона" chip below the title in place of the single format badge. Click-through still goes to `/tournament/[id]`. Avatar row aggregates across all divisions (already does via tournament-wide query).
+- [ ] 7.8.2 `app/page.tsx` — fetch `division_count_by_tournament` in one batched query (select `tournament_id, count(*)` grouped). Pass count to `TournamentCard`.
+
+## 7.9 Build + verify
+
+- [ ] 7.9.1 `npm run build` clean.
+- [ ] 7.9.2 Manual test path: create tournament → add 2 divisions (Мужчины Д1 Американо / Женщины Американо) with distinct court sets → register 8 players in each → start one division → verify display page shows two cards → start second division → verify both live leaderboards update independently → complete first division → verify winner on display while second still ИДЁТ.
+
+## 7.10 Open questions / decisions (resolve before coding each sub-phase)
+
+- [ ] 7.10.1 Does league_season tournament type support divisions in v1, or one_day only? (Recommend: one_day only in v1; revisit league later.)
+- [ ] 7.10.2 Does the tournament's `date_start` / `start_time` apply to all divisions, or can divisions have their own start time? (Recommend: shared for v1; add `start_time` on division later if needed.)
+- [ ] 7.10.3 When no divisions exist, keep legacy mode **permanently** or force-migrate existing tournaments into a single "default" division? (Recommend: permanent legacy path; null `division_id` is a valid state forever.)
+- [ ] 7.10.4 Calendar page (`/calendar`): does a tournament with divisions show as one event or N events? (Recommend: one event, since time/date/venue are shared.)
+

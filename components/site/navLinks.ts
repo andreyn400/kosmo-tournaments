@@ -2,6 +2,7 @@ export type NavLink = {
   href: string;
   label: string;
   icon: string;
+  dividerBefore?: boolean;
 };
 
 export const navLinks: NavLink[] = [
@@ -10,4 +11,5 @@ export const navLinks: NavLink[] = [
   { href: "/courts", label: "Корты", icon: "🎾" },
   { href: "/calendar", label: "Календарь", icon: "📅" },
   { href: "/analytics", label: "Аналитика", icon: "📊" },
+  { href: "/display", label: "Дисплей", icon: "📺", dividerBefore: true },
 ];

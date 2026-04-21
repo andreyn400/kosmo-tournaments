@@ -5,9 +5,16 @@ import { PageShell } from "@/components/site/PageShell";
 import { TournamentCard } from "@/components/tournament/TournamentCard";
 import { listTournaments } from "@/lib/queries/tournaments";
 import { listCourts } from "@/lib/queries/courts";
+import { listRegisteredPlayersByTournaments } from "@/lib/queries/registrations";
+import { listDivisionsByTournaments } from "@/lib/queries/divisions";
 
 export default async function HomePage() {
   const [all, courts] = await Promise.all([listTournaments(), listCourts()]);
+  const tournamentIds = all.map((t) => t.id);
+  const [playersByTournament, divisionsByTournament] = await Promise.all([
+    listRegisteredPlayersByTournaments(tournamentIds),
+    listDivisionsByTournaments(tournamentIds),
+  ]);
   const leagues = all.filter((t) => t.type === "league_season");
   const oneDays = all.filter((t) => t.type === "one_day");
 
@@ -64,7 +71,13 @@ export default async function HomePage() {
             emptyCopy="Сезонные лиги с несколькими сессиями и кумулятивной таблицей."
           >
             {leagues.map((t) => (
-              <TournamentCard key={t.id} tournament={t} courts={courts} />
+              <TournamentCard
+                key={t.id}
+                tournament={t}
+                courts={courts}
+                players={playersByTournament.get(t.id) ?? []}
+                divisionCount={divisionsByTournament.get(t.id)?.length ?? 0}
+              />
             ))}
           </Section>
           <Section
@@ -75,7 +88,13 @@ export default async function HomePage() {
             emptyCopy="Однодневные турниры: Американо, Мексикано, Круговой, Команды."
           >
             {oneDays.map((t) => (
-              <TournamentCard key={t.id} tournament={t} courts={courts} />
+              <TournamentCard
+                key={t.id}
+                tournament={t}
+                courts={courts}
+                players={playersByTournament.get(t.id) ?? []}
+                divisionCount={divisionsByTournament.get(t.id)?.length ?? 0}
+              />
             ))}
           </Section>
         </div>

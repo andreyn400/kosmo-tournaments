@@ -11,10 +11,12 @@ export function AddPairPanel({
   tournamentId,
   allPlayers,
   registeredIds,
+  divisionId,
 }: {
   tournamentId: string;
   allPlayers: Player[];
   registeredIds: Set<string>;
+  divisionId?: string | null;
 }) {
   const router = useRouter();
   const [queryA, setQueryA] = useState("");
@@ -53,6 +55,7 @@ export function AddPairPanel({
         tournamentId,
         playerAId: selectedA.id,
         playerBId: selectedB.id,
+        divisionId: divisionId ?? null,
       });
       if (res.error) {
         setError(res.error);

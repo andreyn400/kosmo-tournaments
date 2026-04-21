@@ -12,12 +12,13 @@ import {
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
 import { listCourtsByIds } from "@/lib/queries/courts";
 import { totalRoundsFor } from "@/lib/total-rounds";
-import type { Court, Match, Player, Tournament } from "@/lib/types";
+import type { Court, Division, Match, Player, Tournament } from "@/lib/types";
 
 export async function advanceRoundAction(input: {
   tournamentId: string;
   sessionId: string;
   currentRoundId: string;
+  divisionId?: string | null;
 }): Promise<{ error?: string }> {
   const supabase = await createClient();
 
@@ -44,6 +45,29 @@ export async function advanceRoundAction(input: {
   if (tournamentErr) return { error: tournamentErr.message };
   const t = tournament as Tournament;
 
+  let division: Division | null = null;
+  if (input.divisionId) {
+    const { data: divData, error: divErr } = await supabase
+      .from("divisions")
+      .select("*")
+      .eq("id", input.divisionId)
+      .single();
+    if (divErr) return { error: divErr.message };
+    division = divData as Division;
+  }
+
+  const format = division?.format ?? t.format;
+  const courtIds = division?.court_ids ?? t.court_ids ?? [];
+
+  const revalidate = () => {
+    revalidatePath(`/tournament/${input.tournamentId}/play`);
+    if (input.divisionId) {
+      revalidatePath(
+        `/tournament/${input.tournamentId}/division/${input.divisionId}/play`,
+      );
+    }
+  };
+
   const { error: completeErr } = await supabase
     .from("rounds")
     .update({ status: "completed" })
@@ -52,12 +76,17 @@ export async function advanceRoundAction(input: {
 
   const nextRoundNumber = currentRound.round_number + 1;
 
-  const { data: nextRound, error: nextErr } = await supabase
+  let nextRoundQuery = supabase
     .from("rounds")
     .select("id")
     .eq("session_id", input.sessionId)
-    .eq("round_number", nextRoundNumber)
-    .maybeSingle();
+    .eq("round_number", nextRoundNumber);
+  if (input.divisionId) {
+    nextRoundQuery = nextRoundQuery.eq("division_id", input.divisionId);
+  } else {
+    nextRoundQuery = nextRoundQuery.is("division_id", null);
+  }
+  const { data: nextRound, error: nextErr } = await nextRoundQuery.maybeSingle();
   if (nextErr) return { error: nextErr.message };
 
   if (nextRound) {
@@ -66,45 +95,51 @@ export async function advanceRoundAction(input: {
       .update({ status: "in_progress" })
       .eq("id", nextRound.id);
     if (startNextErr) return { error: startNextErr.message };
-    revalidatePath(`/tournament/${input.tournamentId}/play`);
+    revalidate();
     return {};
   }
 
-  if (t.format === "mexicano") {
+  if (format === "mexicano") {
     const generated = await generateNextIndividualMexicanoRound({
       supabase,
       tournament: t,
       sessionId: input.sessionId,
       nextRoundNumber,
+      divisionId: input.divisionId ?? null,
+      courtIds,
     });
     if (generated.error) return { error: generated.error };
     if (generated.generated) {
-      revalidatePath(`/tournament/${input.tournamentId}/play`);
+      revalidate();
       return {};
     }
   }
 
-  if (t.format === "team_mexicano") {
+  if (format === "team_mexicano") {
     const generated = await generateNextTeamMexicanoRound({
       supabase,
       tournament: t,
       sessionId: input.sessionId,
       nextRoundNumber,
+      divisionId: input.divisionId ?? null,
+      courtIds,
     });
     if (generated.error) return { error: generated.error };
     if (generated.generated) {
-      revalidatePath(`/tournament/${input.tournamentId}/play`);
+      revalidate();
       return {};
     }
   }
 
-  const { error: sessionErr } = await supabase
-    .from("tournament_sessions")
-    .update({ status: "completed" })
-    .eq("id", input.sessionId);
-  if (sessionErr) return { error: sessionErr.message };
+  if (!input.divisionId) {
+    const { error: sessionErr } = await supabase
+      .from("tournament_sessions")
+      .update({ status: "completed" })
+      .eq("id", input.sessionId);
+    if (sessionErr) return { error: sessionErr.message };
+  }
 
-  revalidatePath(`/tournament/${input.tournamentId}/play`);
+  revalidate();
   return {};
 }
 
@@ -112,28 +147,34 @@ async function loadRoundAndMatchData({
   supabase,
   tournament,
   sessionId,
+  divisionId,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   tournament: Tournament;
   sessionId: string;
+  divisionId: string | null;
 }): Promise<{
   regs: Array<{ player_id: string; partner_id: string | null }>;
   matches: Match[];
   players: Player[];
   error?: string;
 }> {
-  const { data: regs, error: regsErr } = await supabase
+  let regsQuery = supabase
     .from("tournament_registrations")
     .select("player_id, partner_id")
     .eq("tournament_id", tournament.id)
     .neq("status", "cancelled");
+  if (divisionId) regsQuery = regsQuery.eq("division_id", divisionId);
+  const { data: regs, error: regsErr } = await regsQuery;
   if (regsErr)
     return { regs: [], matches: [], players: [], error: regsErr.message };
 
-  const { data: allRounds, error: allRoundsErr } = await supabase
+  let roundsQuery = supabase
     .from("rounds")
     .select("id")
     .eq("session_id", sessionId);
+  if (divisionId) roundsQuery = roundsQuery.eq("division_id", divisionId);
+  const { data: allRounds, error: allRoundsErr } = await roundsQuery;
   if (allRoundsErr)
     return { regs: [], matches: [], players: [], error: allRoundsErr.message };
   const roundIds = (allRounds ?? []).map((r) => r.id);
@@ -173,14 +214,16 @@ async function loadRoundAndMatchData({
 
 async function insertGeneratedRound({
   supabase,
-  tournament,
   sessionId,
+  divisionId,
+  courtIds,
   roundNumber,
   matches,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  tournament: Tournament;
   sessionId: string;
+  divisionId: string | null;
+  courtIds: string[];
   roundNumber: number;
   matches: Array<{
     courtIndex: number;
@@ -192,6 +235,7 @@ async function insertGeneratedRound({
     .from("rounds")
     .insert({
       session_id: sessionId,
+      division_id: divisionId,
       round_number: roundNumber,
       status: "in_progress",
     })
@@ -199,11 +243,12 @@ async function insertGeneratedRound({
     .single();
   if (roundErr) return { error: roundErr.message };
 
-  const tournamentCourts = await loadTournamentCourts(tournament);
+  const courts = await loadCourts(courtIds);
   const matchRows = matches.map((m) => {
-    const court = tournamentCourts[m.courtIndex] ?? null;
+    const court = courts[m.courtIndex] ?? null;
     return {
       round_id: createdRound.id,
+      division_id: divisionId,
       court_id: court?.id ?? null,
       court_number: court?.number ?? m.courtIndex + 1,
       team1_player1_id: m.team1[0],
@@ -222,9 +267,9 @@ async function insertGeneratedRound({
   return {};
 }
 
-async function loadTournamentCourts(tournament: Tournament): Promise<Court[]> {
-  if (!tournament.court_ids || tournament.court_ids.length === 0) return [];
-  return await listCourtsByIds(tournament.court_ids);
+async function loadCourts(courtIds: string[]): Promise<Court[]> {
+  if (!courtIds || courtIds.length === 0) return [];
+  return await listCourtsByIds(courtIds);
 }
 
 async function generateNextIndividualMexicanoRound({
@@ -232,21 +277,26 @@ async function generateNextIndividualMexicanoRound({
   tournament,
   sessionId,
   nextRoundNumber,
+  divisionId,
+  courtIds,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   tournament: Tournament;
   sessionId: string;
   nextRoundNumber: number;
+  divisionId: string | null;
+  courtIds: string[];
 }): Promise<{ generated: boolean; error?: string }> {
   const loaded = await loadRoundAndMatchData({
     supabase,
     tournament,
     sessionId,
+    divisionId,
   });
   if (loaded.error) return { generated: false, error: loaded.error };
 
   const playerCount = loaded.regs.length;
-  const maxRounds = totalRoundsFor(tournament.format, playerCount);
+  const maxRounds = totalRoundsFor("mexicano", playerCount);
   if (maxRounds === 0) {
     return {
       generated: false,
@@ -276,8 +326,9 @@ async function generateNextIndividualMexicanoRound({
   const scheduled = generateMexicanoRound(orderedPlayerIds, nextRoundNumber);
   const inserted = await insertGeneratedRound({
     supabase,
-    tournament,
     sessionId,
+    divisionId,
+    courtIds,
     roundNumber: nextRoundNumber,
     matches: scheduled.matches,
   });
@@ -290,21 +341,26 @@ async function generateNextTeamMexicanoRound({
   tournament,
   sessionId,
   nextRoundNumber,
+  divisionId,
+  courtIds,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   tournament: Tournament;
   sessionId: string;
   nextRoundNumber: number;
+  divisionId: string | null;
+  courtIds: string[];
 }): Promise<{ generated: boolean; error?: string }> {
   const loaded = await loadRoundAndMatchData({
     supabase,
     tournament,
     sessionId,
+    divisionId,
   });
   if (loaded.error) return { generated: false, error: loaded.error };
 
   const playerCount = loaded.regs.length;
-  const maxRounds = totalRoundsFor(tournament.format, playerCount);
+  const maxRounds = totalRoundsFor("team_mexicano", playerCount);
   if (maxRounds === 0) {
     return {
       generated: false,
@@ -333,8 +389,9 @@ async function generateNextTeamMexicanoRound({
   const scheduled = generateTeamMexicanoRound(orderedPairs, nextRoundNumber);
   const inserted = await insertGeneratedRound({
     supabase,
-    tournament,
     sessionId,
+    divisionId,
+    courtIds,
     roundNumber: nextRoundNumber,
     matches: scheduled.matches,
   });

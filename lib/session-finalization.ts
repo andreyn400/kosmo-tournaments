@@ -6,14 +6,14 @@ import type { Match, Player } from "./types";
 export async function finalizeSessionElo(input: {
   sessionId: string;
   tournamentId: string;
+  divisionId?: string | null;
 }): Promise<void> {
-  const { sessionId, tournamentId } = input;
+  const { sessionId, tournamentId, divisionId } = input;
   const supabase = await createClient();
 
-  const { data: roundRows, error: roundErr } = await supabase
-    .from("rounds")
-    .select("id")
-    .eq("session_id", sessionId);
+  let roundQuery = supabase.from("rounds").select("id").eq("session_id", sessionId);
+  if (divisionId) roundQuery = roundQuery.eq("division_id", divisionId);
+  const { data: roundRows, error: roundErr } = await roundQuery;
   if (roundErr) throw new Error(roundErr.message);
   const roundIds = (roundRows ?? []).map((r) => r.id);
   if (roundIds.length === 0) return;

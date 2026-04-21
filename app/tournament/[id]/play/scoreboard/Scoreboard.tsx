@@ -9,7 +9,7 @@ import {
   sortStrategyForFormat,
 } from "@/lib/leaderboard";
 import type { Pair } from "@/lib/algorithms/teamAmericano";
-import type { Match, Player, Round, Tournament } from "@/lib/types";
+import type { Match, Player, Round, Tournament, TournamentFormat } from "@/lib/types";
 
 export function Scoreboard({
   tournament,
@@ -18,6 +18,9 @@ export function Scoreboard({
   players,
   totalRounds,
   pairs,
+  divisionId,
+  divisionName,
+  divisionFormat,
 }: {
   tournament: Tournament;
   initialRounds: Round[];
@@ -25,7 +28,17 @@ export function Scoreboard({
   players: Player[];
   totalRounds: number;
   pairs?: ReadonlyArray<Pair>;
+  divisionId?: string | null;
+  divisionName?: string;
+  divisionFormat?: TournamentFormat;
 }) {
+  const format = divisionFormat ?? tournament.format;
+  const displayTitle = divisionName
+    ? `${tournament.name} · ${divisionName}`
+    : tournament.name;
+  const closeHref = divisionId
+    ? `/tournament/${tournament.id}/division/${divisionId}/play`
+    : `/tournament/${tournament.id}/play`;
   const [rounds, setRounds] = useState<Round[]>(initialRounds);
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [prevInitialRounds, setPrevInitialRounds] = useState(initialRounds);
@@ -88,7 +101,7 @@ export function Scoreboard({
     (r) => r.status === "completed",
   ).length;
 
-  const strategy = sortStrategyForFormat(tournament.format);
+  const strategy = sortStrategyForFormat(format);
   const isTeamFormat = pairs && pairs.length > 0;
   const completedMatches = matches.filter((m) => m.status === "completed");
 
@@ -118,7 +131,7 @@ export function Scoreboard({
   return (
     <div className="min-h-dvh bg-black text-white flex flex-col relative">
       <Link
-        href={`/tournament/${tournament.id}/play`}
+        href={closeHref}
         aria-label="Закрыть табло"
         className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center text-xl leading-none"
       >
@@ -130,7 +143,7 @@ export function Scoreboard({
             Kosmo
           </div>
           <div className="text-3xl lg:text-5xl font-semibold truncate">
-            {tournament.name}
+            {displayTitle}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">

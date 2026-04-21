@@ -10,14 +10,39 @@ import type { Player } from "@/lib/types";
 import { addPlayerAction } from "./add-player-action";
 import { createAndAddPlayerAction } from "./create-and-add-player-action";
 
+function isLevelOutOfRange(
+  level: string,
+  min: string | null | undefined,
+  max: string | null | undefined,
+): boolean {
+  if (!min && !max) return false;
+  const idx = PADEL_LEVELS.indexOf(level as (typeof PADEL_LEVELS)[number]);
+  if (idx === -1) return false;
+  const minIdx = min
+    ? PADEL_LEVELS.indexOf(min as (typeof PADEL_LEVELS)[number])
+    : -1;
+  const maxIdx = max
+    ? PADEL_LEVELS.indexOf(max as (typeof PADEL_LEVELS)[number])
+    : -1;
+  if (minIdx !== -1 && idx < minIdx) return true;
+  if (maxIdx !== -1 && idx > maxIdx) return true;
+  return false;
+}
+
 export function AddPlayerPanel({
   tournamentId,
   allPlayers,
   registeredIds,
+  divisionId,
+  levelMin,
+  levelMax,
 }: {
   tournamentId: string;
   allPlayers: Player[];
   registeredIds: Set<string>;
+  divisionId?: string | null;
+  levelMin?: string | null;
+  levelMax?: string | null;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -38,7 +63,11 @@ export function AddPlayerPanel({
   const add = (playerId: string) => {
     setError(null);
     startTransition(async () => {
-      const res = await addPlayerAction({ tournamentId, playerId });
+      const res = await addPlayerAction({
+        tournamentId,
+        playerId,
+        divisionId: divisionId ?? null,
+      });
       if (res.error) setError(res.error);
       else {
         setQuery("");
@@ -54,6 +83,7 @@ export function AddPlayerPanel({
         tournamentId,
         name: newName,
         level: newLevel,
+        divisionId: divisionId ?? null,
       });
       if (res.error) setError(res.error);
       else {
@@ -82,27 +112,35 @@ export function AddPlayerPanel({
 
       {filtered.length > 0 ? (
         <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
-          {filtered.map((p) => (
-            <li
-              key={p.id}
-              className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-black truncate">{p.name}</span>
-                <span className="text-xs text-muted flex-shrink-0">
-                  {p.level} · {p.elo_rating}
-                </span>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => add(p.id)}
+          {filtered.map((p) => {
+            const outOfRange = isLevelOutOfRange(p.level, levelMin, levelMax);
+            return (
+              <li
+                key={p.id}
+                className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white"
               >
-                Добавить
-              </Button>
-            </li>
-          ))}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-black truncate">{p.name}</span>
+                  <span className="text-xs text-muted flex-shrink-0">
+                    {p.level} · {p.elo_rating}
+                  </span>
+                  {outOfRange ? (
+                    <span className="text-xs text-[var(--color-warning)] flex-shrink-0">
+                      вне уровня
+                    </span>
+                  ) : null}
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => add(p.id)}
+                >
+                  Добавить
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <p className="text-sm text-muted">

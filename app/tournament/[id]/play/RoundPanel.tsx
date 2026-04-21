@@ -15,11 +15,13 @@ import type {
 import { MatchCard } from "./MatchCard";
 import { advanceRoundAction } from "./advance-round-action";
 import { finalizeTournamentAction } from "./finalize-tournament-action";
+import { finalizeDivisionAction } from "../division/[divisionId]/play/finalize-division-action";
 
 export function RoundPanel({
   tournamentId,
   tournamentType,
   sessionId,
+  divisionId,
   round,
   matches,
   playerById,
@@ -32,6 +34,7 @@ export function RoundPanel({
   tournamentId: string;
   tournamentType: TournamentType;
   sessionId: string;
+  divisionId?: string | null;
   round: Round;
   matches: Match[];
   playerById: Map<string, Player>;
@@ -55,6 +58,7 @@ export function RoundPanel({
         tournamentId,
         sessionId,
         currentRoundId: round.id,
+        divisionId: divisionId ?? null,
       });
       if (res.error) setError(res.error);
       else router.refresh();
@@ -64,7 +68,9 @@ export function RoundPanel({
   const finalize = () => {
     setError(null);
     startTransition(async () => {
-      const res = await finalizeTournamentAction(tournamentId);
+      const res = divisionId
+        ? await finalizeDivisionAction({ tournamentId, divisionId })
+        : await finalizeTournamentAction(tournamentId);
       if (res?.error) setError(res.error);
     });
   };

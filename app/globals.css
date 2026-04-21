@@ -85,3 +85,12 @@ input[type="number"] {
 *::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-strong);
 }
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}

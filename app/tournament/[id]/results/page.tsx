@@ -11,6 +11,7 @@ import { listMatchesByRound } from "@/lib/queries/matches";
 import { listPlayers } from "@/lib/queries/players";
 import { listRatingHistoryByTournament } from "@/lib/queries/rating-history";
 import { listRegistrations } from "@/lib/queries/registrations";
+import { listDivisions } from "@/lib/queries/divisions";
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
 import {
   computeLiveLeaderboard,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/leaderboard";
 import { aggregateEloChanges } from "@/lib/aggregate-elo-changes";
 import {
+  DIVISION_CATEGORY_LABEL_RU,
   FORMAT_LABEL_RU,
   STATUS_LABEL_RU,
 } from "@/lib/constants";
@@ -34,6 +36,84 @@ export default async function ResultsPage({
   const { id } = await params;
   const tournament = await getTournament(id);
   if (!tournament) notFound();
+
+  const divisions = await listDivisions(id);
+
+  if (divisions.length > 0) {
+    return (
+      <PageShell
+        title={tournament.name}
+        action={
+          <div className="flex items-center gap-2">
+            <ShareButton />
+            <Link href={`/tournament/${id}`}>
+              <Button variant="secondary" size="md">
+                К турниру
+              </Button>
+            </Link>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-6 max-w-3xl">
+          <Card className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={statusTone(tournament.status)}>
+                {STATUS_LABEL_RU[tournament.status]}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted">
+              {formatDateRangeRu(tournament.date_start, tournament.date_end)} ·{" "}
+              Дивизионов: {divisions.length}
+            </p>
+          </Card>
+
+          <Card className="flex flex-col gap-3">
+            <h2 className="font-semibold text-black">Дивизионы</h2>
+            <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
+              {divisions.map((d) => (
+                <li
+                  key={d.id}
+                  className="flex items-center gap-3 px-4 py-3 bg-white text-sm"
+                >
+                  <div className="min-w-0 flex-1 flex flex-col gap-1">
+                    <span className="text-black truncate font-medium">
+                      {d.name}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone="neutral">
+                        {DIVISION_CATEGORY_LABEL_RU[d.category]}
+                      </Badge>
+                      <Badge tone="format">{FORMAT_LABEL_RU[d.format]}</Badge>
+                      <Badge tone={statusTone(d.status)}>
+                        {STATUS_LABEL_RU[d.status]}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/tournament/${id}/division/${d.id}/results`}
+                    className="shrink-0"
+                  >
+                    <Button variant="secondary" size="sm">
+                      Итоги →
+                    </Button>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {tournament.prize_description ? (
+            <Card className="flex flex-col gap-1">
+              <span className="text-xs text-muted uppercase tracking-wider">
+                Приз
+              </span>
+              <p className="text-black">{tournament.prize_description}</p>
+            </Card>
+          ) : null}
+        </div>
+      </PageShell>
+    );
+  }
 
   const [sessions, players, history, registrations] = await Promise.all([
     listSessionsByTournament(id),

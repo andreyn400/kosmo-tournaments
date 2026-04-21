@@ -14,6 +14,7 @@ export function RegistrationRow({
   partnerName,
   canRemove,
   index,
+  divisionId,
 }: {
   tournamentId: string;
   registrationId: string;
@@ -21,6 +22,7 @@ export function RegistrationRow({
   partnerName?: string | null;
   canRemove: boolean;
   index: number;
+  divisionId?: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -30,6 +32,7 @@ export function RegistrationRow({
       const res = await removePlayerAction({
         tournamentId,
         registrationId,
+        divisionId: divisionId ?? null,
       });
       if (!res.error) router.refresh();
     });

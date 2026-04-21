@@ -27,6 +27,9 @@ export function LivePlayBoard({
   courts,
   totalRounds,
   pairs,
+  divisionId,
+  divisionFormat,
+  divisionScoringSystem,
 }: {
   tournament: Tournament;
   session: TournamentSession;
@@ -36,7 +39,12 @@ export function LivePlayBoard({
   courts: Court[];
   totalRounds: number;
   pairs?: ReadonlyArray<Pair>;
+  divisionId?: string | null;
+  divisionFormat?: Tournament["format"];
+  divisionScoringSystem?: Tournament["scoring_system"];
 }) {
+  const format = divisionFormat ?? tournament.format;
+  const scoringSystem = divisionScoringSystem ?? tournament.scoring_system;
   const [rounds, setRounds] = useState<Round[]>(initialRounds);
   const [matches, setMatches] = useState<Match[]>(initialMatches);
   const [prevInitialRounds, setPrevInitialRounds] = useState(initialRounds);
@@ -175,11 +183,12 @@ export function LivePlayBoard({
               tournamentId={tournament.id}
               tournamentType={tournament.type}
               sessionId={session.id}
+              divisionId={divisionId ?? null}
               round={r}
               matches={matchesByRound.get(r.id) ?? []}
               playerById={playerById}
               courtById={courtById}
-              scoringSystem={tournament.scoring_system}
+              scoringSystem={scoringSystem}
               isCurrent={r.id === currentRound?.id}
               isLast={roundNumberIsLast(r.round_number)}
               allRoundsComplete={allRoundsComplete}
@@ -191,8 +200,8 @@ export function LivePlayBoard({
           <LeaderboardPanel
             matches={completedMatches}
             players={players}
-            format={tournament.format}
-            scoringSystem={tournament.scoring_system}
+            format={format}
+            scoringSystem={scoringSystem}
             pairs={pairs}
           />
         </aside>

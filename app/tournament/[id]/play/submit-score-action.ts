@@ -19,6 +19,7 @@ export interface SubmitScoreInput {
   team1Score?: number;
   team2Score?: number;
   scoreDetail?: SetsDetail;
+  divisionId?: string | null;
 }
 
 export async function submitScoreAction(
@@ -59,5 +60,10 @@ export async function submitScoreAction(
   }
 
   revalidatePath(`/tournament/${input.tournamentId}/play`);
+  if (input.divisionId) {
+    revalidatePath(
+      `/tournament/${input.tournamentId}/division/${input.divisionId}/play`,
+    );
+  }
   return {};
 }

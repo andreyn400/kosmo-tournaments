@@ -8,12 +8,14 @@ export async function createMatch(input: {
   team1_player2_id: string;
   team2_player1_id: string;
   team2_player2_id: string;
+  division_id?: string | null;
 }): Promise<Match> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("matches")
     .insert({
       round_id: input.round_id,
+      division_id: input.division_id ?? null,
       court_number: input.court_number,
       team1_player1_id: input.team1_player1_id,
       team1_player2_id: input.team1_player2_id,
@@ -26,6 +28,20 @@ export async function createMatch(input: {
 
   if (error) throw new Error(error.message);
   return data as Match;
+}
+
+export async function listMatchesByDivision(
+  divisionId: string,
+): Promise<Match[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("division_id", divisionId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Match[];
 }
 
 export async function listMatchesByRound(roundId: string): Promise<Match[]> {
@@ -53,6 +69,7 @@ export async function listMatchesByTournament(
   return ((data ?? []) as unknown as Match[]).map((m) => ({
     id: m.id,
     round_id: m.round_id,
+    division_id: m.division_id,
     court_number: m.court_number,
     court_id: m.court_id,
     team1_player1_id: m.team1_player1_id,

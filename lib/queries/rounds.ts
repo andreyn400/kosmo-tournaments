@@ -4,6 +4,7 @@ import type { Round } from "../types";
 export async function createRound(input: {
   session_id: string;
   round_number: number;
+  division_id?: string | null;
   status?: Round["status"];
 }): Promise<Round> {
   const supabase = await createClient();
@@ -11,6 +12,7 @@ export async function createRound(input: {
     .from("rounds")
     .insert({
       session_id: input.session_id,
+      division_id: input.division_id ?? null,
       round_number: input.round_number,
       status: input.status ?? "pending",
     })
@@ -27,6 +29,20 @@ export async function listRoundsBySession(sessionId: string): Promise<Round[]> {
     .from("rounds")
     .select("*")
     .eq("session_id", sessionId)
+    .order("round_number", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Round[];
+}
+
+export async function listRoundsByDivision(
+  divisionId: string,
+): Promise<Round[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("rounds")
+    .select("*")
+    .eq("division_id", divisionId)
     .order("round_number", { ascending: true });
 
   if (error) throw new Error(error.message);

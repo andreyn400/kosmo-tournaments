@@ -1,0 +1,83 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createDivision } from "@/lib/queries/divisions";
+import { PADEL_LEVELS } from "@/lib/constants";
+import { SCORING_SYSTEMS } from "@/lib/scoring-systems";
+import type {
+  DivisionCategory,
+  PadelLevel,
+  ScoringSystem,
+  TournamentFormat,
+} from "@/lib/types";
+
+const CATEGORIES: DivisionCategory[] = ["mens", "womens", "mixed", "open"];
+
+const FORMATS: TournamentFormat[] = [
+  "americano",
+  "team_americano",
+  "mexicano",
+  "team_mexicano",
+  "round_robin",
+  "escalera",
+];
+
+export interface CreateDivisionInput {
+  tournamentId: string;
+  name: string;
+  category: string;
+  format: string;
+  scoring_system: string;
+  level_min: string | null;
+  level_max: string | null;
+  max_players: number | null;
+  court_ids: string[];
+}
+
+export async function createDivisionAction(
+  input: CreateDivisionInput,
+): Promise<{ error?: string; id?: string }> {
+  const name = input.name.trim();
+  if (!name) return { error: "Введите название дивизиона" };
+  if (!CATEGORIES.includes(input.category as DivisionCategory))
+    return { error: "Неизвестная категория" };
+  if (!FORMATS.includes(input.format as TournamentFormat))
+    return { error: "Неизвестный формат" };
+  if (!SCORING_SYSTEMS.includes(input.scoring_system as ScoringSystem))
+    return { error: "Неизвестная система счёта" };
+  if (input.max_players != null && input.max_players < 4)
+    return { error: "Минимум 4 игрока" };
+  if (input.max_players != null && input.max_players % 4 !== 0)
+    return { error: "Число игроков должно быть кратно 4" };
+  if (input.court_ids.length === 0)
+    return { error: "Выберите хотя бы один корт" };
+
+  const level_min =
+    input.level_min && (PADEL_LEVELS as string[]).includes(input.level_min)
+      ? (input.level_min as PadelLevel)
+      : null;
+  const level_max =
+    input.level_max && (PADEL_LEVELS as string[]).includes(input.level_max)
+      ? (input.level_max as PadelLevel)
+      : null;
+
+  try {
+    const created = await createDivision({
+      tournament_id: input.tournamentId,
+      name,
+      category: input.category as DivisionCategory,
+      level_min,
+      level_max,
+      max_players: input.max_players,
+      court_ids: input.court_ids,
+      format: input.format as TournamentFormat,
+      scoring_system: input.scoring_system as ScoringSystem,
+    });
+    revalidatePath(`/tournament/${input.tournamentId}`);
+    revalidatePath("/display");
+    return { id: created.id };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
+    return { error: `Ошибка сохранения: ${msg}` };
+  }
+}
