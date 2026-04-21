@@ -27,21 +27,16 @@ export function BracketMatchCard({
 }) {
   const [editing, setEditing] = useState(false);
 
-  const t1Name1 = match.team1_player1_id
-    ? (playerNameById[match.team1_player1_id] ?? "—")
-    : null;
-  const t1Name2 = match.team1_player2_id
-    ? (playerNameById[match.team1_player2_id] ?? "—")
-    : null;
-  const t2Name1 = match.team2_player1_id
-    ? (playerNameById[match.team2_player1_id] ?? "—")
-    : null;
-  const t2Name2 = match.team2_player2_id
-    ? (playerNameById[match.team2_player2_id] ?? "—")
-    : null;
-
-  const team1Label = t1Name1 && t1Name2 ? `${t1Name1} / ${t1Name2}` : "—";
-  const team2Label = t2Name1 && t2Name2 ? `${t2Name1} / ${t2Name2}` : "—";
+  const team1 = formatTeam(
+    match.team1_player1_id,
+    match.team1_player2_id,
+    playerNameById,
+  );
+  const team2 = formatTeam(
+    match.team2_player1_id,
+    match.team2_player2_id,
+    playerNameById,
+  );
 
   const isSets = scoringGroup(scoringSystem) === "sets";
   const setsDetail: SetsDetail | null =
@@ -51,62 +46,72 @@ export function BracketMatchCard({
 
   const isBye = match.status === "bye";
   const isCompleted = match.status === "completed";
-  const hasBothSides = t1Name1 && t2Name1;
-  const canEdit = !readOnly && !isBye && hasBothSides;
-
-  const winner = match.winner_team;
+  const bothKnown = Boolean(team1 && team2);
+  const canEdit = !readOnly && !isBye && bothKnown;
   const courtLabel = match.court_id ? courtLabelById[match.court_id] : null;
 
+  const statusText = isBye
+    ? "Бай"
+    : isCompleted
+      ? "Сыгран"
+      : bothKnown
+        ? "Ожидает"
+        : "Ждёт соперников";
+
   return (
-    <div className="rounded-[var(--radius-card)] border border-border bg-white overflow-hidden text-sm">
-      <div className="flex items-center justify-between px-3 pt-2 text-[11px] text-muted uppercase tracking-[0.08em]">
+    <div
+      className="rounded-lg bg-white border border-border overflow-hidden text-sm"
+      style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)" }}
+    >
+      <div className="flex items-center justify-between px-3 pt-2 pb-1 text-[10px] uppercase tracking-[0.08em] text-muted">
         <span>
-          R{match.round_number}·M{match.position + 1}
+          {courtLabel ? `Корт ${courtLabel}` : `M${match.position + 1}`}
         </span>
-        <span className="flex items-center gap-2">
-          {courtLabel ? <span>К{courtLabel}</span> : null}
-          {isBye ? (
-            <span className="text-accent font-semibold">BYE</span>
-          ) : isCompleted ? (
-            <span className="text-[var(--color-success)] font-semibold">
-              Сыгран
-            </span>
-          ) : hasBothSides ? (
-            <span>Ожидает</span>
-          ) : (
-            <span>Ждёт соперников</span>
-          )}
+        <span
+          className={
+            isCompleted
+              ? "text-[var(--color-success)] font-semibold"
+              : isBye
+                ? "text-accent font-semibold"
+                : ""
+          }
+        >
+          {statusText}
         </span>
       </div>
 
-      <TeamRow
-        seed={match.seed1}
-        label={team1Label}
-        winning={isCompleted && winner === 1}
-        losing={isCompleted && winner === 2}
-        bye={isBye && winner === 2 && !t1Name1}
-        score={match.team1_score}
-        isSets={isSets}
-      />
-      <div className="border-t border-border/60" />
-      <TeamRow
-        seed={match.seed2}
-        label={team2Label}
-        winning={isCompleted && winner === 2}
-        losing={isCompleted && winner === 1}
-        bye={isBye && winner === 1 && !t2Name1}
-        score={match.team2_score}
-        isSets={isSets}
-      />
+      {isBye ? (
+        <ByeBody team={team1 ?? team2} seed={team1 ? match.seed1 : match.seed2} />
+      ) : (
+        <>
+          <TeamRow
+            seed={match.seed1}
+            team={team1}
+            isWinner={isCompleted && match.winner_team === 1}
+            isLoser={isCompleted && match.winner_team === 2}
+            score={match.team1_score}
+            showScore={isCompleted}
+          />
+          <div className="border-t border-border/60 mx-3" />
+          <TeamRow
+            seed={match.seed2}
+            team={team2}
+            isWinner={isCompleted && match.winner_team === 2}
+            isLoser={isCompleted && match.winner_team === 1}
+            score={match.team2_score}
+            showScore={isCompleted}
+          />
+        </>
+      )}
 
       {setsDetail && isCompleted ? (
-        <div className="px-3 py-1.5 text-[11px] text-muted border-t border-border bg-subtle/40">
+        <div className="px-3 py-1.5 text-[11px] text-muted border-t border-border bg-subtle/60 tabular-nums">
           {setsSummary(setsDetail)}
         </div>
       ) : null}
 
       {editing ? (
-        <div className="px-3 py-3 border-t border-border bg-subtle/30">
+        <div className="px-3 py-3 border-t border-border bg-subtle/40">
           <BracketScoreInput
             tournamentId={tournamentId}
             matchId={match.id}
@@ -122,7 +127,7 @@ export function BracketMatchCard({
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="w-full text-left px-3 py-1.5 border-t border-border text-xs text-accent hover:bg-accent-soft/40"
+          className="block w-full px-3 py-2 border-t border-border text-xs font-semibold text-accent hover:bg-accent-soft text-center"
         >
           {isCompleted ? "Изменить счёт" : "Ввести счёт"}
         </button>
@@ -131,41 +136,82 @@ export function BracketMatchCard({
   );
 }
 
+function formatTeam(
+  p1Id: string | null,
+  p2Id: string | null,
+  nameById: Record<string, string>,
+): string | null {
+  if (!p1Id || !p2Id) return null;
+  return `${nameById[p1Id] ?? "—"} / ${nameById[p2Id] ?? "—"}`;
+}
+
 function TeamRow({
   seed,
-  label,
-  winning,
-  losing,
-  bye,
+  team,
+  isWinner,
+  isLoser,
   score,
-  isSets,
+  showScore,
 }: {
   seed: number | null;
-  label: string;
-  winning: boolean;
-  losing: boolean;
-  bye: boolean;
+  team: string | null;
+  isWinner: boolean;
+  isLoser: boolean;
   score: number | null;
-  isSets: boolean;
+  showScore: boolean;
 }) {
-  const nameClass = winning
-    ? "font-bold text-black"
-    : losing
-      ? "text-muted"
-      : "text-black";
   return (
-    <div className="flex items-center gap-2 px-3 py-2">
-      <span className="w-5 text-[11px] text-muted tabular-nums text-right">
+    <div
+      className={`flex items-center gap-2 pr-3 py-2 border-l-4 ${
+        isWinner ? "border-accent" : "border-transparent"
+      } ${isLoser ? "opacity-50" : ""}`}
+      style={{ paddingLeft: "8px" }}
+    >
+      <span className="w-4 text-[10px] text-muted tabular-nums text-right flex-shrink-0">
         {seed != null ? seed : ""}
       </span>
-      <span className={`flex-1 truncate ${nameClass}`} title={label}>
-        {bye ? <span className="text-muted italic">—</span> : label}
+      <span
+        className={`flex-1 truncate ${isWinner ? "font-bold text-black" : "text-black"}`}
+        title={team ?? undefined}
+      >
+        {team ?? <span className="text-muted italic">Ожидание</span>}
       </span>
-      {score != null ? (
-        <span className={`tabular-nums font-bold ${winning ? "text-black" : "text-muted"}`}>
-          {isSets ? score : score}
+      {showScore && score != null ? (
+        <span
+          className={`tabular-nums flex-shrink-0 ${
+            isWinner ? "font-bold text-black" : "text-muted"
+          }`}
+        >
+          {score}
         </span>
       ) : null}
     </div>
+  );
+}
+
+function ByeBody({
+  team,
+  seed,
+}: {
+  team: string | null;
+  seed: number | null;
+}) {
+  return (
+    <>
+      <div
+        className="flex items-center gap-2 pr-3 py-2 border-l-4 border-accent"
+        style={{ paddingLeft: "8px" }}
+      >
+        <span className="w-4 text-[10px] text-muted tabular-nums text-right flex-shrink-0">
+          {seed != null ? seed : ""}
+        </span>
+        <span className="flex-1 truncate font-bold text-black" title={team ?? undefined}>
+          {team ?? <span className="text-muted italic">—</span>}
+        </span>
+      </div>
+      <div className="px-3 py-1.5 text-[11px] text-muted italic border-t border-border bg-subtle/60">
+        Бай — авто-выход
+      </div>
+    </>
   );
 }
