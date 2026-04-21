@@ -125,6 +125,7 @@ export function DivisionsPanel({
       {mode.kind === "creating" ? (
         <DivisionForm
           initial={defaultInitial(tournamentDefaults)}
+          tournamentId={tournamentId}
           tournamentCourts={tournamentCourts}
           submitLabel="Создать"
           pending={pending}
@@ -137,6 +138,8 @@ export function DivisionsPanel({
       {mode.kind === "editing" ? (
         <DivisionForm
           initial={initialFromDivision(mode.division)}
+          tournamentId={tournamentId}
+          divisionId={mode.division.id}
           tournamentCourts={tournamentCourts}
           submitLabel="Сохранить"
           pending={pending}

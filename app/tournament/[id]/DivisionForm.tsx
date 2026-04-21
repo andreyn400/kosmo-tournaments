@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/Input";
+import {
+  checkDivisionCourtConflictsAction,
+  type DivisionCourtConflict,
+} from "./check-division-court-conflicts-action";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import {
@@ -90,6 +94,8 @@ export function defaultInitial(defaults: {
 
 export function DivisionForm({
   initial,
+  tournamentId,
+  divisionId,
   tournamentCourts,
   submitLabel,
   pending,
@@ -98,6 +104,8 @@ export function DivisionForm({
   onCancel,
 }: {
   initial: DivisionFormValues;
+  tournamentId: string;
+  divisionId?: string;
   tournamentCourts: Court[];
   submitLabel: string;
   pending: boolean;
@@ -106,6 +114,36 @@ export function DivisionForm({
   onCancel: () => void;
 }) {
   const [values, setValues] = useState<DivisionFormValues>(initial);
+  const [siblingConflicts, setSiblingConflicts] = useState<
+    DivisionCourtConflict[]
+  >([]);
+
+  const courtIdsKey = Array.from(values.court_ids).sort().join(",");
+  const hasCourts = values.court_ids.size > 0;
+
+  useEffect(() => {
+    if (!hasCourts) return;
+    const ids = courtIdsKey.split(",");
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await checkDivisionCourtConflictsAction({
+          tournamentId,
+          divisionId,
+          courtIds: ids,
+        });
+        if (!cancelled) setSiblingConflicts(res.conflicts);
+      } catch {
+        if (!cancelled) setSiblingConflicts([]);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [hasCourts, courtIdsKey, tournamentId, divisionId]);
+
+  const visibleConflicts = hasCourts ? siblingConflicts : [];
 
   const set = <K extends keyof DivisionFormValues>(
     key: K,
@@ -290,6 +328,17 @@ export function DivisionForm({
             Для {parsedMax} игроков необходимо минимум {courtsNeeded}{" "}
             {courtsNeeded === 1 ? "корт" : courtsNeeded! < 5 ? "корта" : "кортов"}.
           </span>
+        ) : null}
+        {visibleConflicts.length > 0 ? (
+          <div className="flex flex-col gap-1 text-xs text-[var(--color-warning)]">
+            {visibleConflicts.map((c, idx) => (
+              <span key={idx}>
+                ⚠ Корт{" "}
+                {c.courtNumber !== null ? `К${c.courtNumber}` : "?"} уже
+                используется дивизионом «{c.divisionName}» (идёт).
+              </span>
+            ))}
+          </div>
         ) : null}
       </Field>
 

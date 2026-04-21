@@ -193,3 +193,46 @@ alter table matches
 create index idx_tournament_registrations_division on tournament_registrations(division_id);
 create index idx_rounds_division on rounds(division_id);
 create index idx_matches_division on matches(division_id);
+
+-- ========================================
+-- Phase 8 migrations — finals bracket (single-elimination playoff)
+-- ========================================
+
+create table bracket_matches (
+  id uuid primary key default gen_random_uuid(),
+  tournament_id uuid references tournaments(id) on delete cascade,
+  league_season_id uuid references league_seasons(id) on delete cascade,
+  round_number int not null,
+  position int not null,
+  seed1 int,
+  seed2 int,
+  team1_player1_id uuid references players(id),
+  team1_player2_id uuid references players(id),
+  team2_player1_id uuid references players(id),
+  team2_player2_id uuid references players(id),
+  team1_score int,
+  team2_score int,
+  score_detail jsonb,
+  winner_team int check (winner_team in (1, 2)),
+  next_match_id uuid references bracket_matches(id) on delete set null,
+  next_match_slot int check (next_match_slot in (1, 2)),
+  court_id uuid references courts(id),
+  scheduled_at timestamptz,
+  status text check (status in ('pending','in_progress','completed','bye')) default 'pending',
+  created_at timestamptz default now(),
+  unique (league_season_id, round_number, position)
+);
+
+create index idx_bracket_matches_league on bracket_matches(league_season_id);
+create index idx_bracket_matches_next on bracket_matches(next_match_id);
+
+alter table league_seasons add column finals_bracket_size int;
+alter table league_seasons add column finals_scoring_system text
+  check (finals_scoring_system in (
+    'points_16','points_21','points_32',
+    'games_16','games_24','games_32',
+    'sets_best3','sets_supertiebreak'
+  ));
+alter table league_seasons add column finals_status text
+  check (finals_status in ('not_created','in_progress','completed')) default 'not_created';
+alter table league_seasons add column finals_champion_player_ids uuid[] default '{}';

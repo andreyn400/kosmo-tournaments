@@ -65,6 +65,32 @@ export async function updateTournamentStatus(
   if (error) throw new Error(error.message);
 }
 
+export interface UpdateTournamentInput {
+  name: string;
+  court_ids: string[];
+  start_time: string | null;
+  duration_hours: number;
+  level_min: Tournament["level_min"];
+  level_max: Tournament["level_max"];
+  max_players: number | null;
+  entry_fee: number;
+  prize_description: string | null;
+  notes: string | null;
+}
+
+export async function updateTournament(
+  id: string,
+  input: UpdateTournamentInput,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update(input)
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteTournament(id: string): Promise<void> {
   const supabase = await createClient();
   const { error: historyErr } = await supabase

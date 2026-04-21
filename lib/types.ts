@@ -184,6 +184,38 @@ export interface SeasonLeaderboardRow {
   qualified: boolean;
 }
 
+export type BracketMatchStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "bye";
+
+export type FinalsStatus = "not_created" | "in_progress" | "completed";
+
+export interface BracketMatch {
+  id: string;
+  tournament_id: string;
+  league_season_id: string;
+  round_number: number;
+  position: number;
+  seed1: number | null;
+  seed2: number | null;
+  team1_player1_id: string | null;
+  team1_player2_id: string | null;
+  team2_player1_id: string | null;
+  team2_player2_id: string | null;
+  team1_score: number | null;
+  team2_score: number | null;
+  score_detail: unknown | null;
+  winner_team: 1 | 2 | null;
+  next_match_id: string | null;
+  next_match_slot: 1 | 2 | null;
+  court_id: string | null;
+  scheduled_at: string | null;
+  status: BracketMatchStatus;
+  created_at: string;
+}
+
 export interface RatingHistoryEntry {
   id: string;
   player_id: string;

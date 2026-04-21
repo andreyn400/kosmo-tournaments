@@ -874,3 +874,280 @@ Design principles:
 - [ ] 7.10.3 When no divisions exist, keep legacy mode **permanently** or force-migrate existing tournaments into a single "default" division? (Recommend: permanent legacy path; null `division_id` is a valid state forever.)
 - [ ] 7.10.4 Calendar page (`/calendar`): does a tournament with divisions show as one event or N events? (Recommend: one event, since time/date/venue are shared.)
 
+
+---
+
+# Phase 8 — Finals bracket (single-elimination playoff)
+
+Goal: after all league sessions are complete and the leaderboard is settled, the director creates a single-elimination finals bracket from the top N qualified players/pairs. Visual bracket, per-match score entry, winner advances, ELO updates, champion crowned.
+
+Scope: finals apply to **league_season** tournaments only. One-day tournaments already end at `/results`. Divisions (Phase 7) are out of scope for Phase 8 — finals belong to the league as a whole, not per-division.
+
+---
+
+## 8.0 Architectural decisions (answer before writing any code)
+
+Each question below has a **recommendation**. Confirm or override before starting 8.1.
+
+### 8.0.1 Database schema — separate `bracket_matches` table or reuse `matches`?
+
+**Recommendation: new `bracket_matches` table. Do NOT reuse `matches` / `rounds`.**
+
+Rationale:
+- `rounds` implies round-robin semantics (all matches in a round happen simultaneously, every player plays every round). Bracket rounds don't behave that way — round 2 only runs after round 1 resolves, and each round has half the matches of the previous.
+- Bracket matches need a **next-match pointer** for winner propagation, which has no analogue in `matches`.
+- Mixing bracket state into `matches` would require a bunch of nullable bracket-only columns (`bracket_slot`, `next_match_id`, `seed1`, `seed2`) and make every query against `matches` filter them out.
+- Separate table isolates the two flows cleanly. ELO can still write to `rating_history` with a new nullable `bracket_match_id` column (or keep using `tournament_id` alone, which already works).
+
+Proposed schema:
+```sql
+create table bracket_matches (
+  id uuid primary key default gen_random_uuid(),
+  tournament_id uuid references tournaments(id) on delete cascade,
+  league_season_id uuid references league_seasons(id) on delete cascade,
+  round_number int not null,              -- 1 = first round, N = final
+  position int not null,                  -- slot within the round, 0-indexed left-to-right
+  seed1 int,                              -- leaderboard rank (1 = top seed)
+  seed2 int,
+  team1_player1_id uuid references players(id),
+  team1_player2_id uuid references players(id),  -- null for singles
+  team2_player1_id uuid references players(id),
+  team2_player2_id uuid references players(id),  -- null for singles
+  team1_score int,
+  team2_score int,
+  score_detail jsonb,                     -- same shape as matches.score_detail
+  winner_team int check (winner_team in (1, 2)),
+  next_match_id uuid references bracket_matches(id) on delete set null,
+  next_match_slot int check (next_match_slot in (1, 2)),  -- which team slot the winner fills
+  court_id uuid references courts(id),
+  scheduled_at timestamptz,
+  status text check (status in ('pending','in_progress','completed','bye')) default 'pending',
+  created_at timestamptz default now(),
+  unique (league_season_id, round_number, position)
+);
+
+create index idx_bracket_matches_league on bracket_matches(league_season_id);
+create index idx_bracket_matches_next on bracket_matches(next_match_id);
+
+-- Finals config on the league
+alter table league_seasons add column finals_bracket_size int;              -- 4, 8, 16, 32
+alter table league_seasons add column finals_scoring_system text
+  check (finals_scoring_system in (
+    'points_16','points_21','points_32',
+    'games_16','games_24','games_32',
+    'sets_best3','sets_supertiebreak'
+  ));
+alter table league_seasons add column finals_status text
+  check (finals_status in ('not_created','in_progress','completed')) default 'not_created';
+alter table league_seasons add column finals_champion_player_ids uuid[] default '{}';
+```
+
+### 8.0.2 Seeding — standard snake draw, halves split so 1 and 2 only meet in final
+
+**Recommendation: standard tournament seeding with mirrored halves.**
+
+For bracket size B (power of 2):
+- Top half positions: `[1, B, 4, B-3, 5, B-4, ...]`
+- Bottom half positions: `[3, B-2, 2, B-1, ...]` (mirrored so seed 2 is in the opposite half from seed 1)
+- Classic pairings: seed 1 vs B, seed 2 vs B-1, seed 3 vs B-2, seed 4 vs B-3; seed 1's half contains seeds {1,8,4,5} for B=8, {1,16,8,9,4,13,5,12} for B=16; seed 2's half contains the rest. This guarantees seeds 1 and 2 only collide in the final, and 1/3 and 2/4 collide in the semifinals.
+- **BYEs**: when `qualification_spots < bracket_size`, top seeds get BYEs. A BYE is a bracket match with one slot filled, status='bye', auto-advancing the seeded player.
+
+Bracket size: smallest power of 2 ≥ qualification_spots. For default qualification_spots=16, bracket is 16 with no BYEs. For 12, bracket is 16 with 4 BYEs for seeds 1-4. Allowed sizes: 4, 8, 16, 32.
+
+### 8.0.3 Formats — both individual and team leagues supported in v1 (OVERRIDE 2026-04-21)
+
+**Decision: v1 supports both individual and team leagues. Bracket is always pair-based (doubles — padel reality). Individual leagues form pairs at finals-setup time from the individual leaderboard; team leagues reuse the existing pair identity from the season.**
+
+**Team leagues (`team_americano`, `team_mexicano`):**
+- Leaderboard ranks pairs (already how season scoring works for team formats).
+- Each bracket slot holds the pre-existing pair (identity preserved from `tournament_registrations.player_id` + `partner_id`).
+- Seed = pair's rank on the season leaderboard.
+
+**Individual leagues (`americano`, `mexicano`, `round_robin`):**
+- Leaderboard ranks individuals.
+- For bracket size B (pairs), qualify **top 2B individuals** and form B pairs via canonical **strong-with-weak snake pairing**:
+  - Bracket size 2 (final-only): (seed1 + seed4) vs (seed2 + seed3).
+  - Bracket size 4: pairs = (1,8), (4,5), (2,7), (3,6).
+  - Bracket size 8: pairs = (1,16), (8,9), (4,13), (5,12), (2,15), (7,10), (3,14), (6,11).
+  - Bracket size 16: top 32 individuals, same extension.
+- Pair seeding in the bracket = the pair's top-individual's rank (so pair (1,8) is seed 1, pair (4,5) is seed 4, etc), preserving the 8.0.2 mirror-half rule.
+- **Operator override in the setup wizard**: preview the auto-pairs, allow manual swaps (pair two specific individuals, lock in) before committing. Implement as a simple list with "Swap" buttons between adjacent pairs, plus one explicit "сбросить к авто" action.
+- `qualification_spots` for individual leagues is interpreted as **qualifying individuals**; bracket size derived as `qualification_spots / 2` rounded up to the nearest power of 2. (E.g. `qualification_spots=16` → 8-pair bracket; `qualification_spots=32` → 16-pair bracket.)
+
+**Implementation notes:**
+- `bracket_matches` schema (8.0.1) already supports both shapes — individual leagues fill all 4 player slots per team once pairs are formed; team leagues fill them from registration pairs. No schema change needed.
+- Pair formation lives in a pure lib: `lib/finals-pair-formation.ts` with `snakePairsForBracket(individuals: Seeded[], bracketSize): Pair[]`.
+- Qualification validation (8.7.1 guard) becomes: team league requires ≥ bracket_size qualified pairs; individual league requires ≥ 2×bracket_size qualified individuals.
+- Setup wizard (8.4) grows a "Пары" step for individual leagues showing the auto-formed pairs with a swap/reset UI. Team leagues skip this step.
+
+**Guard kept:** button still disabled if leaderboard has fewer qualified entries than the minimum bracket needs (4 pairs / 8 individuals).
+
+### 8.0.4 Visual bracket — how does it render?
+
+**Recommendation: CSS Grid horizontal tree, mobile horizontally scrollable.**
+
+Layout:
+- One column per round; column width fixed (~220px desktop, ~180px mobile).
+- Matches stack vertically within a column, spaced so each match aligns to the midpoint of the two feeding matches in the previous column.
+- Match card: two rows (top team / bottom team), each with seed badge + name(s) + score. Winner row has `font-semibold text-black` + left border `bg-accent`. Loser row is `text-muted`. `bye` matches show only the seeded pair, "BYE" label on the other row.
+- Connectors between rounds: thin CSS borders drawn as horizontal lines from each match to the midpoint, then vertical line joining the pair, then horizontal into the next match. Implement as pseudo-elements or inline SVG.
+- Click a match → inline score-entry drawer (desktop) or bottom sheet (mobile), similar to `RoundPanel.tsx`.
+- Champion card at the far right of the final column: trophy icon + pair name + "Чемпион".
+
+Mobile (<640px): entire bracket inside `overflow-x-auto` wrapper with sticky first column. At 32-slot bracket this is a 5-column grid — fine horizontally scrolled.
+
+### 8.0.5 Score entry — which scoring system?
+
+**Recommendation: default to `sets_best3`, operator can override during finals creation; stored on `league_seasons.finals_scoring_system` (separate from session scoring).**
+
+Why:
+- Session games use a fast points-based system (games_24 default) because you play many of them in a session.
+- Finals are single elimination — one match determines who continues. Best-of-3 sets is the padel convention for knockout play.
+- Making it separate from the league's session scoring system lets the director pick `sets_best3` for a real final even if the league played `points_24` all season.
+
+On the finals creation wizard: "Система счёта финала" select, default `sets_best3`, options grouped as in the tournament form.
+
+### 8.0.6 ELO updates — yes, with higher K-factor
+
+**Recommendation: yes, finals matches affect ELO. Use K=48 for finals regardless of bracket size.**
+
+Why:
+- Finals are higher-stakes than session matches → bigger rating swing makes sense.
+- Constant K=48 is simpler than a per-round K ramp (K for quarterfinals < K for final). Extra complexity with no clear gameplay benefit.
+
+Application:
+- Each bracket match, on completion, immediately writes a `rating_history` row and updates `players.elo_rating` — same pattern as session matches in `session-finalization.ts`, but with the different K.
+- Alternative: batch at end of bracket. Rejected because in-session flow already updates ELO live, and directors will want to see "игрок выбыл из турнира, +25 ELO" immediately.
+- Use **team-average vs team-average** expected score (same as session ELO), applied to each player on the team.
+
+### 8.0.7 URL structure
+
+**Recommendation: `/tournament/[id]/finals`** (sibling to `/play`, `/season`, `/results`).
+
+Why:
+- All league routes already live under `/tournament/[id]` — no `/league/[id]` exists. Keeping finals under the same path is consistent.
+- `/tournament/[id]/finals` — bracket view (read + score entry)
+- `/tournament/[id]/finals/setup` — creation wizard (bracket size, pairs, scoring system, scheduled date/time, courts)
+
+### 8.0.8 Entry point — "Создать финальную сетку" button
+
+**Recommendation: button appears on `/tournament/[id]` (the league detail page) when all four conditions are true:**
+1. `tournament.type === 'league_season'`
+2. All `tournament_sessions` have `status='completed'`
+3. `league.qualification_spots` is set AND the leaderboard has ≥ `qualification_spots` qualified rows
+4. `league.finals_status === 'not_created'`
+
+When `finals_status === 'in_progress'` → button becomes "Перейти к финалу →" linking to `/tournament/[id]/finals`. When `'completed'` → "Итоги финала →".
+
+For individual leagues (per 8.0.3), the button is disabled with the tooltip explaining v2 deferral.
+
+---
+
+## 8.1 Database migration
+
+- [ ] 8.1.1 Write SQL migration block in `supabase/schema.sql` under a new `-- Phase 8 — Finals bracket` header:
+  - `create table bracket_matches (...)` per 8.0.1
+  - `alter table league_seasons add column finals_bracket_size int`
+  - `alter table league_seasons add column finals_scoring_system text check (...)`
+  - `alter table league_seasons add column finals_status text check (...) default 'not_created'`
+  - `alter table league_seasons add column finals_champion_player_ids uuid[] default '{}'`
+  - Indexes on `league_season_id` and `next_match_id`
+- [ ] 8.1.2 Ask user to paste migration into Supabase SQL editor, confirm success.
+
+## 8.2 Types + queries
+
+- [ ] 8.2.1 `lib/types.ts` — add `BracketMatch`, `BracketStatus` types.
+- [ ] 8.2.2 `lib/queries/bracket-matches.ts` — `listBracketMatches(leagueSeasonId)`, `getBracketMatch(id)`, `createBracketMatches(rows)`, `updateBracketMatch(id, patch)`, `setMatchScore(id, team1Score, team2Score, scoreDetail, winnerTeam)`.
+- [ ] 8.2.3 `lib/queries/league-seasons.ts` — extend `LeagueSeason` type with `finals_bracket_size`, `finals_scoring_system`, `finals_status`, `finals_champion_player_ids`. Add `updateFinalsConfig(id, patch)`.
+
+## 8.3 Seeding + bracket generation (pure lib)
+
+- [ ] 8.3.1 `lib/finals-seeding.ts`:
+  - `seedingOrderForSize(size: 4 | 8 | 16 | 32): number[]` — returns array where `arr[i]` is the seed at bracket position `i` (0-indexed). Uses standard snake placement so seeds 1 and 2 land in opposite halves.
+  - Unit test (comment block): for size=8, returns `[1,8,4,5,2,7,3,6]`. Seed 1 at position 0 plays seed 8 at position 1, etc.
+  - For size=16: `[1,16,8,9,4,13,5,12,2,15,7,10,3,14,6,11]`.
+- [ ] 8.3.2 `lib/finals-bracket.ts`:
+  - `generateBracket(params: { leagueSeasonId, tournamentId, size, qualified: Array<{seed: number; playerIds: string[]}>, scoringSystem, scheduledAt? }): BracketMatchInsert[]`
+  - Generates matches for all rounds up-front. Round 1 has `size/2` matches with players filled in. Rounds 2+ have matches created with empty player slots and `next_match_id` / `next_match_slot` pointers from round N-1 matches.
+  - When `qualified.length < size`, fills only top-seeded slots; remaining round-1 matches with one seeded team become `status='bye'` and auto-advance the seed (prefill the corresponding round-2 slot). Double-BYEs (both slots empty) shouldn't occur if we size the bracket as smallest power of 2 ≥ qualification count — assert otherwise.
+- [ ] 8.3.3 `lib/finals-advance.ts`:
+  - `advanceWinner(bracketMatch, allMatches): BracketMatchInsert | null` — given a just-completed match, writes winner into the next match's correct slot. Returns the updated next match, or null if this was the final.
+  - Idempotent: running it twice on the same match doesn't double-advance.
+
+## 8.4 Finals setup wizard `/tournament/[id]/finals/setup`
+
+- [ ] 8.4.1 Server component page:
+  - Load tournament, league_season, season leaderboard (reuse `computeSeasonLeaderboard`).
+  - Guard: `type='league_season'`, all sessions completed, `finals_status='not_created'`, team format (per 8.0.3). Otherwise redirect back to `/tournament/[id]` with notice.
+- [ ] 8.4.2 Client wizard form:
+  - Bracket size select (4/8/16/32; default = smallest power of 2 ≥ qualification_spots).
+  - Scoring system select (default `sets_best3`).
+  - Scheduled date (default `league.finals_date` if set, else tournament's last session date + 7 days).
+  - Start time + duration.
+  - Court pick (checkboxes from tournament.court_ids).
+  - Preview table: seed, pair name, qualification points — top N rows highlighted.
+- [ ] 8.4.3 Server action `createFinalsAction`:
+  - Call `generateBracket`, insert all `bracket_matches` rows.
+  - Update `league_seasons.finals_*` columns to reflect config + `finals_status='in_progress'`.
+  - `revalidatePath` `/tournament/[id]` and `/tournament/[id]/finals`.
+  - `redirect('/tournament/[id]/finals')`.
+
+## 8.5 Bracket view `/tournament/[id]/finals`
+
+- [ ] 8.5.1 Server component: load `bracket_matches` for this league_season, player names, courts.
+- [ ] 8.5.2 `components/finals/Bracket.tsx` client component — CSS Grid layout per 8.0.4.
+- [ ] 8.5.3 `components/finals/BracketMatchCard.tsx` — two-row card; click opens score entry.
+- [ ] 8.5.4 Score entry modal/drawer — reuse the scoring strategy layer (`lib/scoring-strategies/*`) so `sets_best3` gets a set-by-set UI, `games_24` gets a single number pair, etc.
+- [ ] 8.5.5 Server action `submitBracketMatchAction({ matchId, team1Score, team2Score, scoreDetail })`:
+  - Validate scores per scoring system.
+  - Compute winner_team.
+  - Update bracket match row.
+  - Call `advanceWinner` → update next match.
+  - Apply ELO (per 8.0.6): load current ELO for 4 players, compute team averages, update per the scoring system's win/loss interpretation, write `rating_history` rows, update `players.elo_rating` and `players.level`.
+  - If this match was the final: set `league_seasons.finals_status='completed'` + `finals_champion_player_ids`.
+  - `revalidatePath('/tournament/[id]/finals')`.
+- [ ] 8.5.6 Mobile: sticky header with round labels, horizontal scroll for bracket body.
+
+## 8.6 Finals results `/tournament/[id]/finals/results`
+
+- [ ] 8.6.1 Shown when `finals_status='completed'`. Podium card: champion pair, runner-up, semifinalists.
+- [ ] 8.6.2 Final bracket (read-only) below the podium.
+- [ ] 8.6.3 Link back to `/tournament/[id]` and `/tournament/[id]/season`.
+
+## 8.7 Entry points + league page
+
+- [ ] 8.7.1 `app/tournament/[id]/page.tsx` — when `type='league_season'`:
+  - All sessions complete + `finals_status='not_created'` → "Создать финальную сетку" button.
+  - `finals_status='in_progress'` → "Перейти к финалу →".
+  - `finals_status='completed'` → "Итоги финала →".
+  - Individual leagues: button disabled with v2-deferral tooltip (per 8.0.3).
+- [ ] 8.7.2 `/display` page (Phase 7 integration): add a "FINAL" display-event type when `finals_status='in_progress'` — one card per active bracket match with court assignment. Low priority; can defer to 8.9.
+
+## 8.8 ELO for finals
+
+- [ ] 8.8.1 `lib/finals-elo.ts`:
+  - `applyBracketMatchElo({ bracketMatch, players, scoringSystem }): { updates: RatingUpdate[] }`
+  - Uses K=48. Interprets `scoreDetail` per scoring strategy to determine `actualScore` in [0, 1] per team.
+  - Returns new ELO per player; caller writes `rating_history` + updates `players`.
+- [ ] 8.8.2 Wire into `submitBracketMatchAction` (see 8.5.5).
+
+## 8.9 Build + verify
+
+- [ ] 8.9.1 `npm run build` clean.
+- [ ] 8.9.2 Manual e2e:
+  - Create team league with 16 qualification_spots and 2+ sessions.
+  - Play sessions to completion.
+  - On league page: click "Создать финальную сетку" → wizard → confirm with 8-slot bracket + `sets_best3`.
+  - Bracket renders with 4 R1 matches, seeds correct (1 vs 8, 4 vs 5, 2 vs 7, 3 vs 6).
+  - Submit R1 scores → winners advance to QF.
+  - Play through SF and F.
+  - Final completes → champion card shows + ELO updated (+bigger deltas than session matches) + `/tournament/[id]` shows "Итоги финала →".
+  - Legacy tournaments without finals unaffected.
+
+## 8.10 Open questions / decisions (resolve as encountered)
+
+- [ ] 8.10.1 Should bracket matches show on `/display`? (Recommend defer to Phase 9; finals are usually a single-court event easily announced live.)
+- [ ] 8.10.2 Third-place playoff (bronze match between SF losers)? (Recommend: skip in v1, add later with a `has_third_place_match` bool on league_seasons.)
+- [ ] 8.10.3 Re-seeding after an upset — is seed 1's half reshuffled? (Recommend: no, classic fixed bracket.)
+- [ ] 8.10.4 Editing/reverting a completed bracket match (operator typo). (Recommend: yes, but only if the next match hasn't started. Soft-block with confirm modal.)
+- [ ] 8.10.5 Can a qualified pair decline to play? (Recommend: manual reseeding in setup wizard — operator can swap one pair for the next one down in the leaderboard before clicking Create.)

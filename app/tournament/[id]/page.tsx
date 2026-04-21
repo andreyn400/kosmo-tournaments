@@ -12,7 +12,7 @@ import { getLeagueSeason } from "@/lib/queries/league-seasons";
 import { listRoundsBySession } from "@/lib/queries/rounds";
 import { listMatchesByRound } from "@/lib/queries/matches";
 import { listDivisions } from "@/lib/queries/divisions";
-import { listCourtsByIds } from "@/lib/queries/courts";
+import { listActiveCourts, listCourtsByIds } from "@/lib/queries/courts";
 import {
   FORMAT_LABEL_RU,
   STATUS_LABEL_RU,
@@ -30,6 +30,8 @@ import { StartTournamentButton } from "./StartTournamentButton";
 import { SessionsList } from "./SessionsList";
 import { DangerZone } from "./DangerZone";
 import { DivisionsPanel } from "./DivisionsPanel";
+import { EditTournamentPanel } from "./EditTournamentPanel";
+import { LeagueSettingsPanel } from "./LeagueSettingsPanel";
 
 export default async function TournamentDetailPage({
   params,
@@ -73,8 +75,8 @@ export default async function TournamentDetailPage({
     </Link>
   );
 
-  const infoCard = (
-    <Card className="flex flex-col gap-4">
+  const infoCardContent = (
+    <>
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="format">{FORMAT_LABEL_RU[t.format]}</Badge>
         <Badge tone={statusTone(t.status)}>{STATUS_LABEL_RU[t.status]}</Badge>
@@ -97,13 +99,18 @@ export default async function TournamentDetailPage({
         ) : null}
         {t.notes ? <Row label="Заметки" value={t.notes} wide /> : null}
       </dl>
-    </Card>
+    </>
+  );
+
+  const infoCard = (
+    <Card className="flex flex-col gap-4">{infoCardContent}</Card>
   );
 
   if (isLeague) {
-    const [sessions, league] = await Promise.all([
+    const [sessions, league, activeCourts] = await Promise.all([
       listSessionsByTournament(id),
       getLeagueSeason(id),
+      listActiveCourts(),
     ]);
 
     const completedSessions = sessions.filter((s) => s.status === "completed");
@@ -136,10 +143,68 @@ export default async function TournamentDetailPage({
 
     const topRows = leaderboard.slice(0, 5);
 
+    const allSessionsCompleted =
+      sessions.length > 0 && sessions.every((s) => s.status === "completed");
+    const qualifiedCount = leaderboard.filter((r) => r.qualified).length;
+    const requiredSpots = league?.qualification_spots ?? 0;
+    const finalsStatus = league?.finals_status ?? "not_created";
+
+    const finalsCard =
+      finalsStatus === "in_progress" ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-black">Финальная сетка</h2>
+          <p className="text-sm text-muted">Финалы идут.</p>
+          <div>
+            <Link href={`/tournament/${t.id}/finals`}>
+              <Button size="lg">К сетке финала</Button>
+            </Link>
+          </div>
+        </Card>
+      ) : finalsStatus === "completed" ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-black">Финалы завершены</h2>
+          <div>
+            <Link href={`/tournament/${t.id}/finals/results`}>
+              <Button size="lg">Итоги финала</Button>
+            </Link>
+          </div>
+        </Card>
+      ) : allSessionsCompleted && qualifiedCount >= requiredSpots ? (
+        <Card className="flex flex-col gap-3">
+          <h2 className="font-semibold text-black">Сезон завершён</h2>
+          <p className="text-sm text-muted">
+            Все сессии сыграны. Квалифицировано игроков: {qualifiedCount} из{" "}
+            {requiredSpots}.
+          </p>
+          <div>
+            <Link href={`/tournament/${t.id}/finals/setup`}>
+              <Button size="lg">Создать финальную сетку</Button>
+            </Link>
+          </div>
+        </Card>
+      ) : null;
+
     return (
       <PageShell title={t.name} action={headerAction}>
         <div className="flex flex-col gap-6 max-w-3xl">
-          {infoCard}
+          <Card className="flex flex-col gap-4">
+            {infoCardContent}
+            <EditTournamentPanel tournament={t} allCourts={activeCourts} />
+          </Card>
+
+          {league ? (
+            <Card>
+              <LeagueSettingsPanel
+                tournamentId={t.id}
+                qualificationSpots={league.qualification_spots}
+                finalsDate={league.finals_date}
+                finalsScoringSystem={league.finals_scoring_system}
+                finalsStatus={league.finals_status}
+              />
+            </Card>
+          ) : null}
+
+          {finalsCard}
 
           <Card className="flex flex-col gap-4">
             <div className="flex items-center justify-between">

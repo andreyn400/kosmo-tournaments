@@ -1,5 +1,6 @@
 import { createClient } from "../supabase/server";
 import type { PointsTable } from "../league-points";
+import type { FinalsStatus, ScoringSystem } from "../types";
 
 export interface LeagueSeason {
   id: string;
@@ -8,6 +9,19 @@ export interface LeagueSeason {
   points_table: PointsTable;
   qualification_spots: number;
   finals_date: string | null;
+  finals_bracket_size: number | null;
+  finals_scoring_system: ScoringSystem | null;
+  finals_status: FinalsStatus;
+  finals_champion_player_ids: string[];
+}
+
+export interface UpdateFinalsConfigInput {
+  finals_bracket_size?: number | null;
+  finals_scoring_system?: ScoringSystem | null;
+  finals_status?: FinalsStatus;
+  finals_champion_player_ids?: string[];
+  finals_date?: string | null;
+  qualification_spots?: number;
 }
 
 export async function createLeagueSeason(input: {
@@ -46,4 +60,16 @@ export async function getLeagueSeason(
 
   if (error) throw new Error(error.message);
   return (data as LeagueSeason | null) ?? null;
+}
+
+export async function updateFinalsConfig(
+  leagueSeasonId: string,
+  patch: UpdateFinalsConfigInput,
+): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("league_seasons")
+    .update(patch)
+    .eq("id", leagueSeasonId);
+  if (error) throw new Error(error.message);
 }

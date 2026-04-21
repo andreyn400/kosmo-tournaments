@@ -97,8 +97,10 @@ export async function createLeagueAction(
     return { error: "Добавьте хотя бы одну дату сессии" };
   if (max_players != null && (max_players < 4 || max_players % 4 !== 0))
     return { error: "Макс. игроков должно быть кратно 4" };
-  if (qualification_spots < 1)
-    return { error: "Квалификационных мест должно быть не меньше 1" };
+  if (![2, 4, 8, 16, 32].includes(qualification_spots))
+    return {
+      error: "Квалификационных мест должно быть степенью двойки: 2, 4, 8, 16 или 32",
+    };
   if (duration_hours < 1 || duration_hours > 12)
     return { error: "Длительность должна быть от 1 до 12 часов" };
 

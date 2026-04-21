@@ -44,6 +44,16 @@ export function SelectPlayersForm({
 
   const count = selected.size;
   const isMultipleOfFour = count > 0 && count % 4 === 0;
+  const allSelected =
+    candidates.length > 0 && count === candidates.length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(candidates.map((p) => p.id)));
+    }
+  };
 
   return (
     <form action={formAction} className="flex flex-col gap-6">
@@ -77,17 +87,29 @@ export function SelectPlayersForm({
               Число должно быть кратно 4. Минимум — 4.
             </p>
           </div>
-          <div className="text-sm tabular-nums">
-            <span className="text-muted">Выбрано: </span>
-            <span
-              className={
-                isMultipleOfFour || count === 0
-                  ? "text-black font-semibold"
-                  : "text-[var(--color-danger)] font-semibold"
-              }
-            >
-              {count}
-            </span>
+          <div className="flex items-center gap-3">
+            {candidates.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={toggleAll}
+              >
+                {allSelected ? "Снять выбор" : "Выбрать всех"}
+              </Button>
+            ) : null}
+            <div className="text-sm tabular-nums">
+              <span className="text-muted">Выбрано: </span>
+              <span
+                className={
+                  isMultipleOfFour || count === 0
+                    ? "text-black font-semibold"
+                    : "text-[var(--color-danger)] font-semibold"
+                }
+              >
+                {count}
+              </span>
+            </div>
           </div>
         </div>
 

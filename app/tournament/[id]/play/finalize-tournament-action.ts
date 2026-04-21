@@ -16,6 +16,8 @@ import {
 export async function finalizeTournamentAction(
   tournamentId: string,
 ): Promise<{ error?: string }> {
+  let redirectPath: string | null = null;
+
   try {
     const tournament = await getTournament(tournamentId);
     if (!tournament) return { error: "Турнир не найден" };
@@ -35,29 +37,19 @@ export async function finalizeTournamentAction(
       revalidatePath(`/tournament/${tournamentId}`);
       revalidatePath(`/tournament/${tournamentId}/play`);
       revalidatePath(`/tournament/${tournamentId}/season`);
-      redirect(`/tournament/${tournamentId}`);
+      redirectPath = `/tournament/${tournamentId}`;
+    } else {
+      await finalizeTournamentElo(tournamentId);
+      await updateTournamentStatus(tournamentId, "completed");
+      revalidatePath("/");
+      revalidatePath(`/tournament/${tournamentId}`);
+      revalidatePath(`/tournament/${tournamentId}/play`);
+      redirectPath = `/tournament/${tournamentId}/results`;
     }
-
-    await finalizeTournamentElo(tournamentId);
-    await updateTournamentStatus(tournamentId, "completed");
   } catch (e) {
-    if (isRedirectError(e)) throw e;
     const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
     return { error: `Не удалось завершить: ${msg}` };
   }
 
-  revalidatePath("/");
-  revalidatePath(`/tournament/${tournamentId}`);
-  revalidatePath(`/tournament/${tournamentId}/play`);
-  redirect(`/tournament/${tournamentId}/results`);
-}
-
-function isRedirectError(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "digest" in e &&
-    typeof (e as { digest: unknown }).digest === "string" &&
-    (e as { digest: string }).digest.startsWith("NEXT_REDIRECT")
-  );
+  redirect(redirectPath);
 }

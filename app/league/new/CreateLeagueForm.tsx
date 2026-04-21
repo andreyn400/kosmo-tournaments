@@ -215,14 +215,15 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
           </Field>
           <Field
             label="Квалификационных мест"
-            hint="Сколько игроков пройдут в финал"
+            hint="Должно быть степенью двойки для корректной финальной сетки"
           >
-            <Input
-              type="number"
-              name="qualification_spots"
-              min={1}
-              defaultValue={8}
-            />
+            <Select name="qualification_spots" defaultValue="8">
+              {[2, 4, 8, 16, 32].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </Select>
           </Field>
         </div>
 
