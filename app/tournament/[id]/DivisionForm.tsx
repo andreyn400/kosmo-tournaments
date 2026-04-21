@@ -46,6 +46,7 @@ const SCORING_GROUPED: Record<
 > = {
   points: SCORING_SYSTEMS.filter((s) => scoringGroup(s) === "points"),
   games: SCORING_SYSTEMS.filter((s) => scoringGroup(s) === "games"),
+  combined: SCORING_SYSTEMS.filter((s) => scoringGroup(s) === "combined"),
   sets: SCORING_SYSTEMS.filter((s) => scoringGroup(s) === "sets"),
 };
 
@@ -232,6 +233,13 @@ export function DivisionForm({
           </optgroup>
           <optgroup label={SCORING_GROUP_LABEL_RU.games}>
             {SCORING_GROUPED.games.map((s) => (
+              <option key={s} value={s}>
+                {SCORING_SYSTEM_LABEL_RU[s]}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label={SCORING_GROUP_LABEL_RU.combined}>
+            {SCORING_GROUPED.combined.map((s) => (
               <option key={s} value={s}>
                 {SCORING_SYSTEM_LABEL_RU[s]}
               </option>

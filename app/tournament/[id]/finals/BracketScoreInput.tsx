@@ -6,6 +6,7 @@ import {
   scoringGroup,
   scoringTarget,
   setsWon,
+  validateCombinedScore,
   validateGamesScore,
   validatePointsScore,
   validateSetsScore,
@@ -99,7 +100,9 @@ function PointsOrGamesEntry({
   const [t1, setT1] = useState<string>(initialT1 != null ? String(initialT1) : "");
   const [t2, setT2] = useState<string>(initialT2 != null ? String(initialT2) : "");
   const target = scoringTarget(scoringSystem);
-  const unit = scoringGroup(scoringSystem) === "points" ? "очков" : "геймов";
+  const group = scoringGroup(scoringSystem);
+  const unit =
+    group === "points" ? "очков" : group === "combined" ? "в сумме" : "геймов";
   const helper = target ? `До ${target} ${unit}` : "";
 
   const submit = () => {
@@ -111,9 +114,11 @@ function PointsOrGamesEntry({
     const a = Number(t1);
     const b = Number(t2);
     const v =
-      scoringGroup(scoringSystem) === "points"
+      group === "points"
         ? validatePointsScore(scoringSystem, a, b)
-        : validateGamesScore(scoringSystem, a, b);
+        : group === "combined"
+          ? validateCombinedScore(scoringSystem, a, b)
+          : validateGamesScore(scoringSystem, a, b);
     if (!v.ok) {
       setError(v.error);
       return;

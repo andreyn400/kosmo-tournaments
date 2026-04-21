@@ -13,6 +13,7 @@ import {
 import {
   scoringGroup,
   setsWon,
+  validateCombinedScore,
   validateGamesScore,
   validatePointsScore,
   validateSetsScore,
@@ -62,7 +63,9 @@ export async function submitBracketScoreAction(
     const v =
       group === "points"
         ? validatePointsScore(input.scoringSystem, a, b)
-        : validateGamesScore(input.scoringSystem, a, b);
+        : group === "combined"
+          ? validateCombinedScore(input.scoringSystem, a, b)
+          : validateGamesScore(input.scoringSystem, a, b);
     if (!v.ok) return { error: v.error };
     t1Score = a;
     t2Score = b;

@@ -1,6 +1,6 @@
 import type { ScoringSystem } from "./types";
 
-export type ScoringGroup = "points" | "games" | "sets";
+export type ScoringGroup = "points" | "games" | "combined" | "sets";
 
 export const SCORING_SYSTEMS: ScoringSystem[] = [
   "points_16",
@@ -9,6 +9,9 @@ export const SCORING_SYSTEMS: ScoringSystem[] = [
   "games_16",
   "games_24",
   "games_32",
+  "combined_21",
+  "combined_32",
+  "combined_42",
   "sets_best3",
   "sets_supertiebreak",
 ];
@@ -22,6 +25,9 @@ export const SCORING_SYSTEM_LABEL_RU: Record<ScoringSystem, string> = {
   games_16: "До 16 геймов",
   games_24: "До 24 геймов (рекомендуется)",
   games_32: "До 32 геймов",
+  combined_21: "До 21 в сумме",
+  combined_32: "До 32 в сумме (рекомендуется для Американо)",
+  combined_42: "До 42 в сумме",
   sets_best3: "3 сета (с тай-брейком)",
   sets_supertiebreak: "2 сета + супер тай-брейк",
 };
@@ -33,6 +39,12 @@ export const SCORING_SYSTEM_HELPER_RU: Record<ScoringSystem, string> = {
   games_16: "Около 16 геймов на матч (±2). Без ничьих.",
   games_24: "Стандарт Kosmo: около 24 геймов на матч (±2). Без ничьих.",
   games_32: "Около 32 геймов на матч (±2). Без ничьих.",
+  combined_21:
+    "Игра идёт до тех пор, пока сумма очков обеих команд не достигнет 21. Побеждает команда с большим количеством очков.",
+  combined_32:
+    "Игра идёт до тех пор, пока сумма очков обеих команд не достигнет 32. Побеждает команда с большим количеством очков.",
+  combined_42:
+    "Игра идёт до тех пор, пока сумма очков обеих команд не достигнет 42. Побеждает команда с большим количеством очков.",
   sets_best3:
     "Лучший из 3 сетов. Сет до 6 геймов с тай-брейком при 6-6, 7-5 при 5-5.",
   sets_supertiebreak:
@@ -42,12 +54,14 @@ export const SCORING_SYSTEM_HELPER_RU: Record<ScoringSystem, string> = {
 export const SCORING_GROUP_LABEL_RU: Record<ScoringGroup, string> = {
   points: "Очки",
   games: "Геймы",
+  combined: "Сумма очков (Американо)",
   sets: "Сеты",
 };
 
 export function scoringGroup(s: ScoringSystem): ScoringGroup {
   if (s.startsWith("points_")) return "points";
   if (s.startsWith("games_")) return "games";
+  if (s.startsWith("combined_")) return "combined";
   return "sets";
 }
 
@@ -57,12 +71,16 @@ export function scoringTarget(s: ScoringSystem): number | null {
     case "games_16":
       return 16;
     case "points_21":
+    case "combined_21":
       return 21;
     case "points_32":
     case "games_32":
+    case "combined_32":
       return 32;
     case "games_24":
       return 24;
+    case "combined_42":
+      return 42;
     default:
       return null;
   }
@@ -123,6 +141,31 @@ export function validateGamesScore(
     return {
       ok: false,
       error: `Сумма геймов должна быть от ${target - 2} до ${target + 2}`,
+    };
+  return { ok: true };
+}
+
+export function validateCombinedScore(
+  system: ScoringSystem,
+  a: number,
+  b: number,
+): ValidationResult {
+  const target = scoringTarget(system);
+  if (target == null) return { ok: false, error: "Неверная система счёта" };
+  if (!Number.isInteger(a) || !Number.isInteger(b))
+    return { ok: false, error: "Очки должны быть целыми числами" };
+  if (a < 0 || b < 0)
+    return { ok: false, error: "Очки не могут быть отрицательными" };
+  const total = a + b;
+  if (total !== target)
+    return {
+      ok: false,
+      error: `Сумма очков должна равняться ${target} (сейчас: ${total})`,
+    };
+  if (a === b)
+    return {
+      ok: false,
+      error: "Ничья не допускается, сыграйте решающее очко",
     };
   return { ok: true };
 }

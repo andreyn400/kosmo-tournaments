@@ -236,3 +236,40 @@ alter table league_seasons add column finals_scoring_system text
 alter table league_seasons add column finals_status text
   check (finals_status in ('not_created','in_progress','completed')) default 'not_created';
 alter table league_seasons add column finals_champion_player_ids uuid[] default '{}';
+
+-- ========================================
+-- Phase 9 migrations — combined-points (Americano) scoring systems
+-- ========================================
+
+-- Extend scoring_system check to include combined_21/32/42 on tournaments.
+alter table tournaments drop constraint if exists tournaments_scoring_system_check;
+alter table tournaments
+  add constraint tournaments_scoring_system_check
+  check (scoring_system in (
+    'points_16','points_21','points_32',
+    'games_16','games_24','games_32',
+    'combined_21','combined_32','combined_42',
+    'sets_best3','sets_supertiebreak'
+  ));
+
+-- Same extension for league_seasons.finals_scoring_system.
+alter table league_seasons drop constraint if exists league_seasons_finals_scoring_system_check;
+alter table league_seasons
+  add constraint league_seasons_finals_scoring_system_check
+  check (finals_scoring_system in (
+    'points_16','points_21','points_32',
+    'games_16','games_24','games_32',
+    'combined_21','combined_32','combined_42',
+    'sets_best3','sets_supertiebreak'
+  ));
+
+-- divisions.scoring_system had no check constraint previously — add one now.
+alter table divisions drop constraint if exists divisions_scoring_system_check;
+alter table divisions
+  add constraint divisions_scoring_system_check
+  check (scoring_system in (
+    'points_16','points_21','points_32',
+    'games_16','games_24','games_32',
+    'combined_21','combined_32','combined_42',
+    'sets_best3','sets_supertiebreak'
+  ));

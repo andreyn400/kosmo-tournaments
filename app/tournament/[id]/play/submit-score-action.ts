@@ -5,6 +5,7 @@ import { updateMatchScore } from "@/lib/queries/matches";
 import {
   scoringGroup,
   setsWon,
+  validateCombinedScore,
   validateGamesScore,
   validatePointsScore,
   validateSetsScore,
@@ -44,7 +45,11 @@ export async function submitScoreAction(
       const b = input.team2Score;
       if (a == null || b == null) return { error: "Введите счёт для обеих команд" };
       const validator =
-        group === "points" ? validatePointsScore : validateGamesScore;
+        group === "points"
+          ? validatePointsScore
+          : group === "combined"
+            ? validateCombinedScore
+            : validateGamesScore;
       const v = validator(input.scoringSystem, a, b);
       if (!v.ok) return { error: v.error };
       await updateMatchScore({

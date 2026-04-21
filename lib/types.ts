@@ -63,6 +63,9 @@ export type ScoringSystem =
   | "games_16"
   | "games_24"
   | "games_32"
+  | "combined_21"
+  | "combined_32"
+  | "combined_42"
   | "sets_best3"
   | "sets_supertiebreak";
 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import {
   scoringGroup,
   scoringTarget,
+  validateCombinedScore,
   validateGamesScore,
   validatePointsScore,
 } from "@/lib/scoring-systems";
@@ -44,8 +45,9 @@ export function PointsScoreInput({
   const [pending, startTransition] = useTransition();
 
   const target = scoringTarget(scoringSystem);
-  const isPointsGroup = scoringGroup(scoringSystem) === "points";
-  const unit = isPointsGroup ? "очков" : "геймов";
+  const group = scoringGroup(scoringSystem);
+  const unit =
+    group === "points" ? "очков" : group === "combined" ? "в сумме" : "геймов";
   const helper = target ? `До ${target} ${unit}` : "";
 
   const submit = () => {
@@ -56,9 +58,12 @@ export function PointsScoreInput({
     }
     const a = Number(t1);
     const b = Number(t2);
-    const v = isPointsGroup
-      ? validatePointsScore(scoringSystem, a, b)
-      : validateGamesScore(scoringSystem, a, b);
+    const v =
+      group === "points"
+        ? validatePointsScore(scoringSystem, a, b)
+        : group === "combined"
+          ? validateCombinedScore(scoringSystem, a, b)
+          : validateGamesScore(scoringSystem, a, b);
     if (!v.ok) {
       setError(v.error);
       return;
