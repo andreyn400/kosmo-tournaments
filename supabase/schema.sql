@@ -273,3 +273,142 @@ alter table divisions
     'combined_21','combined_32','combined_42',
     'sets_best3','sets_supertiebreak'
   ));
+
+-- ========================================
+-- Phase 10 — Operations module (unified platform merger from padel-ops)
+-- ========================================
+
+-- 10.2 — Program library.
+-- Type is free-text (not constrained) so the operator can add new categories
+-- without a migration. The UI dropdown is seeded with the 12 canonical types
+-- from padel-ops: Аренда, Тренировка персональная, Тренировка групповая,
+-- Американо, Мексикано, Детская тренировка, Корпоратив, Турнир, Клиника,
+-- Сплит-аренда, Абонемент, Прочее.
+-- Both peak and off-peak prices are stored (peak window = 17:00–22:00,
+-- ported from padel-ops PEAK_START/PEAK_END).
+create table programs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null,
+  duration_minutes int not null,
+  price_peak_rub int not null default 0,
+  price_offpeak_rub int not null default 0,
+  courts_needed int not null default 1,
+  max_players int,
+  description text,
+  is_active boolean not null default true,
+  created_at timestamptz default now()
+);
+
+create index idx_programs_type on programs(type);
+create index idx_programs_active on programs(is_active);
+
+-- ========================================
+-- Phase 10.3 — Coaches module
+-- ========================================
+
+-- Coaches profile. Rate model is split: 'flat' coaches earn a fixed amount per
+-- session; 'percent' coaches earn rate_court_percent of the court revenue plus
+-- rate_coaching_percent of the coaching fee (the two slices that programs.txt
+-- splits a session revenue into, see schedule_sessions below).
+-- photo_url stores an external URL — actual upload UI is out of scope here.
+create table coaches (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text,
+  specialization text,
+  level text,                            -- e.g. "старший", "стажёр"
+  bio text,
+  photo_url text,
+  color text not null default '#4fc3f7', -- accent on cards / scheduler blocks
+  rate_type text not null check (rate_type in ('flat','percent')) default 'flat',
+  flat_rate_rub int not null default 0,
+  rate_court_percent numeric(5,2) not null default 0,
+  rate_coaching_percent numeric(5,2) not null default 0,
+  is_active boolean not null default true,
+  notes text,
+  created_at timestamptz default now()
+);
+create index idx_coaches_active on coaches(is_active);
+
+-- Weekly availability windows. Multiple rows per (coach, day) allowed
+-- (e.g. 09:00-12:00 and 17:00-21:00 on Monday).
+create table coach_availability (
+  id uuid primary key default gen_random_uuid(),
+  coach_id uuid not null references coaches(id) on delete cascade,
+  day_of_week int not null check (day_of_week between 0 and 6),  -- 0=Mon
+  start_time time not null,
+  end_time time not null,
+  unique(coach_id, day_of_week, start_time)
+);
+create index idx_coach_availability_coach on coach_availability(coach_id);
+
+-- Schedule sessions (the central operational session table).
+-- Created early in 10.3 to back the coach session log; 10.5 will add the
+-- weekly scheduler UI that writes to the same table.
+-- Revenue split is snapshotted at create time so historical payouts stay
+-- correct even if program prices later change:
+--   revenue_rub        = total session revenue (typically price × max_players)
+--   court_revenue_rub  = court rental portion (price × courts_needed)
+--   coaching_fee_rub   = revenue_rub - court_revenue_rub
+-- is_peak is also snapshotted (peak window from program-groups.ts: 17:00-22:00).
+create table schedule_sessions (
+  id uuid primary key default gen_random_uuid(),
+  program_id uuid references programs(id),  -- nullable: free-form sessions OK
+  date date not null,
+  start_time time not null,
+  end_time time not null,
+  court_ids uuid[] not null default '{}',
+  attendee_count int not null default 0,
+  revenue_rub int not null default 0,
+  court_revenue_rub int not null default 0,
+  coaching_fee_rub int not null default 0,
+  is_peak boolean not null default false,
+  notes text,
+  source text not null default 'manual',     -- manual | scheduler | migration
+  status text not null check (status in ('scheduled','completed','cancelled')) default 'scheduled',
+  created_at timestamptz default now()
+);
+create index idx_schedule_sessions_date on schedule_sessions(date);
+create index idx_schedule_sessions_courts on schedule_sessions using gin(court_ids);
+create index idx_schedule_sessions_status on schedule_sessions(status);
+
+-- Many-to-many: which coaches worked which session.
+create table session_coaches (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references schedule_sessions(id) on delete cascade,
+  coach_id uuid not null references coaches(id) on delete cascade,
+  unique(session_id, coach_id)
+);
+create index idx_session_coaches_session on session_coaches(session_id);
+create index idx_session_coaches_coach on session_coaches(coach_id);
+
+-- ── Phase 10.4: Tournament organizer accounts ─────────────────────────────
+-- Operators record per-organizer ledgers: charges for court rental/event hosting,
+-- deposits received, and any refunds issued.
+--
+-- Balance convention: positive balance = organizer owes the club.
+--   balance = SUM(payment) − SUM(deposit) − SUM(refund)
+create table organizers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  contact_name text,
+  phone text,
+  email text,
+  notes text,
+  created_at timestamptz default now()
+);
+
+create table organizer_payments (
+  id uuid primary key default gen_random_uuid(),
+  organizer_id uuid references organizers(id) on delete cascade,
+  date date not null,
+  amount_rub int not null,
+  type text not null check (type in ('deposit','payment','refund')) default 'payment',
+  courts_booked int,
+  hours_booked numeric(4,1),
+  notes text,
+  created_at timestamptz default now()
+);
+create index idx_organizer_payments_org on organizer_payments(organizer_id);
+create index idx_organizer_payments_date on organizer_payments(date desc);

@@ -1151,3 +1151,353 @@ For individual leagues (per 8.0.3), the button is disabled with the tooltip expl
 - [ ] 8.10.3 Re-seeding after an upset — is seed 1's half reshuffled? (Recommend: no, classic fixed bracket.)
 - [ ] 8.10.4 Editing/reverting a completed bracket match (operator typo). (Recommend: yes, but only if the next match hasn't started. Soft-block with confirm modal.)
 - [ ] 8.10.5 Can a qualified pair decline to play? (Recommend: manual reseeding in setup wizard — operator can swap one pair for the next one down in the leaderboard before clicking Create.)
+
+---
+
+# Phase 10 — Unified Platform Merger (padel-ops → Kosmo Tournaments)
+
+Goal: fold the old Flask **Kosmo Padel OPS** (Railway-deployed) into this Next.js app so there is one unified platform. Tournaments side stays untouched; a new "Операции" mode adds court scheduling, rental contracts, coaches, organizers, programs, and a weekly ops report. Data migration is the last step — Flask app keeps running on Railway until the new module is verified end-to-end.
+
+Workflow: build one sub-phase at a time, run `npm run build` clean after each, check in before the next. Padel-ops Flask app must not be touched.
+
+## 10.0 Architectural decisions — RESOLVED 2026-05-12
+
+Answers from user:
+1. **Peak/off-peak pricing** → keep both. `programs` has `price_peak_rub` + `price_offpeak_rub`.
+2. **Weeks table** → drop. Sessions store `date` directly; reports aggregate on the fly.
+3. **Coach rate model** → keep the split. `rate_type` ∈ {`flat`,`percent`}; percent coaches use `rate_court_percent` + `rate_coaching_percent`; flat coaches use `flat_rate_rub`.
+4. **Rentals** → keep many slots per contract. `rental_contracts` + `rental_slots` (recurring weekly day-of-week + time).
+5. **Attendees** → keep. `schedule_sessions.attendee_count` + new `session_attendees(session_id, player_id nullable, name, status)`. Drop `week_templates`. Keep `coach_availability`.
+6. **Display page** → confirmed: unified feed, source badge per event.
+7. **Mode switcher** → confirmed: `localStorage.kosmo_mode`, URL is authoritative (`/ops/*` → ops, `/tournament/*` → tournaments).
+8. **Courts** → confirmed: reuse existing `courts` table; migrate by `courts.number`.
+
+Font: DM Sans (already configured globally in `app/layout.tsx` via `--font-sans`).
+
+
+
+### What I learned reading padel-ops
+
+**File map**
+- `~/Desktop/padel-ops/app.py` — single 1939-line Flask app. All routes, DB schema, helpers.
+- `~/Desktop/padel-ops/templates/index.html` — single-page SPA with tab nav; pages: scheduler, report, analytics, programs, rentals, calendar, coaches.
+- `~/Desktop/padel-ops/migrate.py` — exports/imports JSON between SQLite and Postgres. We'll write a Node equivalent for Supabase.
+
+**Database tables in padel-ops** (with key columns, full DDL at lines 184-319):
+- `programs` (id, **code unique**, type, name, **price_off_peak**, **price_peak**, duration, players, **courts**, coaches) — peak pricing baked into pricing model.
+- `weeks` (id, start_date, name, status open/locked, report_json) — scheduler is week-scoped. Locking a week freezes its report.
+- `sessions` (id, week_id, program_id, day_of_week 0-6, time_slot HH:MM, **court_start**, **courts_used**, **courts_list** "1,3,5", duration, is_peak, revenue, notes, source manual/crm_import) — week × day × time × court grid. Programs that need 2 courts (e.g. Турнир) store comma-separated court list.
+- `attendees` (id, session_id, name, status registered/attended) — per-session player list, used for attendance %.
+- `coaches` (id, name, color, phone, **rate_type fixed/pct**, flat_rate, **revenue_pct**, **coaching_fee_pct**, active, specialty, level, notes) — payout model: flat per session OR % of court revenue + % of coaching fee.
+- `session_coaches` (session_id, coach_id) — many-to-many.
+- `coach_availability` (coach_id, day_of_week, start_time, end_time) — recurring weekly availability.
+- `rental_contracts` (id, client_name, client_type физлицо/юрлицо, client_contact, start_date, end_date, total_contract_value, **payment_type единовременно/ежемесячно/ежеквартально**, status активен/etc, notes).
+- `rental_slots` (id, contract_id, court_number, day_of_week, start_time, end_time, coach_id, notes) — one contract → N recurring weekly slots.
+- `rental_payments` (id, contract_id, period_label "Май 2026", amount_due, amount_paid, due_date, paid_date, status ожидается/оплачено) — auto-generated when contract is created (see `_generate_payments` at line 1181).
+- `settings` (key, value) — only `weekly_target=2000000` used.
+- `week_templates` (id, name, data_json, total_sessions, theoretical_revenue) — save/reapply a week's schedule.
+
+**Key logic worth preserving**
+- Peak hours = 17:00–22:00. `is_peak()` and `calc_revenue()` (lines 411-425): revenue = `price_per_player × players` using peak price if any minute overlaps peak window. **The user's Phase 10 spec uses a single `price_rub` field — this drops peak/off-peak pricing.** Flag in open questions.
+- `check_collision()` (line 704): exact rectangle overlap on (day, time window, court set).
+- `coach_monthly_summary` (line 817): walks every session a coach is assigned to in weeks that overlap the month, splits revenue into court_revenue (price_peak/off_peak × courts_used) and coaching_fee (session_revenue − court_revenue), pays `revenue_pct × court + coaching_fee_pct × fee` for pct coaches or flat_rate per session.
+- `generate_week_report` (line 1485): total revenue, court utilization (% of 16h × 7d × 5 courts), attendance %, best/worst day, peak vs off-peak split, prev-week comparison, recommendation engine for empty slots.
+- `calendar_events` API (line 1063): unified day/week/month feed merging sessions + rental slots. Our `/calendar` already merges tournaments + sessions; we extend it to add rentals and scheduler sessions.
+- `_generate_payments` (line 1181): builds N payment periods for a contract based on `payment_type`. We may want this even though the user's spec describes manual payments.
+
+**Program types from padel-ops (Excel import via `import_programs_from_excel`)**: 12 declared by user — Аренда, Тренировка персональная, Тренировка групповая, Американо, Мексикано, Детская тренировка, Корпоратив, Турнир, Клиника, Сплит-аренда, Абонемент, Прочее.
+
+**UI patterns from index.html**
+- Tabbed top nav with active state, single-page SPA, modals for create/edit forms.
+- Scheduler is a fixed-grid table: Y-axis time slots 07:00–23:00 in 30-min rows, X-axis courts K1–K5. Day-of-week tabs above.
+- Stats bar above grid (sessions count, theoretical revenue, utilization), color-coded legend below by program type.
+
+### Decisions to confirm before coding
+
+- [ ] 10.0.1 **Peak/off-peak pricing.** User's Phase 10 spec defines `programs.price_rub` (single price). Padel-ops uses peak+off-peak with peak being 17–22:00. Recommend: keep single `price_rub` for now (the spec is explicit), but add an open question — if peak pricing was actually used in production we'll need to migrate it. I'll check `data_export.json` during migration to see if both columns hold different values.
+- [ ] 10.0.2 **Weekly grid (padel-ops `weeks` table) vs date-only scheduler (user spec).** Padel-ops models a schedule as `weeks(id) ← sessions(week_id, day_of_week)`. User's Phase 10 spec stores sessions directly with `date` (no weeks layer). The week layer powered locking, weekly reports, templates, week duplication. Recommend: **drop the weeks layer**, store `date` on each session, and compute the weekly report on-the-fly by aggregating `WHERE date BETWEEN ws AND we`. Templates and duplication become "copy sessions from week X to week Y" actions. Locking weeks is dropped (open weeks are now the only mode). Confirm.
+- [ ] 10.0.3 **Mode switcher persistence.** localStorage key `kosmo_mode` = `tournaments` | `ops`. Default `tournaments`. The switcher is a client component inside `PageShell`. The nav links shown below depend on it. URL is the source of truth — visiting `/ops/...` should auto-set mode to `ops` regardless of localStorage so links from outside work. Confirm.
+- [ ] 10.0.4 **Courts table reuse.** Kosmo Tournaments already has `courts` (uuid id, name, number, surface, status). Padel-ops uses int court numbers 1–5. We use the existing `courts` table; `schedule_sessions.court_id` references it. Migration step: map padel-ops integer `court_number` → uuid by looking up `courts.number`. Confirm.
+- [ ] 10.0.5 **Coaches: no existing table.** Kosmo Tournaments has no `coaches` table. Padel-ops has a full one. User's spec says "expand the existing coaches concept" but in this codebase coaches don't exist yet. I'll create the table from scratch with the fields described in 10.3 (name, phone, rate_type, rate_value, specialization, bio) plus what's needed for migration: `color`, `active`. Padel-ops's split rate model (revenue_pct + coaching_fee_pct) is more nuanced than user's spec (single rate_value). Recommend: store both `rate_value` (the percentage for percent-type, the rubles for flat-type) AND `coaching_fee_pct` so we don't lose data from the old system. Confirm or simplify.
+- [ ] 10.0.6 **Rentals model.** Padel-ops: one contract → many recurring weekly slots → auto-generated payment schedule. User's Phase 10.6 spec: one contract = one recurring slot (`day_of_week`, `start_time`, `end_time`, `price_rub`, `start_date`, `end_date`) with manual payments. **This is simpler but loses multi-slot contracts.** I'll go with the spec but warn that migrating from padel-ops will require expanding multi-slot contracts into multiple `rental_contracts` rows (one per slot). Confirm.
+- [ ] 10.0.7 **Attendees, week_templates, coach_availability.** Padel-ops has these. User's Phase 10 doesn't mention them. Recommend: drop attendees (tournament side already handles registrations), drop week_templates (low-value with date-based sessions — duplicate a date range manually), drop coach_availability (operator knows their team's schedule). If user wants them, raise scope. Confirm.
+- [ ] 10.0.8 **Organizers.** New concept, not in padel-ops. Standalone — no link to schedule sessions or tournaments. Just a ledger: who owes us money, history of payments. Confirm scope is "just a balance ledger, not booking integration".
+- [ ] 10.0.9 **Display page.** Currently shows tournament events. Phase 10.9 says "also show rental sessions and scheduler sessions." Recommend: keep the same card design, add type tag (Аренда / Тренировка / etc), and source the feed from a unified query that merges tournaments + schedule_sessions + active rental slots for "today". Confirm.
+
+## 10.1 Sub-phase: Top-level switcher + Ops shell
+
+**Database**: none.
+
+**Files to add/edit**
+- [ ] 10.1.1 `components/site/ModeSwitcher.tsx` — client component, two pills "Турниры" / "Операции". Reads `localStorage.kosmo_mode`, falls back to inferring from pathname (`/ops/*` → ops). On click, navigates to the default page for that mode (`/` for tournaments, `/ops/schedule` for ops) and writes localStorage.
+- [ ] 10.1.2 `components/site/navLinks.ts` — split into two arrays: `tournamentNavLinks` (existing 6 links) and `opsNavLinks` (Расписание, Аренда, Тренеры, Организаторы, Программы, Отчёт, План зала — last one is the Phase 10.8 placeholder).
+- [ ] 10.1.3 `components/site/SidebarNav.tsx` — accept a `mode` prop; render the appropriate links array. Active matching unchanged.
+- [ ] 10.1.4 `components/site/PageShell.tsx` — mount `ModeSwitcher` above `SidebarNav`. Compute mode from pathname (server-side) and pass down. MobileNav mirrors the same.
+- [ ] 10.1.5 `app/ops/layout.tsx` — server component, just wraps children. Mode inference will use the pathname directly.
+- [ ] 10.1.6 `app/ops/page.tsx` — redirect to `/ops/schedule`.
+- [ ] 10.1.7 Placeholder pages: `app/ops/schedule/page.tsx`, `app/ops/rentals/page.tsx`, `app/ops/coaches/page.tsx`, `app/ops/organizers/page.tsx`, `app/ops/programs/page.tsx`, `app/ops/report/page.tsx`, `app/ops/floorplan/page.tsx`. Each renders `<PageShell title="…"><p className="text-muted">Скоро.</p></PageShell>`.
+- [ ] 10.1.8 Verify: load `/`, see Tournaments mode active, click "Операции" pill → routes to `/ops/schedule`, ops nav links visible, refresh keeps you on ops, click "Турниры" → back to `/` with tournament links.
+
+## 10.2 Sub-phase: Program library
+
+**SQL** (hand to user first, save to `supabase/schema.sql` as Phase 10 section):
+```sql
+create table programs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  type text not null,
+  duration_minutes int not null,
+  price_peak_rub int not null default 0,
+  price_offpeak_rub int not null default 0,
+  courts_needed int default 1,
+  max_players int,
+  description text,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+create index idx_programs_type on programs(type);
+```
+Peak window: 17:00–22:00 (port from padel-ops `PEAK_START/PEAK_END`).
+
+- [ ] 10.2.1 Append migration to `supabase/schema.sql` under "Phase 10 — Operations module" header. Instruct user to run it.
+- [ ] 10.2.2 `lib/types.ts` — add `Program` type; export `PROGRAM_TYPES` constant of the 12 strings.
+- [ ] 10.2.3 `lib/queries/programs.ts` — `listPrograms({ search, type })`, `getProgram(id)`.
+- [ ] 10.2.4 `app/ops/programs/page.tsx` — server component, table of programs with type filter + search box (both via URL search params).
+- [ ] 10.2.5 `app/ops/programs/ProgramForm.tsx` — client component, used for create + edit (modal or inline panel). Fields per the schema, type as `<Select>` of the 12 values.
+- [ ] 10.2.6 Server actions: `create-program-action.ts`, `update-program-action.ts`, `delete-program-action.ts`. Each `revalidatePath('/ops/programs')`.
+- [ ] 10.2.7 Seed action / one-time button "Загрузить набор по умолчанию" that inserts the 12 program types with reasonable defaults (Аренда 60min 4000₽ 1 court, Тренировка персональная 60min 3500₽ 1 court coach, Американо 90min 1500₽/player 2 courts 8 players, etc). Use only if user wants quick start — otherwise skip.
+- [ ] 10.2.8 Verify: create one of each type, edit a price, search by name, filter by type, soft-delete via `is_active=false` toggle.
+- [ ] 10.2.9 `npm run build` clean.
+
+## 10.3 Sub-phase: Coaches module
+
+**SQL**:
+```sql
+create table coaches (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text,
+  rate_type text check (rate_type in ('flat','percent')) default 'flat',
+  flat_rate_rub int default 0,
+  rate_court_percent numeric(5,2) default 0,
+  rate_coaching_percent numeric(5,2) default 0,
+  specialization text,
+  bio text,
+  color text default '#4fc3f7',
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+create table coach_availability (
+  id uuid primary key default gen_random_uuid(),
+  coach_id uuid references coaches(id) on delete cascade,
+  day_of_week int check (day_of_week between 0 and 6),
+  start_time time not null,
+  end_time time not null
+);
+create index idx_coach_availability_coach on coach_availability(coach_id);
+```
+
+- [ ] 10.3.1 Append SQL to schema, instruct user to run.
+- [ ] 10.3.2 `lib/types.ts` — `Coach` type.
+- [ ] 10.3.3 `lib/queries/coaches.ts` — `listCoaches({ activeOnly })`, `getCoach(id)`, `coachMonthlyEarnings(coachId, yyyyMm)` — port the calculation from padel-ops line 817, simplified: walks `schedule_sessions` where `coach_id=?` and date is in month, computes earnings per rate_type.
+- [ ] 10.3.4 `app/ops/coaches/page.tsx` — server component, list of active coaches with this-month-earnings cards.
+- [ ] 10.3.5 `app/ops/coaches/[id]/page.tsx` — coach profile with monthly tabs, session log table for current month, totals.
+- [ ] 10.3.6 `CoachForm.tsx` + create/update/delete server actions.
+- [ ] 10.3.7 Verify: create coach with both rate types, set 70% percent for one, navigate to profile.
+- [ ] 10.3.8 `npm run build` clean.
+
+## 10.4 Sub-phase: Tournament organizer accounts
+
+**SQL**:
+```sql
+create table organizers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  contact_name text,
+  phone text,
+  email text,
+  notes text,
+  created_at timestamptz default now()
+);
+create table organizer_payments (
+  id uuid primary key default gen_random_uuid(),
+  organizer_id uuid references organizers(id) on delete cascade,
+  date date not null,
+  amount_rub int not null,
+  type text check (type in ('deposit','payment','refund')) default 'payment',
+  courts_booked int,
+  hours_booked numeric(4,1),
+  notes text,
+  created_at timestamptz default now()
+);
+create index idx_organizer_payments_org on organizer_payments(organizer_id);
+```
+
+- [ ] 10.4.1 Append SQL.
+- [ ] 10.4.2 `lib/queries/organizers.ts` — `listOrganizers()` returns each with balance = SUM(payment) − SUM(deposit) − SUM(refund) computed in SQL. `getOrganizer(id)`, `listPaymentsForOrganizer(id)`.
+- [ ] 10.4.3 `app/ops/organizers/page.tsx` — list with outstanding balance column (red if >0).
+- [ ] 10.4.4 `app/ops/organizers/[id]/page.tsx` — profile + payment ledger table + "Добавить платёж" button (modal form).
+- [ ] 10.4.5 Server actions: create/update/delete organizer, add/edit/delete payment.
+- [ ] 10.4.6 Verify: create organizer, add deposit, add several payments (different types), balance updates.
+- [ ] 10.4.7 `npm run build` clean.
+
+## 10.5 Sub-phase: Weekly court scheduler
+
+**SQL**:
+```sql
+create table schedule_sessions (
+  id uuid primary key default gen_random_uuid(),
+  program_id uuid references programs(id),
+  date date not null,
+  start_time time not null,
+  end_time time not null,
+  court_ids uuid[] not null default '{}',         -- supports multi-court programs (Турнир)
+  attendee_count int default 0,
+  revenue_rub int,
+  is_peak boolean default false,
+  notes text,
+  source text default 'manual',                    -- manual | template | migration
+  status text check (status in ('scheduled','completed','cancelled')) default 'scheduled',
+  created_at timestamptz default now()
+);
+create index idx_schedule_sessions_date on schedule_sessions(date);
+create index idx_schedule_sessions_courts on schedule_sessions using gin(court_ids);
+
+create table session_coaches (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references schedule_sessions(id) on delete cascade,
+  coach_id uuid references coaches(id) on delete cascade,
+  unique(session_id, coach_id)
+);
+create index idx_session_coaches_session on session_coaches(session_id);
+
+create table session_attendees (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references schedule_sessions(id) on delete cascade,
+  player_id uuid references players(id),           -- optional link to global player
+  name text not null,                              -- denormalized so external guests work
+  status text check (status in ('registered','attended','no_show','cancelled')) default 'registered'
+);
+create index idx_session_attendees_session on session_attendees(session_id);
+```
+Multi-coach via `session_coaches` (matches padel-ops). Multi-court via `court_ids uuid[]`.
+
+- [ ] 10.5.1 Append SQL.
+- [ ] 10.5.2 `lib/queries/schedule.ts` — `listSessionsForWeek(monday)`, `getSession(id)`. Join programs (name, type) and courts (name).
+- [ ] 10.5.3 `lib/schedule-collisions.ts` (pure lib) — `detectCollision(existing[], candidate): string | null`. Port padel-ops `check_collision` logic for date-based comparison (line 704).
+- [ ] 10.5.4 `app/ops/schedule/page.tsx` — server component fetching the active week's sessions (default = current week, override via `?week=YYYY-MM-DD`).
+- [ ] 10.5.5 `WeekGrid.tsx` — client component. Renders one column per active court, rows in 30-min increments 07:00–23:00 over 7 days. Today's column highlighted. Each session is an absolute-positioned colored block; color from program type palette (define `PROGRAM_TYPE_COLORS` in lib/constants).
+- [ ] 10.5.6 `WeekNav.tsx` — ◀ ▶ + "Сегодня" button. Updates `?week=` query param.
+- [ ] 10.5.7 `SessionForm.tsx` — modal triggered by clicking an empty slot. Pre-fills court + date + start_time. Choose program (autocomplete), duration defaulted from program but editable in 30-min steps, optional coach, optional revenue override, notes. Submit validates collision client-side and server-side.
+- [ ] 10.5.8 Right-click / long-press an existing session → edit or delete.
+- [ ] 10.5.9 Server actions: `create-schedule-session-action.ts`, `update-schedule-session-action.ts`, `delete-schedule-session-action.ts`. Each `revalidatePath('/ops/schedule')`.
+- [ ] 10.5.10 Verify: navigate weeks, place sessions on multiple courts, collision blocked, delete works, today's column highlighted.
+- [ ] 10.5.11 `npm run build` clean.
+
+## 10.6 Sub-phase: Court rental contracts
+
+**SQL** (multi-slot model — one contract → many recurring weekly slots):
+```sql
+create table rental_contracts (
+  id uuid primary key default gen_random_uuid(),
+  client_name text not null,
+  client_type text check (client_type in ('физлицо','юрлицо')) default 'физлицо',
+  client_contact text,
+  start_date date not null,
+  end_date date,
+  total_contract_value_rub int default 0,
+  payment_type text check (payment_type in ('единовременно','ежемесячно','ежеквартально')) default 'ежемесячно',
+  status text check (status in ('active','paused','ended')) default 'active',
+  notes text,
+  created_at timestamptz default now()
+);
+create table rental_slots (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid references rental_contracts(id) on delete cascade,
+  court_id uuid references courts(id),
+  day_of_week int check (day_of_week between 0 and 6) not null,
+  start_time time not null,
+  end_time time not null,
+  coach_id uuid references coaches(id),
+  notes text
+);
+create table rental_payments (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid references rental_contracts(id) on delete cascade,
+  date date not null,
+  amount_rub int not null,
+  method text check (method in ('cash','card','transfer')),
+  period_label text,
+  notes text,
+  created_at timestamptz default now()
+);
+create index idx_rental_slots_contract on rental_slots(contract_id);
+create index idx_rental_payments_contract on rental_payments(contract_id);
+```
+
+- [ ] 10.6.1 Append SQL.
+- [ ] 10.6.2 `lib/queries/rentals.ts` — `listContracts()` with per-contract balance (sum of expected periods × price minus payments), `getContract(id)`, `listPaymentsForContract(id)`.
+- [ ] 10.6.3 `app/ops/rentals/page.tsx` — list of active contracts, status filter, outstanding balance column.
+- [ ] 10.6.4 `app/ops/rentals/[id]/page.tsx` — contract detail: slot info, payment history table, add-payment button.
+- [ ] 10.6.5 `RentalForm.tsx`, `PaymentForm.tsx`.
+- [ ] 10.6.6 Server actions: create/update/delete contract, add/edit/delete payment.
+- [ ] 10.6.7 **Scheduler integration**: extend `app/ops/schedule/page.tsx` to also query active rental contracts whose `day_of_week` and `start_date..end_date` cover days in the current week. Render them as teal-tinted blocks behind/below schedule_sessions on the matching court column. Click → opens the contract detail page in a new tab; no edit-from-grid (contracts edited only from `/ops/rentals/[id]`).
+- [ ] 10.6.8 Verify: create a Mon 19:00-20:30 contract for a year, see it appear on every Monday in scheduler, log a few payments, balance updates.
+- [ ] 10.6.9 `npm run build` clean.
+
+## 10.7 Sub-phase: Weekly report
+
+- [ ] 10.7.1 `lib/queries/weekly-report.ts` — `generateWeeklyReport(monday)`: revenue by source (sum schedule_sessions.revenue_rub + sum tournament entry_fee × registrations for tournaments dated in this week + sum rental_payments.amount in this week), per-court utilization (sum of session minutes ÷ available open-hours minutes), top 5 programs by revenue, coach totals (sessions count + earnings), comparison vs prev week.
+- [ ] 10.7.2 `app/ops/report/page.tsx` — server component, week selector at top, all sections rendered.
+- [ ] 10.7.3 Configurable weekly target: read from `localStorage` or a single-row `ops_settings` table — defer to a simple input on the report page that persists to localStorage for now (no new table).
+- [ ] 10.7.4 Verify with seeded data.
+- [ ] 10.7.5 `npm run build` clean.
+
+## 10.8 Sub-phase: Floor plan placeholder
+
+- [ ] 10.8.1 `app/ops/floorplan/page.tsx` — single PageShell with heading "План зала" and body "Скоро."
+- [ ] 10.8.2 Already linked from nav (10.1.2). No build verification beyond load.
+
+## 10.9 Sub-phase: Display page integration
+
+- [ ] 10.9.1 Read `app/display/page.tsx` to understand current data source.
+- [ ] 10.9.2 Extend the events query to merge in: today's `schedule_sessions` (non-cancelled) + active rental_contracts whose `day_of_week === today.dow`. Tag each event with `source: 'tournament' | 'schedule' | 'rental'`.
+- [ ] 10.9.3 Update `EventCard.tsx` to render a small badge per source. Color rentals teal, schedule sessions by program type, tournaments keep current style.
+- [ ] 10.9.4 Verify on `/display` with at least one of each type scheduled for today.
+- [ ] 10.9.5 `npm run build` clean.
+
+## 10.10 Sub-phase: Data migration (final step, only after 10.1–10.9 verified)
+
+- [ ] 10.10.1 Ask user to run `DATABASE_URL=<railway-postgres-url> python3 ~/Desktop/padel-ops/migrate.py export`, producing `data_export.json` in `~/Desktop/padel-ops/`.
+- [ ] 10.10.2 `scripts/migrate-from-padel-ops.ts` — Node script that reads `data_export.json` and uses the Supabase service-role key from `.env.local`:
+  - **programs**: map padel-ops row → new schema. `name`, `type`, `duration_minutes = round(duration × 60)`, `price_rub = round((price_peak + price_off_peak) / 2 × players)` (or just `price_peak × players` — confirm with user during 10.0.1 resolution), `courts_needed = courts`, `max_players = players`, `description = code`, `is_active = true`. Keep old `code` in description so users recognize them.
+  - **coaches**: name, phone, color, rate_type (`fixed`→`flat`, `pct`→`percent`), rate_value (flat_rate for flat, revenue_pct for percent), coaching_fee_pct, specialty→specialization, notes→bio.
+  - **courts**: padel-ops uses int 1–5; look up our existing `courts.number` to get uuid mapping. If counts don't match, abort with a message asking user to ensure 5 courts exist in this app first.
+  - **schedule_sessions** (from padel-ops `sessions` + `weeks`): for each session, compute `date = week.start_date + day_of_week`, end_time = start + duration, court_id from courts_list[0] (drop multi-court sessions to the first court; emit a warning to console for any session with `courts_used > 1` — those will need manual review).
+  - **rental_contracts** (from padel-ops `rental_contracts` + `rental_slots`): expand each contract×slot pair into a new `rental_contracts` row (since our model is one-slot-per-contract). Price = total_contract_value ÷ slot_count (rough; flag in console for manual review).
+  - **rental_payments**: map period payments to dated payments. Padel-ops `paid_date` becomes `date`; rows with no paid_date are dropped (they're future expected payments, not actual payments).
+  - **organizers**: no source data, skip.
+  - Skip: weeks, sessions/attendees, week_templates, coach_availability, settings.
+- [ ] 10.10.3 Run script with `--dry-run` first, log row counts per table.
+- [ ] 10.10.4 Run script for real. Spot-check 5 programs, 3 coaches, 5 schedule sessions, 2 rental contracts in the UI.
+- [ ] 10.10.5 Verify weekly report on a known-good week matches the old Railway report visually.
+- [ ] 10.10.6 User confirms data integrity → shuts down Railway service, archives the GitHub repo. Done.
+
+---
+
+## Implementation order summary
+
+1. Resolve open questions in 10.0 (user decisions)
+2. 10.1 shell + nav (no DB)
+3. 10.2 programs
+4. 10.3 coaches
+5. 10.4 organizers
+6. 10.5 scheduler (depends on programs + coaches + courts)
+7. 10.6 rentals (depends on courts; integrates into scheduler)
+8. 10.7 weekly report
+9. 10.8 floor plan placeholder
+10. 10.9 display integration
+11. 10.10 migration (last)
+
+After every sub-phase: `npm run build` clean + browser verification + check-in with user.

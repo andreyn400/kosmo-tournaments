@@ -3,7 +3,10 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { navLinks } from "./navLinks";
+import {
+  getModeFromPathname,
+  getNavLinksForMode,
+} from "./navLinks";
 
 type SidebarNavProps = {
   onNavigate?: () => void;
@@ -16,9 +19,11 @@ function isActive(pathname: string, href: string): boolean {
 
 export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const pathname = usePathname();
+  const mode = getModeFromPathname(pathname);
+  const links = getNavLinksForMode(mode);
   return (
     <nav className="flex flex-col gap-0.5 p-3">
-      {navLinks.map((link) => {
+      {links.map((link) => {
         const active = isActive(pathname, link.href);
         return (
           <Fragment key={link.href}>

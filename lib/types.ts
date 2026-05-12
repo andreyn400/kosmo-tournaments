@@ -229,3 +229,149 @@ export interface RatingHistoryEntry {
   change: number;
   recorded_at: string;
 }
+
+// ── Phase 10 — Operations ────────────────────────────────────────────────
+
+export interface Program {
+  id: string;
+  name: string;
+  type: string;
+  duration_minutes: number;
+  price_peak_rub: number;
+  price_offpeak_rub: number;
+  courts_needed: number;
+  max_players: number | null;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export type ProgramInput = Omit<Program, "id" | "created_at">;
+
+export type CoachRateType = "flat" | "percent";
+
+export interface Coach {
+  id: string;
+  name: string;
+  phone: string | null;
+  specialization: string | null;
+  level: string | null;
+  bio: string | null;
+  photo_url: string | null;
+  color: string;
+  rate_type: CoachRateType;
+  flat_rate_rub: number;
+  rate_court_percent: number;
+  rate_coaching_percent: number;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
+export type CoachInput = Omit<Coach, "id" | "created_at">;
+
+export interface CoachAvailability {
+  id: string;
+  coach_id: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+export interface AvailabilityWindow {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+export type ScheduleSessionStatus = "scheduled" | "completed" | "cancelled";
+
+export interface ScheduleSession {
+  id: string;
+  program_id: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  court_ids: string[];
+  attendee_count: number;
+  revenue_rub: number;
+  court_revenue_rub: number;
+  coaching_fee_rub: number;
+  is_peak: boolean;
+  notes: string | null;
+  source: string;
+  status: ScheduleSessionStatus;
+  created_at: string;
+}
+
+export interface ScheduleSessionWithMeta extends ScheduleSession {
+  program_name: string | null;
+  program_type: string | null;
+}
+
+export interface SessionInput {
+  program_id: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  court_ids: string[];
+  attendee_count: number;
+  revenue_rub: number;
+  court_revenue_rub: number;
+  coaching_fee_rub: number;
+  is_peak: boolean;
+  notes: string | null;
+  source: string;
+  status: ScheduleSessionStatus;
+}
+
+// ── Organizer accounts ──────────────────────────────────────────────────
+
+export interface Organizer {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export type OrganizerInput = Omit<Organizer, "id" | "created_at">;
+
+/**
+ * Ledger entry types:
+ *  - payment: charge for court rental / event hosting (increases what organizer owes)
+ *  - deposit: cash received from organizer (decreases what they owe)
+ *  - refund:  refund issued back to organizer (decreases what they owe)
+ *
+ * Balance convention: positive balance = organizer owes the club.
+ *   balance = SUM(payment) − SUM(deposit) − SUM(refund)
+ */
+export type OrganizerPaymentType = "payment" | "deposit" | "refund";
+
+export interface OrganizerPayment {
+  id: string;
+  organizer_id: string;
+  date: string;
+  amount_rub: number;
+  type: OrganizerPaymentType;
+  courts_booked: number | null;
+  hours_booked: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export type OrganizerPaymentInput = Omit<
+  OrganizerPayment,
+  "id" | "created_at"
+>;
+
+export interface OrganizerWithBalance extends Organizer {
+  balance_rub: number;
+  charges_total: number;
+  deposits_total: number;
+  refunds_total: number;
+  entries_count: number;
+  last_activity: string | null;
+}
