@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Logo } from "./Logo";
-import { ModeSwitcher } from "./ModeSwitcher";
 import { SidebarNav } from "./SidebarNav";
 
 export function MobileNav() {
@@ -77,7 +76,6 @@ export function MobileNav() {
                 </svg>
               </button>
             </div>
-            <ModeSwitcher onNavigate={() => setOpen(false)} />
             <SidebarNav onNavigate={() => setOpen(false)} />
           </aside>
         </div>

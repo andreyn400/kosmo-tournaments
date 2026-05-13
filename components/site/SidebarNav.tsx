@@ -4,36 +4,68 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  getModeFromPathname,
-  getNavLinksForMode,
+  NAV_SECTIONS,
+  type NavSection,
+  isLinkActive,
+  isSectionActive,
 } from "./navLinks";
 
 type SidebarNavProps = {
   onNavigate?: () => void;
 };
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const pathname = usePathname();
-  const mode = getModeFromPathname(pathname);
-  const links = getNavLinksForMode(mode);
   return (
-    <nav className="flex flex-col gap-0.5 p-3">
-      {links.map((link) => {
-        const active = isActive(pathname, link.href);
-        return (
-          <Fragment key={link.href}>
-            {link.dividerBefore && (
-              <hr
-                aria-hidden
-                className="my-2 mx-1 border-0 border-t border-border"
-              />
-            )}
+    <nav className="flex flex-col p-3 pt-1">
+      {NAV_SECTIONS.map((section, idx) => (
+        <Fragment key={section.title}>
+          {section.dividerAbove && (
+            <hr
+              aria-hidden
+              className="my-3 mx-1 border-0 border-t border-border"
+            />
+          )}
+          <SectionGroup
+            section={section}
+            pathname={pathname}
+            isFirst={idx === 0}
+            onNavigate={onNavigate}
+          />
+        </Fragment>
+      ))}
+    </nav>
+  );
+}
+
+function SectionGroup({
+  section,
+  pathname,
+  isFirst,
+  onNavigate,
+}: {
+  section: NavSection;
+  pathname: string;
+  isFirst: boolean;
+  onNavigate?: () => void;
+}) {
+  const sectionActive = isSectionActive(pathname, section);
+  return (
+    <div className={isFirst ? "" : "mt-4"}>
+      <div
+        className={[
+          "px-4 pt-1 pb-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] select-none transition-colors",
+          sectionActive ? "text-[var(--color-accent)]" : "text-muted",
+        ].join(" ")}
+      >
+        {section.title}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {section.links.map((link) => {
+          const active = isLinkActive(pathname, link.href);
+          return (
             <Link
+              key={link.href}
               href={link.href}
               onClick={onNavigate}
               aria-current={active ? "page" : undefined}
@@ -50,14 +82,16 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
                   className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-accent rounded-r"
                 />
               )}
-              <span className="text-base leading-none" aria-hidden>
-                {link.icon}
-              </span>
+              {link.icon && (
+                <span className="text-base leading-none" aria-hidden>
+                  {link.icon}
+                </span>
+              )}
               <span>{link.label}</span>
             </Link>
-          </Fragment>
-        );
-      })}
-    </nav>
+          );
+        })}
+      </div>
+    </div>
   );
 }

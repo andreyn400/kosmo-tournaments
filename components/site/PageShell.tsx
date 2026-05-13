@@ -1,6 +1,5 @@
 import { type ReactNode } from "react";
 import { Logo } from "./Logo";
-import { ModeSwitcher } from "./ModeSwitcher";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
 import { MobileNav } from "./MobileNav";
@@ -21,7 +20,6 @@ export function PageShell({ title, action, children }: PageShellProps) {
         <div className="h-16 flex items-center px-5 border-b border-border flex-shrink-0">
           <Logo />
         </div>
-        <ModeSwitcher />
         <SidebarNav />
         <SidebarMiniCalendar />
         <div className="mt-auto p-4 text-[11px] text-fade tracking-wide flex-shrink-0">

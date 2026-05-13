@@ -1569,3 +1569,106 @@ create index idx_rental_payments_contract on rental_payments(contract_id);
 11. 10.10 migration (last)
 
 After every sub-phase: `npm run build` clean + browser verification + check-in with user.
+
+---
+
+# Phase 11 — Unified sidebar navigation
+
+Goal: remove the Турниры/Операции mode toggle entirely. Replace with one unified, sectioned sidebar. No database changes. No URL changes. Purely navigation restructure.
+
+Workflow: write plan (this section) → confirm with user → build top-to-bottom → `npm run build` + `npm run lint` clean → browser verification → single commit.
+
+## 11.0 Open decisions (resolved before planning)
+
+- [x] Home route `/` appears under **ТУРНИРЫ** only as «Турниры и лиги». No separate ГЛАВНАЯ section.
+- [x] `/ops/report` (weekly report) keeps its route and is surfaced under **КОРТЫ** in the new sidebar. (Floor plan placeholder from old Phase 10.8 is not added — out of scope.)
+- [x] Icons stripped from every nav item except 📺 «Дисплей». Section headers carry visual structure instead.
+- [x] Section-header active state = color shift only (`--text-muted` → `--accent`). No dot, no background.
+
+## 11.1 Sub-phase: navLinks shape rewrite
+
+Pure data + helpers, no UI yet.
+
+- [ ] 11.1.1 In `components/site/navLinks.ts`, delete: `AppMode`, `tournamentNavLinks`, `opsNavLinks`, `MODE_DEFAULT_PATH`, `getModeFromPathname`, `getNavLinksForMode`, the `dividerBefore` field on `NavLink`.
+- [ ] 11.1.2 Replace `NavLink` with:
+  ```ts
+  export type NavLink = {
+    href: string;
+    label: string;
+    icon?: string; // only Дисплей uses this in v1
+  };
+  export type NavSection = {
+    title: string;        // small-caps header text
+    dividerAbove?: boolean; // only true for СИСТЕМА
+    links: NavLink[];
+  };
+  ```
+- [ ] 11.1.3 Export `NAV_SECTIONS: NavSection[]` in this order:
+  - КОРТЫ — Расписание /ops/schedule, Аренда /ops/rentals, Календарь /calendar, Корты /courts, Отчёт /ops/report
+  - ТУРНИРЫ — Турниры и лиги /, Игроки /players, Аналитика /analytics
+  - ПЕРСОНАЛ — Тренеры /ops/coaches, Организаторы /ops/organizers
+  - ПРОГРАММЫ — Программы /ops/programs
+  - СИСТЕМА (dividerAbove: true) — 📺 Дисплей /display (only item with `icon: "📺"`)
+- [ ] 11.1.4 Export `isLinkActive(pathname: string, href: string): boolean`:
+  - if `href === "/"` → active only when `pathname === "/"` (exact match)
+  - else → `pathname === href || pathname.startsWith(href + "/")`
+- [ ] 11.1.5 Export `isSectionActive(pathname: string, section: NavSection): boolean` — true when any of `section.links` is active.
+
+## 11.2 Sub-phase: SidebarNav rewrite
+
+- [ ] 11.2.1 Rewrite `components/site/SidebarNav.tsx` to consume `NAV_SECTIONS`. Iterate sections, then links inside each.
+- [ ] 11.2.2 Section header rendering:
+  - `<div>` (not a button — not clickable)
+  - classes: `px-4 pt-1 pb-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.1em] select-none transition-colors`
+  - color: `text-muted` by default, `text-[var(--color-accent)]` when `isSectionActive(pathname, section)` is true
+- [ ] 11.2.3 Section spacing: each section gets `mt-4` (16 px) except the first; sections with `dividerAbove` also render `<hr aria-hidden className="my-3 mx-3 border-0 border-t border-border" />` BEFORE the header.
+- [ ] 11.2.4 Link rendering — preserve current active styling exactly:
+  - 40 px row height (`h-10`), `pl-4 pr-3`, rounded
+  - active: `text-black bg-subtle font-semibold` + 3 px left bar in `bg-accent`
+  - inactive: `text-muted hover:text-black hover:bg-subtle font-medium`
+  - icon span only renders when `link.icon` truthy (preserves Дисплей's 📺)
+- [ ] 11.2.5 Nav wrapper: `<nav className="flex flex-col p-3">` — replaces the current `gap-0.5` flat layout because sections handle their own spacing.
+- [ ] 11.2.6 Keep the `onNavigate?: () => void` prop and pass through to each Link's `onClick` (used by MobileNav for drawer-close-on-tap).
+
+## 11.3 Sub-phase: Remove ModeSwitcher
+
+- [ ] 11.3.1 Delete `components/site/ModeSwitcher.tsx`.
+- [ ] 11.3.2 `components/site/PageShell.tsx` — remove `import { ModeSwitcher } …` and the `<ModeSwitcher />` line. Verify Logo sits directly above SidebarNav with no extra spacing weirdness; if needed, add `pt-1` to SidebarNav's `<nav>`.
+- [ ] 11.3.3 `components/site/MobileNav.tsx` — remove `import { ModeSwitcher } …` and the `<ModeSwitcher onNavigate=… />` line.
+- [ ] 11.3.4 Grep the repo for `kosmo_mode`, `ModeSwitcher`, `getModeFromPathname`, `getNavLinksForMode`, `tournamentNavLinks`, `opsNavLinks`, `MODE_DEFAULT_PATH`, `AppMode` — confirm zero remaining references outside the files already changed.
+
+## 11.4 Sub-phase: Mobile drawer
+
+Mostly free — the rewritten `SidebarNav` is shared. Only confirm the drawer still scrolls when nav grows.
+
+- [ ] 11.4.1 Open drawer on a small viewport; confirm all five sections + Дисплей render with headers and the active section's header is tinted accent.
+- [ ] 11.4.2 Confirm 240 px desktop sidebar still fits all nav within `min-h-screen` without crowding the mini calendar — section headers add ~110 px of vertical space, calendar is `mt-auto`, sidebar is `overflow-y-auto` so scrolling is OK if it overflows.
+
+## 11.5 Sub-phase: Verify, polish, commit
+
+- [ ] 11.5.1 `npm run build` clean (Turbopack).
+- [ ] 11.5.2 `npm run lint` exits 0.
+- [ ] 11.5.3 Manual browser sweep: visit `/`, `/players`, `/analytics`, `/courts`, `/calendar`, `/ops/schedule`, `/ops/rentals`, `/ops/coaches`, `/ops/organizers`, `/ops/programs`, `/ops/report`, `/display`. For each: confirm the right link is highlighted (3 px accent bar + background) AND the right section header is tinted accent.
+- [ ] 11.5.4 Edge case: `/` is the only route that should match exactly — visiting `/tournament/123` must NOT mark «Турниры и лиги» active (the `href === "/"` exact-match branch in `isLinkActive` covers this). Verify in browser.
+- [ ] 11.5.5 No file exceeds 600 lines (none of the touched files come close).
+- [ ] 11.5.6 Single commit: `Phase 11: unified sidebar nav (remove mode toggle)` with HEREDOC body listing the rename, deletion, and behavior change. Push to `origin/main`.
+
+---
+
+## Out of scope for Phase 11
+
+- No database changes.
+- No URL changes — every existing route keeps its current path.
+- No new pages, no copy changes to non-nav strings.
+- No styling changes outside the sidebar component tree.
+- No mobile-vs-desktop divergence — both render `<SidebarNav />`.
+
+## Files touched (expected)
+
+- `components/site/navLinks.ts` — rewrite
+- `components/site/SidebarNav.tsx` — rewrite
+- `components/site/PageShell.tsx` — 2 lines removed
+- `components/site/MobileNav.tsx` — 2 lines removed
+- `components/site/ModeSwitcher.tsx` — **deleted**
+
+Total surface: 5 files, 1 deletion, ~150 lines net change.
