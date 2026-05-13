@@ -412,3 +412,107 @@ create table organizer_payments (
 );
 create index idx_organizer_payments_org on organizer_payments(organizer_id);
 create index idx_organizer_payments_date on organizer_payments(date desc);
+
+-- ── Phase 10.6: Court rental contracts ────────────────────────────────────
+-- Commercial-grade recurring court rentals. Five tables:
+--   rental_contracts        — one row per client engagement
+--   rental_slots            — recurring weekly schedule (one slot per row)
+--   rental_slot_exceptions  — pauses / one-off cancellations (date ranges)
+--   rental_payment_schedule — expected payments (planning view)
+--   rental_payments         — actual ledger (receipts, deposits, penalties, refunds)
+--
+-- Scheduler blocks are generated on the fly from slots × exceptions for the
+-- requested week — never materialised in advance. Outstanding balance is
+-- computed from (scheduled.due_by_today − net_received).
+
+create table rental_contracts (
+  id uuid primary key default gen_random_uuid(),
+  client_name text not null,
+  client_type text not null check (client_type in ('individual','legal_entity')) default 'individual',
+  contact_person text,
+  contact_phone text,
+  contact_email text,
+  legal_entity_name text,
+  inn text,
+  contract_number text,
+  start_date date not null,
+  end_date date not null,
+  total_value_rub int not null default 0,
+  deposit_rub int not null default 0,
+  payment_schedule_type text not null check (
+    payment_schedule_type in ('one_time','monthly','quarterly','custom')
+  ) default 'monthly',
+  document_url text,
+  status text not null check (
+    status in ('draft','active','paused','ended','cancelled')
+  ) default 'draft',
+  notes text,
+  internal_notes text,
+  created_at timestamptz default now(),
+  constraint rental_contract_date_order check (end_date >= start_date),
+  constraint rental_contract_total_positive check (total_value_rub >= 0),
+  constraint rental_contract_deposit_positive check (deposit_rub >= 0)
+);
+create index idx_rental_contracts_status on rental_contracts(status);
+create index idx_rental_contracts_dates on rental_contracts(start_date, end_date);
+
+create table rental_slots (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references rental_contracts(id) on delete cascade,
+  court_ids uuid[] not null,
+  day_of_week int not null check (day_of_week between 0 and 6),
+  start_time time not null,
+  end_time time not null,
+  notes text,
+  created_at timestamptz default now(),
+  constraint rental_slot_time_order check (end_time > start_time),
+  constraint rental_slot_court_not_empty check (array_length(court_ids, 1) > 0)
+);
+create index idx_rental_slots_contract on rental_slots(contract_id);
+create index idx_rental_slots_dow on rental_slots(day_of_week);
+create index idx_rental_slots_courts on rental_slots using gin(court_ids);
+
+create table rental_slot_exceptions (
+  id uuid primary key default gen_random_uuid(),
+  slot_id uuid not null references rental_slots(id) on delete cascade,
+  exception_type text not null check (exception_type in ('cancellation','pause')) default 'cancellation',
+  from_date date not null,
+  to_date date not null,
+  reason text,
+  created_at timestamptz default now(),
+  constraint rental_exception_date_order check (to_date >= from_date)
+);
+create index idx_rental_exceptions_slot on rental_slot_exceptions(slot_id);
+create index idx_rental_exceptions_dates on rental_slot_exceptions(from_date, to_date);
+
+create table rental_payment_schedule (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references rental_contracts(id) on delete cascade,
+  period_label text not null,
+  amount_due_rub int not null,
+  due_date date not null,
+  notes text,
+  created_at timestamptz default now(),
+  constraint rental_schedule_amount_positive check (amount_due_rub >= 0)
+);
+create index idx_rental_schedule_contract on rental_payment_schedule(contract_id);
+create index idx_rental_schedule_due on rental_payment_schedule(due_date);
+
+create table rental_payments (
+  id uuid primary key default gen_random_uuid(),
+  contract_id uuid not null references rental_contracts(id) on delete cascade,
+  schedule_id uuid references rental_payment_schedule(id) on delete set null,
+  payment_date date not null,
+  amount_rub int not null,
+  payment_type text not null check (
+    payment_type in ('payment','deposit','penalty','refund')
+  ) default 'payment',
+  method text check (method in ('cash','card','transfer')) default 'transfer',
+  invoice_number text,
+  notes text,
+  created_at timestamptz default now(),
+  constraint rental_payment_amount_positive check (amount_rub > 0)
+);
+create index idx_rental_payments_contract on rental_payments(contract_id);
+create index idx_rental_payments_schedule on rental_payments(schedule_id);
+create index idx_rental_payments_date on rental_payments(payment_date desc);

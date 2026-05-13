@@ -120,3 +120,68 @@ export async function deleteSession(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Insert a schedule_session and link zero-or-many coaches. Rolls back the
+ * session insert if any coach-link insert fails so the operator never sees a
+ * half-created session.
+ */
+export async function createScheduleSession(
+  input: SessionInput,
+  coachIds: string[],
+): Promise<string> {
+  const supabase = await createClient();
+  const insertRes = await supabase
+    .from("schedule_sessions")
+    .insert(input)
+    .select("id")
+    .single();
+  if (insertRes.error) throw new Error(insertRes.error.message);
+  const sessionId = insertRes.data.id as string;
+
+  if (coachIds.length > 0) {
+    const rows = coachIds.map((cid) => ({
+      session_id: sessionId,
+      coach_id: cid,
+    }));
+    const linkRes = await supabase.from("session_coaches").insert(rows);
+    if (linkRes.error) {
+      await supabase.from("schedule_sessions").delete().eq("id", sessionId);
+      throw new Error(linkRes.error.message);
+    }
+  }
+  return sessionId;
+}
+
+/**
+ * Update a session's core fields and replace its coach links wholesale. We
+ * delete-then-insert rather than diff because the link rows are tiny and
+ * `unique(session_id, coach_id)` prevents soft-conflicts. The two writes are
+ * not transactional — if the insert fails after the delete, the operator can
+ * just re-save (revalidate fetches fresh state).
+ */
+export async function updateScheduleSession(
+  id: string,
+  input: SessionInput,
+  coachIds: string[],
+): Promise<void> {
+  const supabase = await createClient();
+
+  const upd = await supabase
+    .from("schedule_sessions")
+    .update(input)
+    .eq("id", id);
+  if (upd.error) throw new Error(upd.error.message);
+
+  const del = await supabase
+    .from("session_coaches")
+    .delete()
+    .eq("session_id", id);
+  if (del.error) throw new Error(del.error.message);
+
+  if (coachIds.length > 0) {
+    const rows = coachIds.map((cid) => ({ session_id: id, coach_id: cid }));
+    const ins = await supabase.from("session_coaches").insert(rows);
+    if (ins.error) throw new Error(ins.error.message);
+  }
+}

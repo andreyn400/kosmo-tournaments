@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
@@ -54,15 +54,12 @@ export function PaymentForm({
   pending,
   onDelete,
 }: PaymentFormProps) {
+  // State initialised once at mount; parent's conditional render (one
+  // expanded row at a time) gives us the re-init we need for free.
   const [state, setState] = useState<RawPaymentInput>(() =>
     makeInitial(payment),
   );
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setState(makeInitial(payment));
-    setError(null);
-  }, [payment]);
 
   function set<K extends keyof RawPaymentInput>(
     key: K,

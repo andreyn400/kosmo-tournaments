@@ -1,13 +1,18 @@
 import { PageShell } from "@/components/site/PageShell";
+import { listContractsWithSummary } from "@/lib/queries/rentals";
+import { listActiveCourts } from "@/lib/queries/courts";
+import { RentalsPanel } from "./RentalsPanel";
 
-export default function OpsRentalsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function OpsRentalsPage() {
+  const [contracts, courts] = await Promise.all([
+    listContractsWithSummary(),
+    listActiveCourts(),
+  ]);
   return (
     <PageShell title="Аренда">
-      <div className="rounded-card border border-border bg-surface p-8 text-center">
-        <p className="text-sm text-muted">
-          Контракты аренды кортов появятся в 10.6.
-        </p>
-      </div>
+      <RentalsPanel contracts={contracts} courts={courts} />
     </PageShell>
   );
 }

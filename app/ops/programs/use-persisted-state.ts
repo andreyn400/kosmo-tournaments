@@ -20,6 +20,9 @@ export function usePersistedState<T>(
     try {
       const raw = window.localStorage.getItem(key);
       if (raw !== null) {
+        // SSR-safe localStorage rehydration — setState in effect is the
+        // canonical pattern; can't read window during render.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setValue(JSON.parse(raw) as T);
       }
     } catch {

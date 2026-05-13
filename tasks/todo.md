@@ -1344,56 +1344,124 @@ create index idx_organizer_payments_org on organizer_payments(organizer_id);
 
 ## 10.5 Sub-phase: Weekly court scheduler
 
-**SQL**:
-```sql
-create table schedule_sessions (
-  id uuid primary key default gen_random_uuid(),
-  program_id uuid references programs(id),
-  date date not null,
-  start_time time not null,
-  end_time time not null,
-  court_ids uuid[] not null default '{}',         -- supports multi-court programs (Турнир)
-  attendee_count int default 0,
-  revenue_rub int,
-  is_peak boolean default false,
-  notes text,
-  source text default 'manual',                    -- manual | template | migration
-  status text check (status in ('scheduled','completed','cancelled')) default 'scheduled',
-  created_at timestamptz default now()
-);
-create index idx_schedule_sessions_date on schedule_sessions(date);
-create index idx_schedule_sessions_courts on schedule_sessions using gin(court_ids);
+**Status of the world (post-10.3):** `schedule_sessions` and `session_coaches` tables already exist. Coach module already writes sessions through `createSessionWithCoach` (`lib/queries/schedule-sessions.ts`). 10.5 is **view + interaction, no new tables** — a Google-Calendar-style grid over the same data, plus an unscoped create flow (a session you place from the scheduler may or may not have a coach).
 
-create table session_coaches (
-  id uuid primary key default gen_random_uuid(),
-  session_id uuid references schedule_sessions(id) on delete cascade,
-  coach_id uuid references coaches(id) on delete cascade,
-  unique(session_id, coach_id)
-);
-create index idx_session_coaches_session on session_coaches(session_id);
+What padel-ops did, audited from `~/Desktop/padel-ops/`:
 
-create table session_attendees (
-  id uuid primary key default gen_random_uuid(),
-  session_id uuid references schedule_sessions(id) on delete cascade,
-  player_id uuid references players(id),           -- optional link to global player
-  name text not null,                              -- denormalized so external guests work
-  status text check (status in ('registered','attended','no_show','cancelled')) default 'registered'
-);
-create index idx_session_attendees_session on session_attendees(session_id);
-```
-Multi-coach via `session_coaches` (matches padel-ops). Multi-court via `court_ids uuid[]`.
+- **Grid shape**: vertical axis = time (32 × 30-min rows, 07:00–23:00, row height 32 px), horizontal = courts (K1–K5). Peak rows (17:00–22:00) shaded; hour-start rows have a heavier top border.
+- **One day at a time**: state.currentDay flips between Пн…Вс. No multi-day view.
+- **Session block**: absolute-positioned, `height = duration_h × 2 × 32 − 2`. Multi-court programs render one block per court (not one wide block).
+- **Color**: 12 program-type colors via `data-type` attribute → CSS. Optional "coach view" toggle re-colors blocks by coach.color.
+- **Click empty cell** → program picker modal (search + type chips + peak/off-peak prices). No drag, no resize, no inline edit; just click empty → modal create, click filled → detail modal.
+- **Rentals overlay**: pulled separately via `/api/rentals/for-week`, expanded from `rental_slots` × contract-active date range. Rendered as a separate `.rental-block` style. Tooltip with "Открыть контракт →".
+- **Current time indicator**: horizontal 2 px cyan line at `(now−07:00)/30 × 32` px from header, only on today & current-week.
+- **Collision detection (server)**: time-rectangle intersect on minutes × court-set intersect (`check_collision`, app.py:704).
 
-- [ ] 10.5.1 Append SQL.
-- [ ] 10.5.2 `lib/queries/schedule.ts` — `listSessionsForWeek(monday)`, `getSession(id)`. Join programs (name, type) and courts (name).
-- [ ] 10.5.3 `lib/schedule-collisions.ts` (pure lib) — `detectCollision(existing[], candidate): string | null`. Port padel-ops `check_collision` logic for date-based comparison (line 704).
-- [ ] 10.5.4 `app/ops/schedule/page.tsx` — server component fetching the active week's sessions (default = current week, override via `?week=YYYY-MM-DD`).
-- [ ] 10.5.5 `WeekGrid.tsx` — client component. Renders one column per active court, rows in 30-min increments 07:00–23:00 over 7 days. Today's column highlighted. Each session is an absolute-positioned colored block; color from program type palette (define `PROGRAM_TYPE_COLORS` in lib/constants).
-- [ ] 10.5.6 `WeekNav.tsx` — ◀ ▶ + "Сегодня" button. Updates `?week=` query param.
-- [ ] 10.5.7 `SessionForm.tsx` — modal triggered by clicking an empty slot. Pre-fills court + date + start_time. Choose program (autocomplete), duration defaulted from program but editable in 30-min steps, optional coach, optional revenue override, notes. Submit validates collision client-side and server-side.
-- [ ] 10.5.8 Right-click / long-press an existing session → edit or delete.
-- [ ] 10.5.9 Server actions: `create-schedule-session-action.ts`, `update-schedule-session-action.ts`, `delete-schedule-session-action.ts`. Each `revalidatePath('/ops/schedule')`.
-- [ ] 10.5.10 Verify: navigate weeks, place sessions on multiple courts, collision blocked, delete works, today's column highlighted.
-- [ ] 10.5.11 `npm run build` clean.
+The user's brief: "Google Calendar meets a professional sports facility management tool" — i.e. significantly richer than padel-ops's day-only Excel-style grid.
+
+### 10.5.0 Architectural decisions — confirm before any code
+
+Each question below has a **recommendation**. Confirm or override before starting 10.5.1.
+
+**10.5.0.1 Primary view: day-of-courts (padel-ops style) or week-of-one-court?**
+
+5 active courts × 7 days × 32 rows = 1 120 cells, plus session blocks. A literal "all of it" week view doesn't fit on a laptop.
+
+**Recommendation**: ship **two views, day primary**.
+- **Day view** (default) — columns = courts (5), rows = 30-min slots. Same shape as padel-ops, but richer styling, current-time line, drag, resize, in-place edit, multi-block per session-with-multi-courts.
+- **Week view** — columns = days (7), rows = 30-min slots, but **for one selected court at a time** (court tab strip at top). Useful for "which day of next week is this court free at 19:00?". Sessions on multi-court programs appear in each court's week view.
+- View toggle in the top bar: `[ День | Неделя ]`. Persist last choice in localStorage.
+
+**10.5.0.2 Drag-to-reschedule / resize handles?**
+
+Padel-ops had neither. A pro tool should have both. But it adds material complexity (pointer handlers, optimistic update + rollback on collision, autoscroll near edges).
+
+**Recommendation**: **yes, both — but only in day view, and only Phase-2 of 10.5**.
+- Sub-phase 10.5a: read-only render + click-to-create + click-to-edit drawer. Ship and verify.
+- Sub-phase 10.5b: add drag-to-move (within day) + resize bottom handle (snap to 30-min). Layered on top.
+
+**10.5.0.3 Editing UX — drawer (10.3 pattern) or popover / modal?**
+
+The 10.3 in-line drawer expands below the row in a table. Inside a grid cell that doesn't work — the cell is too narrow and a drawer would shove the rest of the grid down.
+
+**Recommendation**: **floating popover anchored to the session block**, with the same fields as `LogSessionForm` (program, date, time range, courts, attendees, status, optional coach, optional revenue override, notes). Click outside or `Esc` closes. Popover positions itself to stay in viewport.
+
+**10.5.0.4 Coach assignment — required, optional, or zero?**
+
+10.3's coach-page form requires a coach because it's coach-scoped. The scheduler is unscoped — court rentals and tournaments have no coach.
+
+**Recommendation**: **optional, zero-or-many**. Multi-select. Empty = no coach (a court rental or an open booking). Reuse the `session_coaches` join.
+
+**10.5.0.5 Multi-court session blocks — one wide block or one block per court?**
+
+Padel-ops did one block per court (each court's column shows the same session independently). A wide block spanning columns is visually clearer but interrupts column scanning.
+
+**Recommendation**: **one wide block spanning the courts it occupies**, with a small "К1+К2" label in the meta line. Easier to read at a glance, makes multi-court tournaments visually distinct.
+
+**10.5.0.6 Rental overlay — show or defer to 10.6?**
+
+10.6 builds `rental_contracts` + `rental_slots`. 10.5 is its prerequisite display surface.
+
+**Recommendation**: **defer rendering to 10.6**. 10.5 ships scheduler over `schedule_sessions` only; 10.6 adds the rental layer and the "click contract" tooltip. Leaves the grid cleaner during 10.5 verification.
+
+**10.5.0.7 Program-type color palette — adopt padel-ops's 12 or design our own?**
+
+Padel-ops's colors (`#e53935` red for ТУРНИР etc.) are tuned for SQLite-era Russian uppercase. We use Cyrillic still but with our own design system.
+
+**Recommendation**: **derive from our existing accent / status tokens** plus eight more harmonised hues. Define `PROGRAM_TYPE_COLORS` in `lib/program-colors.ts` keyed by the lowercase program `type` field. Each color has a 600 (block bg) and 50 (peak-row tint) variant.
+
+**10.5.0.8 Operating hours and slot size**
+
+Padel-ops hardcoded `07:00–23:00` and 30-min slots.
+
+**Recommendation**: **same defaults**, but expose `OPS_OPEN_HOUR=7`, `OPS_CLOSE_HOUR=23`, `OPS_SLOT_MINUTES=30` constants in `lib/ops-constants.ts` so they're tweakable later without grepping. Peak window already lives there.
+
+---
+
+### 10.5a — Read-only scheduler + click-to-create + click-to-edit
+
+**Dependencies**: none new. Uses existing `schedule_sessions`, `session_coaches`, `programs`, `courts`, `coaches`.
+
+- [ ] 10.5a.1 `lib/ops-constants.ts` — `OPS_OPEN_HOUR`, `OPS_CLOSE_HOUR`, `OPS_SLOT_MINUTES`, `SLOTS_PER_DAY` derived. Re-export `PEAK_START_HOUR`/`PEAK_END_HOUR` from `lib/program-groups.ts` for ergonomic single import.
+- [ ] 10.5a.2 `lib/program-colors.ts` — `PROGRAM_TYPE_COLORS: Record<string, { block: string; soft: string; ink: string }>`. Stable order; a default fallback `{ block: var(--color-accent), soft: var(--color-accent-soft), ink: white }` for unknown types.
+- [ ] 10.5a.3 `lib/queries/schedule.ts` (new) — `listSessionsForRange(fromIso, toIso)` returning `ScheduleSessionWithMeta & { coach_chips: Array<{id, name, color}> }`. Single batched query that left-joins `session_coaches` → `coaches` and groups in JS. Order by date, start_time.
+- [ ] 10.5a.4 `lib/schedule-collisions.ts` (pure) — `detectCollision(existing, candidate): string | null`. Time-rectangle intersect (minute granularity) **× court-set intersect**. Skip `candidate.id` when present (edit mode). Used both client-side (preview) and server-side (final check).
+- [ ] 10.5a.5 `app/ops/schedule/page.tsx` — server component. Reads `?view=day|week`, `?date=YYYY-MM-DD` (defaults to today), and for week view `?court=<uuid>`. Fetches `listSessionsForRange`, `listActiveCourts`, `listActivePrograms`, `listCoaches({activeOnly:true})`.
+- [ ] 10.5a.6 `app/ops/schedule/SchedulerShell.tsx` — client. Top bar: date label, ◀ ▶ Сегодня, view-toggle (`День | Неделя`), court selector visible only in week view. Persists view choice to localStorage. Renders `<DayGrid>` or `<WeekGrid>`.
+- [ ] 10.5a.7 `app/ops/schedule/DayGrid.tsx` — CSS grid. Columns = `[time-header] [court1] [court2] …`. Rows = `SLOTS_PER_DAY`. Time column sticky-left when scrolled horizontally. Peak rows tinted; hour-start rows with heavier top border. Current-time indicator (red 2 px line) absolutely positioned, only shown when `date === today`. Today's column header gets `bg-accent-soft`.
+- [ ] 10.5a.8 `app/ops/schedule/WeekGrid.tsx` — analogous, columns = 7 days, rows = same. One court at a time.
+- [ ] 10.5a.9 `app/ops/schedule/SessionBlock.tsx` — absolute-positioned block. Background from `PROGRAM_TYPE_COLORS[session.program_type].block`. Spans court columns when multi-court (uses grid-column span computed by parent). Inside: program name, time range, court labels if multi, coach color dots row, attendee count if set. Status `cancelled` gets striped/desaturated.
+- [ ] 10.5a.10 `app/ops/schedule/EmptyCell.tsx` — clickable empty 30-min cell. Hover state: subtle accent-soft + plus icon. Click opens `<SessionPopover anchor=cell mode="create" date=... start_time=... court_ids=[col] />`.
+- [ ] 10.5a.11 `app/ops/schedule/SessionPopover.tsx` — floating panel (use `@floating-ui/react` if already in deps; else hand-rolled absolute positioning with viewport clamp). Mode `create` or `edit`. Form fields: Program (search-select with type chips, like padel-ops's picker — port the UX), Date / Start / End / Duration auto-derived from program but editable in 30-min steps, Courts (multi-select chips, default = program's `courts_needed` starting from the clicked column), Coaches (multi-select chips, **optional zero-or-many**), Attendees, Status, Manual revenue override (same `manualRevenue=false` default as 10.3), Notes. Live preview cards same as 10.3. Server submit goes through actions below.
+- [ ] 10.5a.12 `app/ops/schedule/create-schedule-action.ts` — validates input, runs `detectCollision` against the existing day's sessions, inserts into `schedule_sessions`, then inserts the (zero-or-many) `session_coaches` links. Rolls back the session insert if coach-link insert fails. `revalidatePath('/ops/schedule')` + `revalidatePath('/ops/coaches')` (so coach-page monthly stats reflect new sessions).
+- [ ] 10.5a.13 `app/ops/schedule/update-schedule-action.ts` — same plus delete-and-reinsert `session_coaches` rows (simplest concurrent-safe update). Collision check excludes the session being edited.
+- [ ] 10.5a.14 `app/ops/schedule/delete-schedule-action.ts` — cascade-deletes session_coaches via FK. Revalidate both paths.
+- [ ] 10.5a.15 `npm run build` clean.
+- [ ] 10.5a.16 Browser verify: open `/ops/schedule`, today highlights; click an empty 19:00 cell → popover; pick Клиника 4 игрока, K1 default, save; block appears with the type color; click block → edit popover; change time to 20:00, save; try to overlap with existing → server error toast; cancel session → block becomes striped; switch to Week view, select a court, navigate weeks.
+
+### 10.5b — Drag to move + resize handles
+
+(Layered on after 10.5a is verified.)
+
+- [ ] 10.5b.1 `app/ops/schedule/useDragSession.ts` — pointer-events based: capture pointer on `<SessionBlock>` body (excluding resize handle and child controls), track delta in slots/columns, render a ghost block, on pointerup call `update-schedule-action` with the new `start_time`/`end_time`/`court_ids`. If `detectCollision` fails client-side, snap back. Touch devices: 150 ms long-press initiates drag.
+- [ ] 10.5b.2 Resize handle on south edge of `<SessionBlock>` — drag down/up snaps to 30-min steps, minimum one slot. Same collision check.
+- [ ] 10.5b.3 Drag from week-view does not change court (court is locked to the column tab); from day view, horizontal drag changes court.
+- [ ] 10.5b.4 Subtle "drop target" outline on cells under the ghost during drag.
+- [ ] 10.5b.5 `npm run build` clean + browser verify.
+
+### Visual reference (the "significantly better" part)
+
+The non-obvious upgrades over padel-ops's grid:
+
+1. **Coach color dots row** inside each block — a thin strip of 4-px dots at the top of every block, one per assigned coach, sourced from `coach.color`. Avoids the all-or-nothing "color by coach" toggle that hides the program-type signal.
+2. **Multi-court wide blocks** (10.5.0.5) instead of N parallel blocks. A tournament that spans K1+K2 renders as one bar across both columns with a "К1+К2" badge — looks like a single event, behaves like one click target.
+3. **Today's column accent**, current-time line — both standard Google Calendar tropes, both absent in padel-ops.
+4. **Hover-on-empty-cell** with a soft plus icon — discoverable "click here to add" without explaining it.
+5. **Type-coded peak shading** — peak rows (17:00–22:00) get the type's `soft` color when occupied, generic `--color-warning-soft` when empty. Visually anchors the "this slot is premium time" without screaming yellow.
+6. **Sticky time gutter** — left column stays put when you scroll the grid horizontally on smaller screens.
+7. **Status semantics** — cancelled sessions render with hatched stripes and 60 % opacity; completed sessions get a small ✓ glyph corner. The block still occupies the cell so collision math is honest.
+8. **Keyboard nav** — `←/→` shifts day, `Shift+←/→` shifts week, `T` jumps to today, `Esc` closes popover. Not in padel-ops at all.
+9. **One-click "Дублировать на следующую неделю"** in the edit popover — re-creates the same session 7 days later. Saves operators a click for recurring events; serves as a "drag-without-dragging" alternative before 10.5b ships.
 
 ## 10.6 Sub-phase: Court rental contracts
 

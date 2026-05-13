@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import type { Coach } from "@/lib/types";
@@ -61,13 +60,12 @@ export function CoachForm({
   pending,
   onDelete,
 }: CoachFormProps) {
+  // State is initialised once at mount. Parents must remount via
+  // `key={coach.id}` (or a conditional render that unmounts the form) to
+  // re-init for a different coach — avoiding the prop-sync useEffect that
+  // silently clobbered user input in earlier iterations.
   const [state, setState] = useState<FormState>(() => makeInitial(coach));
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setState(makeInitial(coach));
-    setError(null);
-  }, [coach]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setState((s) => ({ ...s, [key]: value }));

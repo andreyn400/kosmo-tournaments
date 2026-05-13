@@ -309,6 +309,18 @@ export interface ScheduleSessionWithMeta extends ScheduleSession {
   program_type: string | null;
 }
 
+/** A coach chip on a session block: just enough to render the dot strip. */
+export interface SessionCoachChip {
+  id: string;
+  name: string;
+  color: string;
+}
+
+/** Sessions as the scheduler page needs them: program label + coach chips. */
+export interface ScheduleSessionForGrid extends ScheduleSessionWithMeta {
+  coach_chips: SessionCoachChip[];
+}
+
 export interface SessionInput {
   program_id: string | null;
   date: string;
@@ -374,4 +386,143 @@ export interface OrganizerWithBalance extends Organizer {
   refunds_total: number;
   entries_count: number;
   last_activity: string | null;
+}
+
+// ── Rental contracts ────────────────────────────────────────────────────
+
+export type RentalClientType = "individual" | "legal_entity";
+export type RentalPaymentScheduleType =
+  | "one_time"
+  | "monthly"
+  | "quarterly"
+  | "custom";
+export type RentalContractStatus =
+  | "draft"
+  | "active"
+  | "paused"
+  | "ended"
+  | "cancelled";
+
+export interface RentalContract {
+  id: string;
+  client_name: string;
+  client_type: RentalClientType;
+  contact_person: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+  legal_entity_name: string | null;
+  inn: string | null;
+  contract_number: string | null;
+  start_date: string;
+  end_date: string;
+  total_value_rub: number;
+  deposit_rub: number;
+  payment_schedule_type: RentalPaymentScheduleType;
+  document_url: string | null;
+  status: RentalContractStatus;
+  notes: string | null;
+  internal_notes: string | null;
+  created_at: string;
+}
+
+export type RentalContractInput = Omit<RentalContract, "id" | "created_at">;
+
+export interface RentalSlot {
+  id: string;
+  contract_id: string;
+  court_ids: string[];
+  day_of_week: number; // 0=Mon..6=Sun
+  start_time: string;
+  end_time: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type RentalSlotInput = Omit<RentalSlot, "id" | "created_at">;
+
+export type RentalExceptionType = "cancellation" | "pause";
+
+export interface RentalSlotException {
+  id: string;
+  slot_id: string;
+  exception_type: RentalExceptionType;
+  from_date: string;
+  to_date: string;
+  reason: string | null;
+  created_at: string;
+}
+
+export type RentalSlotExceptionInput = Omit<
+  RentalSlotException,
+  "id" | "created_at"
+>;
+
+export interface RentalPaymentScheduleEntry {
+  id: string;
+  contract_id: string;
+  period_label: string;
+  amount_due_rub: number;
+  due_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type RentalPaymentScheduleInput = Omit<
+  RentalPaymentScheduleEntry,
+  "id" | "created_at"
+>;
+
+export type RentalPaymentType = "payment" | "deposit" | "penalty" | "refund";
+export type RentalPaymentMethod = "cash" | "card" | "transfer";
+
+export interface RentalPayment {
+  id: string;
+  contract_id: string;
+  schedule_id: string | null;
+  payment_date: string;
+  amount_rub: number;
+  payment_type: RentalPaymentType;
+  method: RentalPaymentMethod | null;
+  invoice_number: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export type RentalPaymentInput = Omit<RentalPayment, "id" | "created_at">;
+
+/**
+ * Per-contract aggregates for the list page.
+ * - net_received = payments + deposits − refunds
+ * - scheduled_due_today = sum(schedule.amount_due where due_date ≤ today)
+ * - overdue = max(0, scheduled_due_today + penalties − net_received)
+ * - ahead = max(0, net_received − scheduled_due_today − penalties)
+ * - remaining_outstanding = total + penalties − net_received  (whole-contract view)
+ */
+export interface RentalContractWithSummary extends RentalContract {
+  slots: RentalSlot[];
+  net_received_rub: number;
+  penalties_total_rub: number;
+  scheduled_due_today_rub: number;
+  overdue_rub: number;
+  ahead_rub: number;
+  remaining_outstanding_rub: number;
+  last_payment_date: string | null;
+}
+
+/**
+ * One concrete recurring-rental instance for a specific date — what the
+ * scheduler grid renders. `id` is synthetic ("rental-<slot_id>-<date>") so
+ * React keys stay stable and it can't collide with real session UUIDs.
+ */
+export interface RentalBlockForGrid {
+  id: string;
+  contract_id: string;
+  slot_id: string;
+  client_name: string;
+  contract_number: string | null;
+  date: string;
+  start_time: string;
+  end_time: string;
+  court_ids: string[];
+  slot_notes: string | null;
 }

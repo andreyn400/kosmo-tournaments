@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
@@ -60,13 +60,11 @@ export function ProgramForm({
   pending,
   onDelete,
 }: ProgramFormProps) {
+  // State initialised once at mount; parent unmounts the form when
+  // switching between create / edit / different row, so a prop-sync useEffect
+  // here would only risk silently clobbering operator input.
   const [state, setState] = useState(() => makeInitial(program, defaultType));
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setState(makeInitial(program, defaultType));
-    setError(null);
-  }, [program, defaultType]);
 
   function set<K extends keyof typeof state>(key: K, value: (typeof state)[K]) {
     setState((s) => ({ ...s, [key]: value }));
