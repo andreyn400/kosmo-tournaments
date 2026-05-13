@@ -1672,3 +1672,202 @@ Mostly free — the rewritten `SidebarNav` is shared. Only confirm the drawer st
 - `components/site/ModeSwitcher.tsx` — **deleted**
 
 Total surface: 5 files, 1 deletion, ~150 lines net change.
+
+---
+
+# Phase 12A — Calendar unification (4 event types)
+
+Goal: `/calendar` shows all 4 event sources side-by-side — tournaments, tournament/league sessions, rental contract instances, and ops scheduler sessions. Mini calendar in the sidebar reflects all four with colored dots. No DB changes. No URL changes. Read-only.
+
+Workflow: write plan (this section) → confirm with user → build top-to-bottom → `npm run build` + `npm run lint` clean → browser verification → single commit.
+
+## 12A.0 Open decisions (resolved before planning)
+
+- [x] `CalendarEvent` becomes a discriminated union with kinds `tournament` (renamed from `tournament_pending`), `league_session` (renamed from `session`), `rental` (new), `schedule_session` (new). Per-kind fields are precisely typed.
+- [x] Mini calendar shows up to 4 small colored dots per date — one per kind present that day. Fixed palette: rose=tournament, green=league_session, teal=rental, amber=schedule_session.
+- [x] Coach names in block subtitle = comma-joined with CSS `truncate`; full list in the popover.
+- [x] Rental popover offers two destinations: «Открыть контракт» → `/ops/rentals/[contract_id]` and «Открыть в расписании» → `/ops/schedule?view=day&date=[date]`.
+
+## 12A.1 Sub-phase: CalendarEvent discriminated union
+
+- [ ] 12A.1.1 In `lib/queries/calendar.ts`, replace the current `CalendarEvent` interface with a discriminated union:
+  ```ts
+  export type EventKind =
+    | "tournament"
+    | "league_session"
+    | "rental"
+    | "schedule_session";
+
+  interface BaseCalendarEvent {
+    key: string;
+    date: string;
+    startTime: string | null;
+    durationHours: number;
+    courtIds: string[];
+  }
+
+  export interface TournamentCalendarEvent extends BaseCalendarEvent {
+    kind: "tournament";
+    tournamentId: string;
+    tournamentName: string;
+    tournamentType: TournamentType;
+    tournamentStatus: TournamentStatus;
+    format: TournamentFormat;
+  }
+
+  export interface LeagueSessionCalendarEvent extends BaseCalendarEvent {
+    kind: "league_session";
+    tournamentId: string;
+    tournamentName: string;
+    tournamentType: TournamentType;
+    tournamentStatus: TournamentStatus;
+    format: TournamentFormat;
+    sessionId: string;
+    sessionNumber: number;
+    sessionStatus: SessionStatus;
+  }
+
+  export interface RentalCalendarEvent extends BaseCalendarEvent {
+    kind: "rental";
+    contractId: string;
+    slotId: string;
+    clientName: string;
+    contractNumber: string | null;
+    slotNotes: string | null;
+  }
+
+  export interface ScheduleSessionCalendarEvent extends BaseCalendarEvent {
+    kind: "schedule_session";
+    sessionId: string;
+    programName: string | null;
+    programType: string | null;
+    coachNames: string[]; // canonical order, comma-joinable
+  }
+
+  export type CalendarEvent =
+    | TournamentCalendarEvent
+    | LeagueSessionCalendarEvent
+    | RentalCalendarEvent
+    | ScheduleSessionCalendarEvent;
+  ```
+- [ ] 12A.1.2 Create new file `lib/calendar-events.ts` with pure display helpers (no I/O):
+  - `eventTitle(e: CalendarEvent): string`
+  - `eventSubtitle(e: CalendarEvent): string | null` — for blocks (one-line, truncatable)
+  - `eventDetailLines(e: CalendarEvent): string[]` — for popover body
+  - `eventBlockStyle(e: CalendarEvent): { background: string; ink: string; stripe?: boolean; badge?: string }` — returns the per-kind visual recipe (teal+stripe+АРЕНДА for rental, programTypeColor+ОПС for schedule_session, falls back for tournament/league)
+  - `eventLinks(e: CalendarEvent): Array<{ label: string; href: string; primary: boolean }>` — for popover actions
+  - `MINI_CALENDAR_KIND_COLOR: Record<EventKind, string>` — fixed palette for mini-cal dots:
+    - tournament: `#e11d48` (rose, matches existing tournament event tone)
+    - league_session: `var(--color-accent)` (green)
+    - rental: `#0d9488` (teal, matches RentalBlock)
+    - schedule_session: `#d97706` (amber, distinct from tournaments/league/rentals)
+- [ ] 12A.1.3 No `any` types anywhere. Each kind narrowed via `switch (e.kind)` exhaustively.
+
+## 12A.2 Sub-phase: extend `listCalendarEventsInRange`
+
+- [ ] 12A.2.1 Update `lib/queries/calendar.ts` `listCalendarEventsInRange(from, to)` to call four sources in parallel:
+  - existing tournaments query → `kind: "tournament"`
+  - existing tournament_sessions query → `kind: "league_session"`
+  - `listRentalBlocksForRange(from, to)` (import from `lib/queries/rentals`) → `kind: "rental"`
+  - `listSessionsForRange(from, to)` (import from `lib/queries/schedule`) → `kind: "schedule_session"`
+- [ ] 12A.2.2 Convert rental blocks to `RentalCalendarEvent`:
+  - `key = "r:" + block.id`
+  - `startTime = block.start_time`
+  - `durationHours = (parseTime(end_time) − parseTime(start_time)) / 60` — write a tiny inline `hhmmToMinutes(s: string): number` helper since the existing layout code expects fractional hours.
+  - `courtIds = block.court_ids`
+  - per-kind fields from block
+- [ ] 12A.2.3 Convert schedule sessions to `ScheduleSessionCalendarEvent`:
+  - `key = "ss:" + session.id`
+  - same time arithmetic
+  - `coachNames = session.coach_chips.map(c => c.name)`
+  - `programName`, `programType` from session
+- [ ] 12A.2.4 Tournaments + league_session conversion: keep current shape, only rename `kind`.
+- [ ] 12A.2.5 Return concatenated array (caller groups/sorts as needed).
+
+## 12A.3 Sub-phase: `listEventKindsByDate` for mini calendar
+
+- [ ] 12A.3.1 Replace `listEventDates(): Promise<string[]>` with `listEventKindsByDate(fromIso: string, toIso: string): Promise<Record<string, EventKind[]>>`.
+- [ ] 12A.3.2 Query dates from:
+  - `tournaments.date_start` (and `date_end` if different) within range → mark `tournament`
+  - `tournament_sessions.session_date` within range → mark `league_session`
+  - `schedule_sessions.date` within range → mark `schedule_session` (only the date column needed — single SELECT)
+  - `listRentalBlocksForRange(from, to)` for each block's `.date` → mark `rental`
+- [ ] 12A.3.3 Fold into `Map<string, Set<EventKind>>`, then JSON-friendly `Record<string, EventKind[]>` preserving canonical kind order.
+- [ ] 12A.3.4 Old `listEventDates` removed (only caller is `SidebarMiniCalendar`, refactored in 12A.7).
+
+## 12A.4 Sub-phase: EventBlock per-kind rendering
+
+- [ ] 12A.4.1 Rewrite `app/calendar/EventBlock.tsx`:
+  - Compute `style = eventBlockStyle(event)`
+  - Compute `title = eventTitle(event)`, `subtitle = eventSubtitle(event)`
+  - For `rental` and `schedule_session` kinds → render filled background using `style.background`, white `style.ink` text, badge in top-right (`style.badge` is `АРЕНДА` or `ОПС`)
+  - For `rental` → add inline `style={{ backgroundImage: "repeating-linear-gradient(45deg, rgba(255,255,255,0.10) 0 6px, transparent 6px 14px)" }}` over the teal
+  - For `tournament` + `league_session` → keep existing `statusClass(event.tournamentStatus)` logic (status-driven colors)
+  - All three densities (pill, compact, comfortable) work for all four kinds
+- [ ] 12A.4.2 No file over 600 lines. Estimated ~150 lines after rewrite.
+
+## 12A.5 Sub-phase: EventPopover per-kind body + actions
+
+- [ ] 12A.5.1 Rewrite `app/calendar/EventPopover.tsx`. Top-level structure stays the same (`<dialog>`, header with close, body, footer with buttons), but the body and footer dispatch on `event.kind`.
+- [ ] 12A.5.2 Per-kind body content:
+  - `tournament` / `league_session` → current layout: name, when, badges (format/status/type), courts, session number+status if league_session. **No changes from today** except switching to `eventTitle` / `eventDetailLines` helpers.
+  - `rental` → title = `clientName`, when = `formatDateRu + start–end`, detail lines: contract number, slot notes. No status badges.
+  - `schedule_session` → title = `programName ?? "Сессия"`, when = `formatDateRu + start–end`, detail lines: program type, coach list (full, comma-joined), courts.
+- [ ] 12A.5.3 Per-kind footer actions (right-aligned, primary button = solid accent):
+  - `tournament` / `league_session` → secondary «Закрыть», primary «Открыть турнир» → `/tournament/[tournamentId]`
+  - `rental` → secondary «Закрыть», secondary «Открыть в расписании» → `/ops/schedule?view=day&date=[date]`, primary «Открыть контракт» → `/ops/rentals/[contractId]`
+  - `schedule_session` → secondary «Закрыть», primary «Открыть в расписании» → `/ops/schedule?view=day&date=[date]`
+- [ ] 12A.5.4 File estimated ~250 lines, well under 600 cap.
+
+## 12A.6 Sub-phase: MiniCalendar dot row
+
+- [ ] 12A.6.1 Update `components/site/MiniCalendar.tsx`:
+  - Prop changes from `eventDates: string[]` to `eventKindsByDate: Record<string, EventKind[]>`
+  - For each date cell, if the date has entries, render a `flex flex-row gap-0.5` row of up to 4 dots (`w-1 h-1 rounded-full`), color from `MINI_CALENDAR_KIND_COLOR`
+  - Dot row sits below the date number, takes ~6 px vertical
+- [ ] 12A.6.2 Confirm cell height accommodates date number + dot row without breaking layout. Adjust grid template if needed.
+
+## 12A.7 Sub-phase: SidebarMiniCalendar fetch range
+
+- [ ] 12A.7.1 Update `components/site/SidebarMiniCalendar.tsx`:
+  - Compute `fromIso = today − 1 month` and `toIso = today + 12 months` using existing helpers in `lib/calendar-range.ts`
+  - Call `listEventKindsByDate(fromIso, toIso)`
+  - Pass result to `<MiniCalendar eventKindsByDate=… />`
+- [ ] 12A.7.2 If `lib/calendar-range.ts` lacks an `addMonths` helper, import the one already in use elsewhere in the app.
+
+## 12A.8 Sub-phase: verify, polish, commit
+
+- [ ] 12A.8.1 `npm run build` clean (Turbopack).
+- [ ] 12A.8.2 `npm run lint` exits 0.
+- [ ] 12A.8.3 Browser sweep on `/calendar`:
+  - Day view: each of the 4 event kinds renders with the right color/badge; click each → correct popover content + buttons
+  - Week view: same, in compact density
+  - Month view: pill density for all 4 kinds
+- [ ] 12A.8.4 Mini calendar sidebar: dates with multiple kinds show multi-colored dot row; single-kind dates show one dot.
+- [ ] 12A.8.5 Popover button checks: «Открыть турнир» → tournament page; «Открыть контракт» → rental detail; «Открыть в расписании» → scheduler day view with correct date in URL.
+- [ ] 12A.8.6 No file over 600 lines. Run `wc -l app/calendar/*.tsx components/site/MiniCalendar.tsx lib/queries/calendar.ts lib/calendar-events.ts` to confirm.
+- [ ] 12A.8.7 Single commit: `Phase 12A: unified calendar (4 event types)`. Push to `origin/main`.
+
+---
+
+## Out of scope for Phase 12A
+
+- No DB schema changes.
+- No URL changes on `/calendar`.
+- No event creation/editing from the calendar — still read-only.
+- No new sources beyond the 4 listed (e.g., no court-blocked-for-maintenance type).
+- No scheduler-page changes (it already handles the same event types from its own queries).
+- No mobile-specific design tweaks beyond what the existing calendar layout already does.
+
+## Files touched (expected)
+
+- `lib/queries/calendar.ts` — major refactor (union type, four-source fold, mini-cal date-kinds query)
+- `lib/calendar-events.ts` — **new** (display helpers + mini-cal palette)
+- `app/calendar/page.tsx` — minor (new return type already inferred)
+- `app/calendar/EventBlock.tsx` — rewrite for 4 kinds
+- `app/calendar/EventPopover.tsx` — rewrite for 4 kinds
+- `app/calendar/DayView.tsx`, `WeekView.tsx`, `MonthView.tsx` — replace direct `event.tournamentName` reads with helper calls
+- `components/site/MiniCalendar.tsx` — prop shape + dot-row rendering
+- `components/site/SidebarMiniCalendar.tsx` — switch to range-aware query
+
+Total surface: ~9 files, 1 new, no deletions, expected ~500–700 lines net change.

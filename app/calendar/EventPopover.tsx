@@ -12,7 +12,20 @@ import {
 import { formatDateRu } from "@/lib/format-date";
 import { formatTimeRange } from "@/lib/calendar-layout";
 import type { CalendarEvent } from "@/lib/queries/calendar";
+import {
+  eventBlockStyle,
+  eventDetailLines,
+  eventLinks,
+  eventTitle,
+} from "@/lib/calendar-events";
 import type { Court, TournamentStatus } from "@/lib/types";
+
+const KIND_LABEL_RU: Record<CalendarEvent["kind"], string> = {
+  tournament: "Турнир",
+  league_session: "Сессия лиги",
+  rental: "Аренда",
+  schedule_session: "Сессия ОПС",
+};
 
 const SESSION_STATUS_LABEL_RU: Record<string, string> = {
   scheduled: "Запланирована",
@@ -73,6 +86,15 @@ export function EventPopover({
     : "";
 
   const courtLabel = event ? courtListLabel(event.courtIds, courts) : null;
+  const title = event ? eventTitle(event) : "";
+  const detailLines = event ? eventDetailLines(event) : [];
+  const links = event ? eventLinks(event) : [];
+  const blockStyle = event ? eventBlockStyle(event) : null;
+  const kindChipColor = event
+    ? blockStyle?.useStatusStyle
+      ? "var(--color-accent)"
+      : blockStyle?.background
+    : null;
 
   return (
     <dialog
@@ -89,9 +111,21 @@ export function EventPopover({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-lg font-semibold text-black leading-snug min-w-0">
-              {event.tournamentName}
-            </h2>
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex items-center gap-2">
+                <span
+                  aria-hidden
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ background: kindChipColor ?? "var(--color-accent)" }}
+                />
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  {KIND_LABEL_RU[event.kind]}
+                </span>
+              </div>
+              <h2 className="text-lg font-semibold text-black leading-snug">
+                {title}
+              </h2>
+            </div>
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
@@ -117,13 +151,17 @@ export function EventPopover({
 
           <div className="text-sm text-secondary">{when}</div>
 
-          <div className="flex flex-wrap gap-1.5">
-            <Badge tone="format">{FORMAT_LABEL_RU[event.format]}</Badge>
-            <Badge tone={statusTone(event.tournamentStatus)}>
-              {STATUS_LABEL_RU[event.tournamentStatus]}
-            </Badge>
-            <Badge tone="neutral">{TYPE_LABEL_RU[event.tournamentType]}</Badge>
-          </div>
+          {(event.kind === "tournament" || event.kind === "league_session") && (
+            <div className="flex flex-wrap gap-1.5">
+              <Badge tone="format">{FORMAT_LABEL_RU[event.format]}</Badge>
+              <Badge tone={statusTone(event.tournamentStatus)}>
+                {STATUS_LABEL_RU[event.tournamentStatus]}
+              </Badge>
+              <Badge tone="neutral">
+                {TYPE_LABEL_RU[event.tournamentType]}
+              </Badge>
+            </div>
+          )}
 
           <dl className="flex flex-col gap-2 text-sm">
             {courtLabel && (
@@ -132,7 +170,7 @@ export function EventPopover({
                 <dd className="text-secondary">{courtLabel}</dd>
               </div>
             )}
-            {event.kind === "session" && event.sessionNumber != null && (
+            {event.kind === "league_session" && (
               <div className="flex gap-2">
                 <dt className="text-muted shrink-0">Сессия:</dt>
                 <dd className="text-secondary">
@@ -143,6 +181,11 @@ export function EventPopover({
                 </dd>
               </div>
             )}
+            {detailLines.map((line, i) => (
+              <div key={i} className="flex gap-2">
+                <dd className="text-secondary">{line}</dd>
+              </div>
+            ))}
           </dl>
 
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -154,12 +197,25 @@ export function EventPopover({
             >
               Закрыть
             </Button>
-            <Link
-              href={`/tournament/${event.tournamentId}`}
-              className="inline-flex items-center justify-center h-9 px-3 rounded-[var(--radius-button)] bg-accent text-white text-sm font-semibold hover:bg-[var(--color-accent-hover)]"
-            >
-              Открыть турнир
-            </Link>
+            {links.map((link) =>
+              link.primary ? (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="inline-flex items-center justify-center h-9 px-3 rounded-[var(--radius-button)] bg-accent text-white text-sm font-semibold hover:bg-[var(--color-accent-hover)]"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="inline-flex items-center justify-center h-9 px-3 rounded-[var(--radius-button)] border border-border bg-surface text-sm font-semibold text-black hover:bg-subtle"
+                >
+                  {link.label}
+                </Link>
+              ),
+            )}
           </div>
         </div>
       )}

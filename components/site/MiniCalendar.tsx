@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import type { EventKind } from "@/lib/queries/calendar";
+import { MINI_CALENDAR_KIND_COLOR } from "@/lib/calendar-events";
 
 const MONTHS_RU = [
   "Январь",
@@ -26,8 +28,11 @@ function toIso(year: number, monthZeroBased: number, day: number): string {
   return `${year}-${mm}-${dd}`;
 }
 
-export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
-  const eventSet = useMemo(() => new Set(eventDates), [eventDates]);
+export function MiniCalendar({
+  eventKindsByDate,
+}: {
+  eventKindsByDate: Record<string, EventKind[]>;
+}) {
   const today = useMemo(() => new Date(), []);
   const todayIso = toIso(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -47,7 +52,7 @@ export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
       day: number | null;
       iso: string | null;
       isToday: boolean;
-      hasEvent: boolean;
+      kinds: EventKind[];
     }> = [];
     for (let i = 0; i < startPad; i++) {
       out.push({
@@ -55,7 +60,7 @@ export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
         day: null,
         iso: null,
         isToday: false,
-        hasEvent: false,
+        kinds: [],
       });
     }
     for (let d = 1; d <= daysInMonth; d++) {
@@ -65,7 +70,7 @@ export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
         day: d,
         iso,
         isToday: iso === todayIso,
-        hasEvent: eventSet.has(iso),
+        kinds: eventKindsByDate[iso] ?? [],
       });
     }
     while (out.length % 7 !== 0) {
@@ -74,11 +79,11 @@ export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
         day: null,
         iso: null,
         isToday: false,
-        hasEvent: false,
+        kinds: [],
       });
     }
     return out;
-  }, [view, eventSet, todayIso]);
+  }, [view, eventKindsByDate, todayIso]);
 
   const prev = () =>
     setView((v) =>
@@ -163,13 +168,14 @@ export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
       <div className="grid grid-cols-7 gap-0.5">
         {cells.map((cell) => {
           if (cell.day == null) {
-            return <span key={cell.key} className="h-7" aria-hidden />;
+            return <span key={cell.key} className="h-8" aria-hidden />;
           }
+          const hasEvent = cell.kinds.length > 0;
           const base =
-            "relative h-7 flex items-center justify-center text-[11px] tabular-nums rounded transition-colors";
+            "relative h-8 flex flex-col items-center justify-center gap-0.5 text-[11px] tabular-nums rounded transition-colors";
           const tone = cell.isToday
             ? "bg-accent text-white font-semibold hover:bg-[var(--color-accent-hover)]"
-            : cell.hasEvent
+            : hasEvent
               ? "text-black font-semibold hover:bg-subtle"
               : "text-muted hover:bg-subtle";
           return (
@@ -177,14 +183,22 @@ export function MiniCalendar({ eventDates }: { eventDates: string[] }) {
               key={cell.key}
               href={`/calendar?view=day&date=${cell.iso}`}
               className={`${base} ${tone}`}
-              title={cell.hasEvent ? "Есть события" : undefined}
+              title={hasEvent ? "Есть события" : undefined}
             >
-              <span>{cell.day}</span>
-              {cell.hasEvent && !cell.isToday ? (
+              <span className="leading-none">{cell.day}</span>
+              {hasEvent && !cell.isToday ? (
                 <span
                   aria-hidden
-                  className="absolute bottom-0.5 h-1 w-1 rounded-full bg-accent"
-                />
+                  className="flex flex-row gap-[2px] h-[3px] mt-px"
+                >
+                  {cell.kinds.slice(0, 4).map((k) => (
+                    <span
+                      key={k}
+                      className="h-[3px] w-[3px] rounded-full"
+                      style={{ background: MINI_CALENDAR_KIND_COLOR[k] }}
+                    />
+                  ))}
+                </span>
               ) : null}
             </Link>
           );
