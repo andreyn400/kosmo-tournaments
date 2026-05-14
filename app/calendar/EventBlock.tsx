@@ -5,22 +5,23 @@ import {
   eventBlockStyle,
   eventSubtitle,
   eventTitle,
+  type EventBlockStyle,
 } from "@/lib/calendar-events";
-import { formatTimeRange } from "@/lib/calendar-layout";
-import { formatTimeRu } from "@/lib/format-date";
 
 type Density = "comfortable" | "compact" | "pill";
 
 const RENTAL_STRIPE =
   "repeating-linear-gradient(45deg, rgba(255,255,255,0.10) 0 6px, transparent 6px 14px)";
 
-function statusClass(event: CalendarEvent): string {
+const MIN_HEIGHT_FOR_SUBTITLE = 40;
+
+function statusBgClass(event: CalendarEvent): string {
   if (event.kind !== "tournament" && event.kind !== "league_session") {
     return "bg-white border-border";
   }
   const status = event.tournamentStatus;
   if (status === "in_progress") {
-    return "bg-[color-mix(in_oklab,var(--color-accent)_14%,white)] border-[color-mix(in_oklab,var(--color-accent)_50%,white)] before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-accent before:rounded-l-[inherit]";
+    return "bg-[color-mix(in_oklab,var(--color-accent)_14%,white)] border-[color-mix(in_oklab,var(--color-accent)_50%,white)]";
   }
   if (status === "completed") {
     return "bg-[var(--color-success-soft)] border-[color-mix(in_oklab,var(--color-success)_30%,white)]";
@@ -28,13 +29,21 @@ function statusClass(event: CalendarEvent): string {
   return "bg-white border-border";
 }
 
+function dotColor(style: EventBlockStyle): string {
+  return style.useStatusStyle ? "var(--color-accent)" : style.background;
+}
+
 export function EventBlock({
   event,
   density = "comfortable",
+  blockHeightPx,
   onClick,
 }: {
   event: CalendarEvent;
   density?: Density;
+  /** Rendered block height in px. Required for compact/comfortable to decide
+   *  whether subtitle fits. Parents compute it from rowSpan × ROW_HEIGHT. */
+  blockHeightPx?: number;
   onClick?: () => void;
 }) {
   const title = eventTitle(event);
@@ -43,45 +52,55 @@ export function EventBlock({
 
   if (density === "pill") {
     return (
-      <PillBlock
-        event={event}
-        title={title}
-        onClick={onClick}
-        useStatusStyle={style.useStatusStyle}
-        background={style.background}
-        ink={style.ink}
-        stripe={style.stripe}
-        badge={style.badge}
-      />
+      <PillBlock event={event} title={title} style={style} onClick={onClick} />
     );
   }
 
-  const timeLabel = event.startTime
-    ? formatTimeRange(event.startTime, event.durationHours)
-    : "Без времени";
+  const showSubtitle =
+    density === "comfortable" &&
+    !!subtitle &&
+    (blockHeightPx ?? Number.POSITIVE_INFINITY) >= MIN_HEIGHT_FOR_SUBTITLE;
 
   if (style.useStatusStyle) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className={`relative w-full h-full overflow-hidden text-left rounded-md border px-2 py-1.5 transition-colors hover:border-border-strong ${statusClass(event)}`}
+        className={`relative w-full h-full overflow-hidden text-left rounded-[4px] border transition-colors hover:border-border-strong ${statusBgClass(event)}`}
       >
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="text-xs font-semibold text-black truncate">
+        <div
+          className="flex items-start"
+          style={{ gap: 4, padding: "4px 6px" }}
+        >
+          <span
+            aria-hidden
+            className="shrink-0 rounded-full"
+            style={{
+              width: 6,
+              height: 6,
+              marginTop: 5,
+              background: dotColor(style),
+            }}
+          />
+          <span
+            className="truncate font-semibold text-black flex-1 min-w-0"
+            style={{ fontSize: "0.75rem", lineHeight: 1.4 }}
+          >
             {title}
-          </div>
-          {density === "comfortable" && (
-            <>
-              <div className="text-[11px] text-muted truncate">{timeLabel}</div>
-              {subtitle && (
-                <div className="text-[11px] text-muted truncate">
-                  {subtitle}
-                </div>
-              )}
-            </>
-          )}
+          </span>
         </div>
+        {showSubtitle && (
+          <div
+            className="truncate text-muted"
+            style={{
+              padding: "0 6px 4px",
+              fontSize: "0.7rem",
+              lineHeight: 1.25,
+            }}
+          >
+            {subtitle}
+          </div>
+        )}
       </button>
     );
   }
@@ -90,47 +109,60 @@ export function EventBlock({
     <button
       type="button"
       onClick={onClick}
-      className="relative w-full h-full overflow-hidden text-left rounded-md border border-transparent px-2 py-1.5 transition-[filter] hover:brightness-110"
-      style={{
-        background: style.background,
-        backgroundImage: style.stripe ? RENTAL_STRIPE : undefined,
-        color: style.ink,
-      }}
+      className="relative w-full h-full overflow-hidden text-left rounded-[4px] border border-transparent transition-[filter] hover:brightness-110"
+      style={{ background: style.background }}
     >
-      {style.badge && (
+      <div
+        className="relative flex items-start"
+        style={{ gap: 4, padding: "4px 6px", zIndex: 1 }}
+      >
+        {style.badge && (
+          <span
+            className="shrink-0 font-semibold uppercase tracking-wide"
+            style={{
+              fontSize: "0.6rem",
+              background: "rgba(0,0,0,0.25)",
+              color: "#ffffff",
+              borderRadius: 3,
+              padding: "1px 4px",
+              lineHeight: 1.4,
+            }}
+          >
+            {style.badge}
+          </span>
+        )}
         <span
-          className="absolute top-1 right-1 px-1 h-[14px] inline-flex items-center justify-center rounded-[3px] bg-white/25 text-[9px] font-semibold tracking-wider uppercase leading-none"
-          style={{ color: style.ink }}
-        >
-          {style.badge}
-        </span>
-      )}
-      <div className="flex flex-col gap-0.5 min-w-0 pr-10">
-        <div
-          className="text-xs font-semibold truncate"
-          style={{ color: style.ink }}
+          className="truncate font-semibold flex-1 min-w-0"
+          style={{
+            fontSize: "0.75rem",
+            color: "#ffffff",
+            lineHeight: 1.4,
+          }}
         >
           {title}
-        </div>
-        {density === "comfortable" && (
-          <>
-            <div
-              className="text-[11px] truncate opacity-90"
-              style={{ color: style.ink }}
-            >
-              {timeLabel}
-            </div>
-            {subtitle && (
-              <div
-                className="text-[11px] truncate opacity-90"
-                style={{ color: style.ink }}
-              >
-                {subtitle}
-              </div>
-            )}
-          </>
-        )}
+        </span>
       </div>
+      {showSubtitle && (
+        <div
+          className="relative truncate"
+          style={{
+            padding: "0 6px 4px",
+            fontSize: "0.7rem",
+            color: "rgba(255,255,255,0.85)",
+            lineHeight: 1.25,
+            zIndex: 1,
+          }}
+        >
+          {subtitle}
+        </div>
+      )}
+      {style.stripe && (
+        <div
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{ backgroundImage: RENTAL_STRIPE }}
+        />
+      )}
     </button>
   );
 }
@@ -138,36 +170,34 @@ export function EventBlock({
 function PillBlock({
   event,
   title,
+  style,
   onClick,
-  useStatusStyle,
-  background,
-  ink,
-  stripe,
-  badge,
 }: {
   event: CalendarEvent;
   title: string;
+  style: EventBlockStyle;
   onClick?: () => void;
-  useStatusStyle: boolean;
-  background: string;
-  ink: string;
-  stripe: boolean;
-  badge: string | null;
 }) {
-  const t = formatTimeRu(event.startTime);
-
-  if (useStatusStyle) {
+  if (style.useStatusStyle) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className={`relative w-full block overflow-hidden text-left rounded-[4px] border px-1.5 h-[18px] leading-[16px] text-[10.5px] hover:border-border-strong ${statusClass(event)}`}
+        className={`relative w-full overflow-hidden text-left rounded-[4px] border h-[18px] hover:brightness-105 ${statusBgClass(event)}`}
+        style={{ padding: "0 6px" }}
       >
-        <span className="truncate block">
-          {t ? (
-            <span className="text-muted tabular-nums mr-1">{t}</span>
-          ) : null}
-          <span className="font-medium text-black">{title}</span>
+        <span className="flex items-center gap-1 min-w-0 h-full">
+          <span
+            aria-hidden
+            className="shrink-0 rounded-full"
+            style={{ width: 6, height: 6, background: dotColor(style) }}
+          />
+          <span
+            className="font-medium text-black truncate flex-1 min-w-0"
+            style={{ fontSize: "0.7rem", lineHeight: "16px" }}
+          >
+            {title}
+          </span>
         </span>
       </button>
     );
@@ -177,27 +207,28 @@ function PillBlock({
     <button
       type="button"
       onClick={onClick}
-      className="relative w-full block overflow-hidden text-left rounded-[4px] border border-transparent px-1.5 h-[18px] leading-[16px] text-[10.5px] hover:brightness-110"
-      style={{
-        background,
-        backgroundImage: stripe ? RENTAL_STRIPE : undefined,
-        color: ink,
-      }}
-      title={badge ? `${badge}: ${title}` : title}
+      className="relative w-full overflow-hidden text-left rounded-[4px] border border-transparent h-[18px] hover:brightness-110"
+      style={{ background: style.background, padding: "0 6px" }}
     >
-      <span className="truncate block">
-        {t ? (
-          <span
-            className="tabular-nums mr-1 opacity-90"
-            style={{ color: ink }}
-          >
-            {t}
-          </span>
-        ) : null}
-        <span className="font-semibold" style={{ color: ink }}>
+      <span className="relative flex items-center min-w-0 h-full" style={{ zIndex: 1 }}>
+        <span
+          className="font-medium truncate flex-1 min-w-0"
+          style={{
+            fontSize: "0.7rem",
+            lineHeight: "16px",
+            color: "#ffffff",
+          }}
+        >
           {title}
         </span>
       </span>
+      {style.stripe && (
+        <span
+          aria-hidden
+          className="absolute inset-0 pointer-events-none"
+          style={{ backgroundImage: RENTAL_STRIPE }}
+        />
+      )}
     </button>
   );
 }

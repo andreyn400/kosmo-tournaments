@@ -117,6 +117,7 @@ export function WeekView({
                     <EventBlock
                       event={e}
                       density="compact"
+                      blockHeightPx={40}
                       onClick={() => onSelectEvent?.(e)}
                     />
                   </div>
@@ -216,6 +217,7 @@ export function WeekView({
               const rowEnd = rowStart + p.rowSpan;
               const widthPct = 100 / p.laneCount;
               const leftPct = p.laneIndex * widthPct;
+              const blockHeightPx = p.rowSpan * 32 - 4;
               return (
                 <div
                   key={`${p.event.key}:${p.day}`}
@@ -234,6 +236,7 @@ export function WeekView({
                     <EventBlock
                       event={p.event}
                       density="compact"
+                      blockHeightPx={blockHeightPx}
                       onClick={() => onSelectEvent?.(p.event)}
                     />
                   </div>

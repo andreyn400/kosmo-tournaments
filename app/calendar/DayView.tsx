@@ -136,6 +136,7 @@ export function DayView({
                     <EventBlock
                       event={event}
                       density="compact"
+                      blockHeightPx={40}
                       onClick={() => onSelectEvent?.(event)}
                     />
                   </div>
@@ -210,6 +211,7 @@ export function DayView({
               if (colIdx === -1) return null;
               const rowStart = p.rowStart + 2;
               const rowEnd = rowStart + p.rowSpan;
+              const blockHeightPx = p.rowSpan * 32 - 4;
               return (
                 <div
                   key={`${p.event.key}:${p.columnKey}`}
@@ -220,6 +222,7 @@ export function DayView({
                 >
                   <EventBlock
                     event={p.event}
+                    blockHeightPx={blockHeightPx}
                     onClick={() => onSelectEvent?.(p.event)}
                   />
                 </div>
