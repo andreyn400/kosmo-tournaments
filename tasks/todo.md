@@ -1871,3 +1871,198 @@ Workflow: write plan (this section) → confirm with user → build top-to-botto
 - `components/site/SidebarMiniCalendar.tsx` — switch to range-aware query
 
 Total surface: ~9 files, 1 new, no deletions, expected ~500–700 lines net change.
+
+---
+
+# Phase 12B — Weekly report at /ops/report
+
+Goal: replace the placeholder at `/ops/report` with a real weekly operations report. Single page, single commit. Adds one small DB table (`app_settings`) so the SQL handoff comes first.
+
+Workflow: write plan → confirm with user → SQL handoff → wait for "ran clean" → build top-to-bottom → `npm run build` + `npm run lint` clean → browser verification → single commit.
+
+## 12B.0 Open decisions (resolved before planning)
+
+- [x] Tournament fees included as «Турниры (расчётно)» with a small inline note explaining the value is computed from `entry_fee × registrations` for tournaments whose `date_start` falls in the week, not from confirmed payments.
+- [x] ~~Weekly revenue target~~ — **REMOVED from scope.** No `app_settings` table, no target card, no SQL migration. Report shows revenue, utilization, payouts, top programs, and sessions breakdown only.
+- [x] Court utilization counts each court independently — a multi-court session contributes its full duration to each of its courts (operator-intuitive view).
+- [x] Sessions breakdown renders as one date-headed sub-table per day with sessions. Days without sessions are skipped.
+
+## 12B.1 Sub-phase: SQL — app_settings table (USER RUNS)
+
+- [ ] 12B.1.1 Append to `supabase/schema.sql`:
+  ```sql
+  create table app_settings (
+    id int primary key default 1,
+    weekly_revenue_target_rub int not null default 200000,
+    updated_at timestamptz default now(),
+    constraint single_row check (id = 1)
+  );
+  insert into app_settings (id) values (1) on conflict do nothing;
+  ```
+- [ ] 12B.1.2 Hand the SQL to the user; wait for "SQL ran clean" before any UI code.
+
+## 12B.2 Sub-phase: Types + fallback constant
+
+- [ ] 12B.2.1 In `lib/types.ts`, add:
+  ```ts
+  export interface AppSettings {
+    id: number;
+    weekly_revenue_target_rub: number;
+    updated_at: string;
+  }
+  ```
+- [ ] 12B.2.2 In `lib/ops-constants.ts`, export `WEEKLY_REVENUE_TARGET_FALLBACK_RUB = 200_000` (used when the settings row is missing — defensive, the migration inserts the row).
+
+## 12B.3 Sub-phase: Query layer
+
+- [ ] 12B.3.1 `lib/queries/settings.ts` — `getAppSettings(): Promise<AppSettings>` (returns fallback if missing); `updateWeeklyRevenueTarget(rub: number): Promise<void>` (UPDATE app_settings set weekly_revenue_target_rub = … where id = 1).
+- [ ] 12B.3.2 `lib/queries/report.ts` — `getWeeklyReport(weekStartIso: string): Promise<WeeklyReport>`. Single parallel batch of queries, then in-memory aggregation:
+  - `schedule_sessions` for the week with nested program + session_coaches → coaches (exclude `cancelled`)
+  - `rental_blocks` via `listRentalBlocksForRange(weekStart, weekEnd)` plus the rental_slots table for slot revenue (rental contracts store an effective hourly rate? — if no per-slot rate exists, use the rental_payments amounts within the week instead; confirm during implementation)
+  - `tournaments` with `date_start` within the week + their `tournament_registrations` (count only)
+  - `coaches` (all active) — reused for the payout table
+  - `courts` (all active) — for utilization rows + court-number labels
+- [ ] 12B.3.3 The returned `WeeklyReport` shape:
+  ```ts
+  export interface WeeklyReport {
+    weekStartIso: string;
+    weekEndIso: string;
+    revenue: {
+      rentals_rub: number;
+      scheduler_rub: number;
+      tournaments_estimated_rub: number;
+      total_rub: number;
+    };
+    target: { target_rub: number; pct: number };
+    courtUtilization: Array<{
+      court_id: string;
+      court_number: number;
+      booked_hours: number;
+      available_hours: number; // 112 = 16h × 7d
+      pct: number;
+    }>;
+    coachPayouts: Array<{
+      coach_id: string;
+      coach_name: string;
+      coach_color: string;
+      sessions: number;
+      gross_revenue_rub: number;
+      payout_rub: number;
+    }>;
+    topPrograms: Array<{
+      program_name: string;
+      program_type: string | null;
+      sessions: number;
+      revenue_rub: number;
+    }>;
+    sessionsByDay: Array<{
+      date: string;
+      rows: Array<{
+        id: string;
+        start_time: string;
+        end_time: string;
+        program_name: string | null;
+        program_type: string | null;
+        coach_names: string[];
+        court_numbers: number[];
+        attendees: number;
+        revenue_rub: number;
+      }>;
+    }>;
+  }
+  ```
+- [ ] 12B.3.4 Coach payout calculation reuses `computeEarnings` from `lib/queries/coaches.ts` — flat-rate coaches get `flat_rate_rub × sessions`; percent coaches get `court_revenue × court_pct + coaching_fee × coaching_pct`.
+
+## 12B.4 Sub-phase: page shell
+
+- [ ] 12B.4.1 `app/ops/report/page.tsx`:
+  - `searchParams: { week?: string }`
+  - Validate `week` as YYYY-MM-DD; fall back to `startOfWeekMon(todayIso())` from `lib/calendar-range.ts`
+  - Parallel fetch: `getWeeklyReport(weekStart)` + `getAppSettings()`
+  - Pass to client components; PageShell title = «Отчёт».
+
+## 12B.5 Sub-phase: week navigation header
+
+- [ ] 12B.5.1 `ReportWeekHeader.tsx` — ◀ ▶ arrows (prev/next week via `addDays(weekStart, ±7)`), «Эта неделя» button (jumps to `startOfWeekMon(todayIso())`), date-range label «12–18 мая 2026» using `formatDateRu` for the start/end.
+- [ ] 12B.5.2 Client component, navigates via `useRouter().push('/ops/report?week=…')`.
+
+## 12B.6 Sub-phase: revenue summary card
+
+- [ ] 12B.6.1 `RevenueSummaryCard.tsx` — title «Доход за неделю», large total ₽ number, then three breakdown rows: «Аренда», «Сессии», «Турниры (расчётно)».
+- [ ] 12B.6.2 The «Турниры (расчётно)» row has a small `(i)` icon with a `title=` tooltip: «Сумма entry_fee × число регистраций для турниров с датой начала в этой неделе. Не учитывает фактическую оплату.»
+
+## 12B.7 Sub-phase: revenue target card (with inline edit)
+
+- [ ] 12B.7.1 `RevenueTargetCard.tsx` — client component. Renders horizontal progress bar (CSS bar 8 px tall) colored by threshold:
+  - `< 50 %` → `--color-danger`
+  - `50 % – 90 %` → `--color-warning`
+  - `≥ 90 %` → `--color-success`
+- [ ] 12B.7.2 Label: «Цель: ₽200 000 · Факт: ₽184 250 · 92 %». Small pencil button on the right opens an inline number input + Save/Cancel buttons.
+- [ ] 12B.7.3 `app/ops/report/update-target-action.ts` — `'use server'`, validates positive integer, calls `updateWeeklyRevenueTarget`, `revalidatePath('/ops/report')`.
+
+## 12B.8 Sub-phase: court utilization card
+
+- [ ] 12B.8.1 `CourtUtilizationCard.tsx` — title «Загрузка кортов», one row per active court: «Корт 1» label, percentage bar (filled `pct%`, accent color), and right-aligned «48 ч / 112 ч · 43 %».
+- [ ] 12B.8.2 Rows sorted by court number asc.
+
+## 12B.9 Sub-phase: coach payouts table
+
+- [ ] 12B.9.1 `CoachPayoutsTable.tsx` — compact 44 px-row table. Columns: coach (with color dot), sessions, gross revenue ₽, payout ₽.
+- [ ] 12B.9.2 Sorted by payout desc. Coaches with zero sessions this week are excluded.
+- [ ] 12B.9.3 Server-rendered (no interactivity beyond the table).
+
+## 12B.10 Sub-phase: top programs card
+
+- [ ] 12B.10.1 `TopProgramsCard.tsx` — title «Топ программ», top 5 rows: small program-type color dot (from `programTypeColor(type).block`) + program name + small «12 сессий» count + right-aligned revenue ₽.
+- [ ] 12B.10.2 Sorted by revenue desc. Empty state: «Нет данных за эту неделю.»
+
+## 12B.11 Sub-phase: sessions breakdown by day
+
+- [ ] 12B.11.1 `SessionsBreakdownByDay.tsx` — title «Все сессии». For each day with sessions, render:
+  - Date header «Понедельник, 11 мая» (use `formatDateRu` + weekday name)
+  - Compact 44 px-row table: time («10:30–12:00»), program (with color dot + name + ОПС/program-type if applicable), coaches (comma-joined names), courts («№1, №3»), attendees, revenue ₽
+- [ ] 12B.11.2 Days with no sessions are skipped entirely (no empty headers).
+
+## 12B.12 Sub-phase: verify, polish, commit
+
+- [ ] 12B.12.1 `npm run build` clean (Turbopack).
+- [ ] 12B.12.2 `npm run lint` exits 0.
+- [ ] 12B.12.3 Browser sweep on `/ops/report`:
+  - Default load shows current week with correct title
+  - ◀ ▶ navigate to ±1 week with URL updating
+  - «Эта неделя» jumps back to current week
+  - Target inline edit works (open input, change to 250000, save → bar recomputes pct)
+  - Coach payouts table shows expected coaches with non-zero sessions
+  - Sessions breakdown groups correctly by day, skips empty days
+- [ ] 12B.12.4 No file over 600 lines. Confirm with `wc -l app/ops/report/*.tsx lib/queries/report.ts lib/queries/settings.ts`.
+- [ ] 12B.12.5 Single commit: `Phase 12B: weekly report at /ops/report`. Push to `origin/main`.
+
+---
+
+## Out of scope for Phase 12B
+
+- No per-court drill-down page.
+- No export to CSV / PDF.
+- No week-over-week comparisons.
+- No operator-configurable peak window (still uses `PEAK_START_HOUR` / `PEAK_END_HOUR` constants).
+- No edits to underlying session/payment data from the report — read-only except for the target.
+- No new event source on the calendar from report data — already covered in Phase 12A.
+
+## Files touched (expected)
+
+- `supabase/schema.sql` — append `app_settings` table
+- `lib/types.ts` — `AppSettings` interface
+- `lib/ops-constants.ts` — fallback constant
+- `lib/queries/settings.ts` — **new**
+- `lib/queries/report.ts` — **new** (~250 lines, the heavy fold)
+- `app/ops/report/page.tsx` — rewrite (~60 lines)
+- `app/ops/report/ReportWeekHeader.tsx` — **new**
+- `app/ops/report/RevenueSummaryCard.tsx` — **new**
+- `app/ops/report/RevenueTargetCard.tsx` — **new** (client)
+- `app/ops/report/CourtUtilizationCard.tsx` — **new**
+- `app/ops/report/CoachPayoutsTable.tsx` — **new**
+- `app/ops/report/TopProgramsCard.tsx` — **new**
+- `app/ops/report/SessionsBreakdownByDay.tsx` — **new**
+- `app/ops/report/update-target-action.ts` — **new**
+
+Total surface: ~12 files (10 new + 1 rewrite + 3 small edits), 0 deletions, expected ~1100 lines net change.
