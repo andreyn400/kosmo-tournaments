@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { openRegistrationAction } from "./open-registration-action";
 
 export function OpenRegistrationButton({
@@ -11,6 +12,7 @@ export function OpenRegistrationButton({
   tournamentId: string;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [pending, startTransition] = useTransition();
 
   const open = () => {
@@ -22,7 +24,7 @@ export function OpenRegistrationButton({
 
   return (
     <Button size="lg" disabled={pending} onClick={open}>
-      {pending ? "Открытие…" : "Открыть регистрацию"}
+      {pending ? t("open_reg.opening") : t("open_reg.cta")}
     </Button>
   );
 }

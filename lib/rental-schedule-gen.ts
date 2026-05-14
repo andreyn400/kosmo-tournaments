@@ -1,4 +1,6 @@
 import type { RentalPaymentScheduleType } from "./types";
+import type { Lang } from "@/lib/i18n/types";
+import { formatMonth } from "@/lib/i18n/format";
 
 /**
  * Generate the expected payment schedule for a contract. Pro-rated by days so
@@ -12,6 +14,11 @@ import type { RentalPaymentScheduleType } from "./types";
  * `custom`    → empty (operator builds manually).
  *
  * Returns the entries with NO contract_id — caller stamps it before insert.
+ *
+ * Labels are localized at generation time using `labels.lang` (for monthly
+ * names) and `labels.fullPayment` (for the one-time case). The result is
+ * persisted as data, so a contract created in RU keeps RU labels even if the
+ * UI later switches to EN — call `regenerateScheduleAction` to rewrite.
  */
 export interface GeneratedScheduleEntry {
   period_label: string;
@@ -19,21 +26,6 @@ export interface GeneratedScheduleEntry {
   due_date: string;
   notes: string | null;
 }
-
-const MONTH_NAMES_RU = [
-  "Январь",
-  "Февраль",
-  "Март",
-  "Апрель",
-  "Май",
-  "Июнь",
-  "Июль",
-  "Август",
-  "Сентябрь",
-  "Октябрь",
-  "Ноябрь",
-  "Декабрь",
-];
 
 function parseIsoLocal(iso: string): Date {
   return new Date(iso + "T00:00:00");
@@ -58,8 +50,15 @@ export function generateSchedule(params: {
   end_date: string;
   total_value_rub: number;
   payment_schedule_type: RentalPaymentScheduleType;
+  labels: { fullPayment: string; lang: Lang };
 }): GeneratedScheduleEntry[] {
-  const { start_date, end_date, total_value_rub, payment_schedule_type } = params;
+  const {
+    start_date,
+    end_date,
+    total_value_rub,
+    payment_schedule_type,
+    labels,
+  } = params;
 
   if (payment_schedule_type === "custom") return [];
   if (total_value_rub <= 0) return [];
@@ -67,7 +66,7 @@ export function generateSchedule(params: {
   if (payment_schedule_type === "one_time") {
     return [
       {
-        period_label: "Полная оплата",
+        period_label: labels.fullPayment,
         amount_due_rub: total_value_rub,
         due_date: start_date,
         notes: null,
@@ -115,7 +114,7 @@ export function generateSchedule(params: {
 
     let label: string;
     if (payment_schedule_type === "monthly") {
-      label = `${MONTH_NAMES_RU[p.start.getMonth()]} ${p.start.getFullYear()}`;
+      label = formatMonth(p.start.getFullYear(), p.start.getMonth(), labels.lang);
     } else {
       const q = Math.floor(p.start.getMonth() / 3) + 1;
       label = `Q${q} ${p.start.getFullYear()}`;

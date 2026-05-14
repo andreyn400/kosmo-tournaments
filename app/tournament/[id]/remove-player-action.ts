@@ -2,17 +2,24 @@
 
 import { revalidatePath } from "next/cache";
 import { deleteRegistrationWithPartner } from "@/lib/queries/registrations";
+import { getServerDict } from "@/lib/i18n/server";
 
 export async function removePlayerAction(input: {
   tournamentId: string;
   registrationId: string;
   divisionId?: string | null;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   try {
     await deleteRegistrationWithPartner(input.registrationId);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось удалить игрока: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.remove_player_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
   revalidatePath(`/tournament/${input.tournamentId}`);
   if (input.divisionId) {

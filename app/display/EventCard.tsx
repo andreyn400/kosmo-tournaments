@@ -1,29 +1,34 @@
-import { DIVISION_CATEGORY_LABEL_RU, FORMAT_LABEL_RU } from "@/lib/constants";
+"use client";
+
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { TOURNAMENT_FORMAT_KEY } from "@/lib/i18n/tournament-keys";
+import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
+import type { TranslationKey } from "@/lib/i18n";
 import type { DisplayEvent, DisplayEventStatus } from "@/lib/queries/display";
 import { UpcomingBody } from "./UpcomingBody";
 import { LiveBody } from "./LiveBody";
 import { CompletedBody } from "./CompletedBody";
 
 type StatusMeta = {
-  label: string;
+  labelKey: TranslationKey;
   stripe: string;
   badge: string;
 };
 
 const STATUS_META: Record<DisplayEventStatus, StatusMeta> = {
   upcoming: {
-    label: "СКОРО",
+    labelKey: "display.status.upcoming",
     stripe: "bg-accent",
     badge: "bg-warning-soft text-warning border border-warning/30",
   },
   in_progress: {
-    label: "ИДЁТ",
+    labelKey: "display.status.in_progress",
     stripe: "bg-[var(--color-success)]",
     badge:
       "bg-success-soft text-[var(--color-success)] border border-[var(--color-success)]/30",
   },
   completed: {
-    label: "ЗАВЕРШЁН",
+    labelKey: "display.status.completed",
     stripe: "bg-border-strong",
     badge: "bg-subtle text-muted border border-border",
   },
@@ -34,8 +39,10 @@ type EventCardProps = {
 };
 
 export function EventCard({ event }: EventCardProps) {
+  const { t } = useTranslation();
   const meta = STATUS_META[event.status];
   const muted = event.status === "completed";
+  const courtPrefix = t("tournament.card.court_short_prefix");
 
   return (
     <article
@@ -59,11 +66,11 @@ export function EventCard({ event }: EventCardProps) {
             <div className="flex flex-wrap items-center gap-2">
               {event.category ? (
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold tracking-wider uppercase bg-accent-soft text-accent border border-accent/30">
-                  {DIVISION_CATEGORY_LABEL_RU[event.category]}
+                  {t(DIVISION_CATEGORY_KEY[event.category])}
                 </span>
               ) : null}
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-[0.7rem] font-semibold tracking-wider uppercase bg-subtle text-secondary border border-border">
-                {FORMAT_LABEL_RU[event.format]}
+                {t(TOURNAMENT_FORMAT_KEY[event.format])}
               </span>
               {event.startTime && (
                 <span className="inline-flex items-center text-[1.1rem] font-bold text-accent tabular-nums">
@@ -78,7 +85,7 @@ export function EventCard({ event }: EventCardProps) {
             <span
               className={`inline-flex items-center px-3 py-1 rounded-md text-xs font-bold tracking-wider ${meta.badge}`}
             >
-              {meta.label}
+              {t(meta.labelKey)}
             </span>
           </div>
         </header>
@@ -90,7 +97,8 @@ export function EventCard({ event }: EventCardProps) {
                 key={n}
                 className="inline-flex items-center px-3 py-1 rounded-md text-sm font-bold tabular-nums bg-accent-soft text-accent"
               >
-                К{n}
+                {courtPrefix}
+                {n}
               </span>
             ))}
           </div>

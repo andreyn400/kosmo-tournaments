@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/Input";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Program } from "@/lib/types";
 import { programTypeColor } from "@/lib/program-colors";
 
@@ -11,18 +12,12 @@ interface ProgramPickerProps {
   onSelect: (program: Program | null) => void;
 }
 
-/**
- * Compact program picker for the session popover: type-chip row + search +
- * scrollable filtered list. Selecting a program calls back with the full
- * `Program` so the popover can prefill duration / courts_needed / max_players
- * in one pass. "Без программы" stays available for ad-hoc bookings that
- * shouldn't be backed by a program (rare, but supported by the schema).
- */
 export function ProgramPicker({
   programs,
   selectedId,
   onSelect,
 }: ProgramPickerProps) {
+  const { t, tPlural } = useTranslation();
   const [search, setSearch] = useState("");
   const [activeType, setActiveType] = useState<string>("");
 
@@ -47,32 +42,31 @@ export function ProgramPicker({
     <div className="flex flex-col gap-2 min-w-0">
       <div className="flex flex-wrap items-center gap-1">
         <TypeChip
-          label="Все"
+          label={t("schedule.picker.all")}
           active={activeType === ""}
           color={null}
           onClick={() => setActiveType("")}
         />
-        {types.map((t) => (
+        {types.map((tp) => (
           <TypeChip
-            key={t}
-            label={t}
-            active={activeType === t}
-            color={programTypeColor(t).block}
-            onClick={() => setActiveType(t)}
+            key={tp}
+            label={tp}
+            active={activeType === tp}
+            color={programTypeColor(tp).block}
+            onClick={() => setActiveType(tp)}
           />
         ))}
       </div>
 
       <Input
         type="search"
-        placeholder="Поиск по названию программы…"
+        placeholder={t("schedule.picker.search")}
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="!h-9"
       />
 
       <div className="rounded-md border border-border bg-subtle/30 max-h-40 overflow-y-auto">
-        {/* "Без программы" option — always at the top, useful for rentals/open play */}
         <button
           type="button"
           onClick={() => onSelect(null)}
@@ -83,14 +77,14 @@ export function ProgramPicker({
               : "text-secondary hover:bg-subtle",
           ].join(" ")}
         >
-          <span className="italic">Без программы</span>
+          <span className="italic">{t("schedule.picker.no_program")}</span>
           <span className="text-fade ml-2 text-[10.5px]">
-            свободное бронирование / аренда
+            {t("schedule.picker.no_program_hint")}
           </span>
         </button>
         {filtered.length === 0 ? (
           <div className="p-3 text-center text-xs text-muted">
-            Ничего не найдено
+            {t("schedule.picker.no_results")}
           </div>
         ) : (
           filtered.slice(0, 40).map((p) => (
@@ -106,10 +100,17 @@ export function ProgramPicker({
 
       {selectedProgram && (
         <div className="text-[10.5px] text-muted tabular-nums px-1">
-          {selectedProgram.duration_minutes} мин · {selectedProgram.courts_needed}{" "}
-          {selectedProgram.courts_needed === 1 ? "корт" : "корта"} · до{" "}
-          {selectedProgram.max_players ?? "—"} игр. · Пик{" "}
-          {selectedProgram.price_peak_rub} ₽ · Off-peak{" "}
+          {selectedProgram.duration_minutes} {t("unit.minutes_short")} ·{" "}
+          {selectedProgram.courts_needed}{" "}
+          {tPlural(selectedProgram.courts_needed, {
+            one: "schedule.picker.courts.one",
+            few: "schedule.picker.courts.few",
+            many: "schedule.picker.courts.many",
+          })}{" "}
+          · {t("schedule.picker.up_to")} {selectedProgram.max_players ?? "—"}{" "}
+          {t("schedule.picker.players_short")} ·{" "}
+          {t("schedule.picker.peak_label")} {selectedProgram.price_peak_rub} ₽ ·{" "}
+          {t("schedule.picker.off_peak_label")}{" "}
           {selectedProgram.price_offpeak_rub} ₽
         </div>
       )}
@@ -155,6 +156,7 @@ function ProgramRow({
   active: boolean;
   onClick: () => void;
 }) {
+  const { t } = useTranslation();
   const c = programTypeColor(program.type);
   return (
     <button
@@ -174,7 +176,10 @@ function ProgramRow({
       />
       <span className="flex-1 min-w-0 truncate">{program.name}</span>
       <span className="text-[10px] text-muted tabular-nums flex-shrink-0">
-        {program.duration_minutes}м · {program.max_players ?? "?"}и
+        {program.duration_minutes}
+        {t("schedule.picker.row.minutes_suffix")} ·{" "}
+        {program.max_players ?? "?"}
+        {t("schedule.picker.row.players_suffix")}
       </span>
     </button>
   );

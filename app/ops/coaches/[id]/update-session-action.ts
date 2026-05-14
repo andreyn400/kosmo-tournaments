@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getProgram } from "@/lib/queries/programs";
 import { updateSession } from "@/lib/queries/schedule-sessions";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import {
   validateSessionInput,
   type RawSessionInput,
@@ -13,16 +15,18 @@ export async function updateSessionAction(
   sessionId: string,
   raw: RawSessionInput,
 ): Promise<{ error?: string }> {
-  if (!coachId || !sessionId) return { error: "Сессия не найдена." };
+  const dict = await getServerDict();
+  if (!coachId || !sessionId) return { error: dict["error.not_found.session"] };
   const program = raw.program_id ? await getProgram(raw.program_id) : null;
   const v = validateSessionInput(raw, program);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
 
   try {
     await updateSession(sessionId, v.value);
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось сохранить сессию.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.save.session"],
     };
   }
 

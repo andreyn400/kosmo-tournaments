@@ -2,8 +2,12 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import {
+  formatDate,
+  getWeekdayLongLabels,
+} from "@/lib/i18n/format";
 import type { Court, RentalBlockForGrid } from "@/lib/types";
-import { DAY_LABELS_LONG, formatDateRu } from "../coaches/format";
 
 const POPOVER_WIDTH = 340;
 const POPOVER_GAP = 8;
@@ -16,18 +20,14 @@ interface RentalInfoPopoverProps {
   onClose: () => void;
 }
 
-/**
- * Compact read-only info card for a rental occurrence. Anchored to the
- * clicked block; same positioning model as `SessionPopover` (right of the
- * anchor, flip-left if it overflows, viewport clamp) but smaller and with
- * no edit affordances — operators manage rentals from /ops/rentals/[id].
- */
 export function RentalInfoPopover({
   block,
   anchor,
   courts,
   onClose,
 }: RentalInfoPopoverProps) {
+  const { t, lang } = useTranslation();
+  const dayLong = getWeekdayLongLabels(lang);
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(
     null,
@@ -65,12 +65,12 @@ export function RentalInfoPopover({
         onClose();
       }
     }
-    const t = setTimeout(() => {
+    const tm = setTimeout(() => {
       document.addEventListener("pointerdown", onPointerDown);
     }, 0);
     document.addEventListener("keydown", onKey);
     return () => {
-      clearTimeout(t);
+      clearTimeout(tm);
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
@@ -80,9 +80,6 @@ export function RentalInfoPopover({
     .map((id) => courts.find((c) => c.id === id)?.name ?? "?")
     .join(", ");
 
-  // Day of week of the instance (0=Mon..6=Sun). Use Date math same as the
-  // expansion query so the label stays consistent with what the operator
-  // sees on the rental detail page.
   const instanceDate = new Date(block.date + "T00:00:00");
   const dow = (instanceDate.getDay() + 6) % 7;
 
@@ -90,7 +87,7 @@ export function RentalInfoPopover({
     <div
       ref={ref}
       role="dialog"
-      aria-label={`Аренда: ${block.client_name}`}
+      aria-label={t("schedule.rental_popover.aria", { name: block.client_name })}
       className="fixed z-50 bg-surface rounded-card border border-border shadow-xl flex flex-col"
       style={{
         top: position?.top ?? -9999,
@@ -105,7 +102,7 @@ export function RentalInfoPopover({
           className="inline-flex items-center px-1.5 h-5 rounded text-[10px] font-bold uppercase tracking-wider"
           style={{ background: "#0d9488", color: "#fff" }}
         >
-          Аренда
+          {t("schedule.rental.label")}
         </span>
         <h2 className="text-sm font-semibold text-black flex-1 truncate">
           {block.client_name}
@@ -113,7 +110,7 @@ export function RentalInfoPopover({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Закрыть"
+          aria-label={t("event.popover.close")}
           className="w-7 h-7 inline-flex items-center justify-center rounded text-muted hover:bg-subtle hover:text-black transition-colors"
         >
           <svg
@@ -132,16 +129,23 @@ export function RentalInfoPopover({
       </header>
 
       <div className="px-4 py-3 flex flex-col gap-3">
-        <Field label="Номер контракта" value={block.contract_number} mono />
+        <Field
+          label={t("schedule.rental_popover.field.contract_no")}
+          value={block.contract_number}
+          mono
+        />
 
         <div className="grid gap-3 grid-cols-2">
-          <Field label="Дата" value={formatDateRu(block.date)} />
           <Field
-            label="День / время"
+            label={t("schedule.rental_popover.field.date")}
+            value={formatDate(block.date, lang)}
+          />
+          <Field
+            label={t("schedule.rental_popover.field.day_time")}
             value={
               <span>
                 <span className="block text-[11px] text-secondary">
-                  {DAY_LABELS_LONG[dow]}
+                  {dayLong[dow]}
                 </span>
                 <span className="tabular-nums">
                   {block.start_time.slice(0, 5)}–{block.end_time.slice(0, 5)}
@@ -151,10 +155,17 @@ export function RentalInfoPopover({
           />
         </div>
 
-        <Field label="Корты" value={courtNames || "—"} />
+        <Field
+          label={t("schedule.rental_popover.field.courts")}
+          value={courtNames || "—"}
+        />
 
         {block.slot_notes && (
-          <Field label="Заметка к слоту" value={block.slot_notes} multiline />
+          <Field
+            label={t("schedule.rental_popover.field.slot_notes")}
+            value={block.slot_notes}
+            multiline
+          />
         )}
       </div>
 
@@ -164,7 +175,7 @@ export function RentalInfoPopover({
           onClick={onClose}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
         >
-          Открыть контракт
+          {t("schedule.rental_popover.open_contract")}
           <svg
             width="11"
             height="11"

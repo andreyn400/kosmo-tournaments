@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans } from "next/font/google";
+import { LanguageProvider } from "@/components/i18n/LanguageProvider";
+import { getServerDict, getServerLang } from "@/lib/i18n/server";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -9,10 +11,13 @@ const dmSans = DM_Sans({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Kosmo Tournaments",
-  description: "Управление турнирами и лигами Kosmo Padel",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const dict = await getServerDict();
+  return {
+    title: "Kosmo Tournaments",
+    description: dict["app.meta_description"],
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#f0f2f5",
@@ -20,14 +25,17 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const lang = await getServerLang();
   return (
-    <html lang="ru" className={`${dmSans.variable} h-full antialiased`}>
-      <body className="min-h-full">{children}</body>
+    <html lang={lang} className={`${dmSans.variable} h-full antialiased`}>
+      <body className="min-h-full">
+        <LanguageProvider initialLang={lang}>{children}</LanguageProvider>
+      </body>
     </html>
   );
 }

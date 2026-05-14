@@ -18,6 +18,8 @@ import {
   allowedBracketSizesForTeam,
   smallestPow2AtLeast,
 } from "@/lib/finals-qualification";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
 import type { Match } from "@/lib/types";
 import { SetupWizard } from "./SetupWizard";
 
@@ -86,10 +88,16 @@ export default async function FinalsSetupPage({
     players,
   });
 
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
+
   const header = (
     <Link href={`/tournament/${id}`}>
       <Button variant="secondary" size="md">
-        К лиге
+        {tr("finals.back_to_league_short")}
       </Button>
     </Link>
   );
@@ -97,18 +105,20 @@ export default async function FinalsSetupPage({
   if (!allCompleted) {
     return (
       <PageShell
-        title={`Финалы · ${tournament.name}`}
+        title={tr("finals.title_with_name", { name: tournament.name })}
         action={header}
       >
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Сессии ещё не завершены</h2>
+          <h2 className="font-semibold text-black">
+            {tr("finals.setup.sessions_not_done_title")}
+          </h2>
           <p className="text-sm text-muted">
-            Завершите все сессии лиги, прежде чем создавать финальную сетку.
+            {tr("finals.setup.sessions_not_done_copy")}
           </p>
           <div>
             <Link href={`/tournament/${id}`}>
               <Button size="sm" variant="secondary">
-                Назад к лиге
+                {tr("finals.setup.back_to_league")}
               </Button>
             </Link>
           </div>
@@ -123,14 +133,21 @@ export default async function FinalsSetupPage({
       : allowedBracketSizesForIndividual(qualification.individuals.length);
 
   if (allowedSizes.length === 0) {
+    const req =
+      qualification.kind === "team"
+        ? tr("finals.setup.req_team")
+        : tr("finals.setup.req_individual");
     return (
-      <PageShell title={`Финалы · ${tournament.name}`} action={header}>
+      <PageShell
+        title={tr("finals.title_with_name", { name: tournament.name })}
+        action={header}
+      >
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Недостаточно участников</h2>
+          <h2 className="font-semibold text-black">
+            {tr("finals.setup.not_enough_title")}
+          </h2>
           <p className="text-sm text-muted">
-            Для сетки нужно минимум{" "}
-            {qualification.kind === "team" ? "1 пара" : "4 квалифицированных игрока"}
-            .
+            {tr("finals.setup.not_enough_copy", { req })}
           </p>
         </Card>
       </PageShell>
@@ -159,7 +176,10 @@ export default async function FinalsSetupPage({
     : allowedSizes[allowedSizes.length - 1];
 
   return (
-    <PageShell title={`Финалы · ${tournament.name}`} action={header}>
+    <PageShell
+      title={tr("finals.title_with_name", { name: tournament.name })}
+      action={header}
+    >
       <SetupWizard
         tournamentId={id}
         leagueFinalsDate={league.finals_date}

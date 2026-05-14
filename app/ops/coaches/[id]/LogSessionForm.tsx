@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
+import { SCHEDULE_SESSION_STATUS_KEY } from "@/lib/i18n/coach-keys";
 import type {
   Coach,
   Court,
@@ -14,7 +17,7 @@ import type {
 } from "@/lib/types";
 import { isPeakWindow } from "@/lib/program-groups";
 import { computeEarnings } from "@/lib/coach-earnings";
-import { formatRub, todayIso } from "../format";
+import { todayIso } from "../format";
 import { endFromStart, type RawSessionInput } from "./session-input";
 
 type Mode = "create" | "edit";
@@ -69,10 +72,6 @@ function makeInitial(
       attendeeCount: String(session.attendee_count),
       notes: session.notes ?? "",
       status: session.status,
-      // Default to auto-calc on edit too, so changing player count updates
-      // the live preview. The saved revenue snapshot is still prefilled into
-      // the manual fields below; flipping the "Указать суммы вручную"
-      // checkbox reveals them with the original values intact.
       manualRevenue: false,
       revenue: String(session.revenue_rub),
       courtRevenue: String(session.court_revenue_rub),
@@ -99,6 +98,12 @@ function makeInitial(
   };
 }
 
+const STATUS_OPTIONS: ScheduleSessionStatus[] = [
+  "completed",
+  "scheduled",
+  "cancelled",
+];
+
 export function LogSessionForm({
   mode,
   coach,
@@ -110,14 +115,7 @@ export function LogSessionForm({
   pending,
   onDelete,
 }: LogSessionFormProps) {
-  // State is initialised once at mount and is the sole source of truth
-  // afterwards. To re-init the form for a different session, parents must
-  // remount this component via `key={session.id}` (see SessionRow); to re-init
-  // for a new create, parents toggle `creating` so the conditional render
-  // unmounts/remounts. There is intentionally NO useEffect that syncs props →
-  // state — that pattern silently clobbered the user's typed values whenever
-  // the server-fetched `programs` / `courts` / `session` arrays came back with
-  // fresh references on parent re-renders.
+  const { t, lang } = useTranslation();
   const [state, setState] = useState<FormState>(() =>
     makeInitial(session, programs, courts),
   );
@@ -150,11 +148,11 @@ export function LogSessionForm({
     });
   }
 
-  function onStartTimeChange(t: string) {
+  function onStartTimeChange(time: string) {
     setState((s) => ({
       ...s,
-      startTime: t,
-      endTime: endFromStart(t, s.duration),
+      startTime: time,
+      endTime: endFromStart(time, s.duration),
     }));
   }
 
@@ -167,9 +165,6 @@ export function LogSessionForm({
     }));
   }
 
-  // Revenue = price_per_player × attendeeCount (the live typed value, NOT
-  // program.max_players). The whole preview must rebuild whenever attendees
-  // change, so attendeeCount must be in the dep array.
   const attendeeCount = Number.parseInt(state.attendeeCount, 10) || 0;
   const preview = useMemo(() => {
     if (!program) return null;
@@ -223,12 +218,12 @@ export function LogSessionForm({
       className="grid gap-3 p-4 rounded-md bg-subtle border border-border"
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_9rem_7rem]">
-        <Field label="Программа">
+        <Field label={t("coach.session.field.program")}>
           <Select
             value={state.programId}
             onChange={(e) => onProgramChange(e.target.value)}
           >
-            <option value="">Без программы</option>
+            <option value="">{t("coach.session.placeholder.no_program")}</option>
             {programs.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -236,43 +231,45 @@ export function LogSessionForm({
             ))}
           </Select>
         </Field>
-        <Field label="Дата">
+        <Field label={t("coach.session.field.date")}>
           <Input
             type="date"
             value={state.date}
             onChange={(e) => set("date", e.target.value)}
           />
         </Field>
-        <Field label="Статус">
+        <Field label={t("coach.session.field.status")}>
           <Select
             value={state.status}
             onChange={(e) =>
               set("status", e.target.value as ScheduleSessionStatus)
             }
           >
-            <option value="completed">Проведена</option>
-            <option value="scheduled">Запланирована</option>
-            <option value="cancelled">Отменена</option>
+            {STATUS_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {t(SCHEDULE_SESSION_STATUS_KEY[opt])}
+              </option>
+            ))}
           </Select>
         </Field>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Начало">
+        <Field label={t("coach.session.field.start")}>
           <Input
             type="time"
             value={state.startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
           />
         </Field>
-        <Field label="Окончание">
+        <Field label={t("coach.session.field.end")}>
           <Input
             type="time"
             value={state.endTime}
             onChange={(e) => set("endTime", e.target.value)}
           />
         </Field>
-        <Field label="Игроков">
+        <Field label={t("coach.session.field.players")}>
           <Input
             type="number"
             min={0}
@@ -283,10 +280,12 @@ export function LogSessionForm({
         </Field>
       </div>
 
-      <Field label="Корты">
+      <Field label={t("coach.session.field.courts")}>
         <div className="flex flex-wrap gap-1.5">
           {courts.length === 0 ? (
-            <span className="text-xs text-fade">Нет активных кортов.</span>
+            <span className="text-xs text-fade">
+              {t("coach.session.no_active_courts")}
+            </span>
           ) : (
             courts.map((c) => {
               const on = state.courtIds.includes(c.id);
@@ -314,20 +313,33 @@ export function LogSessionForm({
       {preview && !state.manualRevenue && (
         <div className="rounded-md bg-surface border border-border p-3 grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs">
           <Preview
-            label={preview.peak ? "Пик" : "Вне пика"}
-            value={formatRub(preview.price) + " / игрок"}
+            label={
+              preview.peak
+                ? t("coach.session.preview.peak")
+                : t("coach.session.preview.off_peak")
+            }
+            value={`${formatRub(preview.price, lang)} ${t("coach.session.preview.per_player")}`}
           />
-          <Preview label="Выручка" value={formatRub(preview.revenue)} />
-          <Preview label="Корт" value={formatRub(preview.courtRev)} />
-          <Preview label="Тренировка" value={formatRub(preview.coachingFee)} />
           <Preview
-            label="Тренеру"
-            value={formatRub(preview.payout)}
+            label={t("coach.metric.revenue")}
+            value={formatRub(preview.revenue, lang)}
+          />
+          <Preview
+            label={t("coach.metric.court")}
+            value={formatRub(preview.courtRev, lang)}
+          />
+          <Preview
+            label={t("coach.metric.coaching")}
+            value={formatRub(preview.coachingFee, lang)}
+          />
+          <Preview
+            label={t("coach.metric.coach")}
+            value={formatRub(preview.payout, lang)}
             tone="accent"
           />
           <Preview
-            label="Клубу"
-            value={formatRub(preview.clubNet)}
+            label={t("coach.metric.club")}
+            value={formatRub(preview.clubNet, lang)}
             tone="success"
           />
         </div>
@@ -340,12 +352,12 @@ export function LogSessionForm({
           onChange={(e) => set("manualRevenue", e.target.checked)}
           className="h-4 w-4 accent-[var(--color-accent)]"
         />
-        Указать суммы вручную (не рассчитывать из программы)
+        {t("coach.session.field.manual_revenue")}
       </label>
 
       {state.manualRevenue && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Выручка, ₽">
+          <Field label={t("coach.session.field.revenue_rub")}>
             <Input
               type="number"
               min={0}
@@ -353,7 +365,7 @@ export function LogSessionForm({
               onChange={(e) => set("revenue", e.target.value)}
             />
           </Field>
-          <Field label="Корт, ₽">
+          <Field label={t("coach.session.field.court_revenue_rub")}>
             <Input
               type="number"
               min={0}
@@ -361,7 +373,7 @@ export function LogSessionForm({
               onChange={(e) => set("courtRevenue", e.target.value)}
             />
           </Field>
-          <Field label="Тренировка, ₽">
+          <Field label={t("coach.session.field.coaching_fee_rub")}>
             <Input
               type="number"
               min={0}
@@ -372,12 +384,12 @@ export function LogSessionForm({
         </div>
       )}
 
-      <Field label="Заметки">
+      <Field label={t("coach.session.field.notes")}>
         <Textarea
           rows={2}
           value={state.notes}
           onChange={(e) => set("notes", e.target.value)}
-          placeholder="Произвольная заметка"
+          placeholder={t("coach.session.placeholder.notes")}
         />
       </Field>
 
@@ -393,7 +405,7 @@ export function LogSessionForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -403,14 +415,14 @@ export function LogSessionForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Записать"
-              : "Сохранить"}
+              ? t("coach.session.submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

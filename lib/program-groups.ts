@@ -3,6 +3,8 @@
 // Color is applied as the left-border accent on each program card and to the
 // group header.
 
+import type { TranslationKey } from "@/lib/i18n";
+
 export type ProgramGroupKey =
   | "games"
   | "training"
@@ -13,7 +15,7 @@ export type ProgramGroupKey =
 
 export interface ProgramGroup {
   key: ProgramGroupKey;
-  label: string;
+  labelKey: TranslationKey;
   icon: string;
   color: string;          // hex accent for borders / dots
   colorSoft: string;      // soft tint for badge backgrounds
@@ -23,7 +25,7 @@ export interface ProgramGroup {
 export const PROGRAM_GROUPS: ProgramGroup[] = [
   {
     key: "games",
-    label: "Игровые форматы",
+    labelKey: "programs.group.games",
     icon: "🎯",
     color: "#7c3aed",
     colorSoft: "#f3efff",
@@ -31,7 +33,7 @@ export const PROGRAM_GROUPS: ProgramGroup[] = [
   },
   {
     key: "training",
-    label: "Тренировки",
+    labelKey: "programs.group.training",
     icon: "🎓",
     color: "#10b981",
     colorSoft: "#ecfdf5",
@@ -39,7 +41,7 @@ export const PROGRAM_GROUPS: ProgramGroup[] = [
   },
   {
     key: "kids",
-    label: "Детские",
+    labelKey: "programs.group.kids",
     icon: "🧒",
     color: "#f59e0b",
     colorSoft: "#fffbeb",
@@ -47,7 +49,7 @@ export const PROGRAM_GROUPS: ProgramGroup[] = [
   },
   {
     key: "corporate",
-    label: "Корпоративные",
+    labelKey: "programs.group.corporate",
     icon: "💼",
     color: "#0ea5e9",
     colorSoft: "#f0f9ff",
@@ -55,7 +57,7 @@ export const PROGRAM_GROUPS: ProgramGroup[] = [
   },
   {
     key: "rental",
-    label: "Аренда",
+    labelKey: "programs.group.rental",
     icon: "🏟",
     color: "#f43f5e",
     colorSoft: "#fff1f2",
@@ -63,7 +65,7 @@ export const PROGRAM_GROUPS: ProgramGroup[] = [
   },
   {
     key: "other",
-    label: "Прочее",
+    labelKey: "programs.group.other",
     icon: "✨",
     color: "#6b7280",
     colorSoft: "#f3f4f6",
@@ -87,7 +89,7 @@ const TYPE_TO_GROUP: Map<string, ProgramGroup> = (() => {
 const FALLBACK_GROUP: ProgramGroup =
   PROGRAM_GROUPS.find((g) => g.key === "other") ?? PROGRAM_GROUPS[0];
 
-/** Resolve a raw type to its group. Unknown types fall back to "Прочее". */
+/** Resolve a raw type to its group. Unknown types fall back to the "other" group. */
 export function groupForType(type: string): ProgramGroup {
   return TYPE_TO_GROUP.get(type) ?? FALLBACK_GROUP;
 }

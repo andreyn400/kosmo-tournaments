@@ -7,11 +7,8 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import {
-  PADEL_LEVELS,
-  FORMAT_LABEL_RU,
-  COURT_SURFACE_LABEL_RU,
-} from "@/lib/constants";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { PADEL_LEVELS } from "@/lib/constants";
 import { generateTimeSlots } from "@/lib/time-slots";
 import type { Court, ScoringSystem, TournamentFormat } from "@/lib/types";
 import {
@@ -20,12 +17,16 @@ import {
 } from "@/lib/league-points";
 import {
   DEFAULT_SCORING_SYSTEM,
-  SCORING_GROUP_LABEL_RU,
-  SCORING_SYSTEM_HELPER_RU,
-  SCORING_SYSTEM_LABEL_RU,
   SCORING_SYSTEMS,
   scoringGroup,
 } from "@/lib/scoring-systems";
+import { TOURNAMENT_FORMAT_KEY } from "@/lib/i18n/tournament-keys";
+import {
+  SCORING_GROUP_LABEL_KEY,
+  SCORING_SYSTEM_HELPER_KEY,
+  SCORING_SYSTEM_LABEL_KEY,
+} from "@/lib/i18n/scoring-keys";
+import { COURT_SURFACE_KEY } from "@/lib/i18n/court-keys";
 import {
   createLeagueAction,
   type CreateLeagueState,
@@ -52,6 +53,7 @@ const SCORING_GROUPED: Record<
 const initial: CreateLeagueState = {};
 
 export function CreateLeagueForm({ courts }: { courts: Court[] }) {
+  const { t } = useTranslation();
   const [state, formAction, pending] = useActionState(
     createLeagueAction,
     initial,
@@ -75,59 +77,62 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
   return (
     <form action={formAction} noValidate className="flex flex-col gap-6">
       <Card className="flex flex-col gap-5">
-        <Field label="Название лиги" required>
+        <Field label={t("league.create.field.name")} required>
           <Input
             name="name"
             required
             maxLength={120}
-            placeholder="Например: Kosmo Весна 2026"
+            placeholder={t("league.create.name_placeholder")}
           />
         </Field>
 
-        <Field label="Формат сессий" hint="Для лиги доступны индивидуальные форматы">
+        <Field
+          label={t("league.create.field.session_format")}
+          hint={t("league.create.session_format_hint")}
+        >
           <Select name="format" defaultValue="americano">
             {INDIVIDUAL_FORMATS.map((f) => (
               <option key={f} value={f}>
-                {FORMAT_LABEL_RU[f]}
+                {t(TOURNAMENT_FORMAT_KEY[f])}
               </option>
             ))}
           </Select>
         </Field>
 
         <Field
-          label="Система счёта"
-          hint={SCORING_SYSTEM_HELPER_RU[scoringSystem]}
+          label={t("create.field.scoring")}
+          hint={t(SCORING_SYSTEM_HELPER_KEY[scoringSystem])}
         >
           <Select
             name="scoring_system"
             value={scoringSystem}
             onChange={(e) => setScoringSystem(e.target.value as ScoringSystem)}
           >
-            <optgroup label={SCORING_GROUP_LABEL_RU.points}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.points)}>
               {SCORING_GROUPED.points.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
-            <optgroup label={SCORING_GROUP_LABEL_RU.games}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.games)}>
               {SCORING_GROUPED.games.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
-            <optgroup label={SCORING_GROUP_LABEL_RU.combined}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.combined)}>
               {SCORING_GROUPED.combined.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
-            <optgroup label={SCORING_GROUP_LABEL_RU.sets}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.sets)}>
               {SCORING_GROUPED.sets.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
@@ -138,7 +143,8 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
           <div className="flex items-end gap-2">
             <label className="flex flex-col gap-1.5 flex-1">
               <span className="text-sm font-medium text-black">
-                Даты сессий <span className="text-accent">*</span>
+                {t("league.create.field.session_dates")}{" "}
+                <span className="text-accent">*</span>
               </span>
               <Input
                 type="date"
@@ -152,7 +158,7 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
               onClick={addDate}
               disabled={!nextDate || dates.includes(nextDate)}
             >
-              + Добавить
+              {t("league.create.add_date")}
             </Button>
           </div>
           <input
@@ -162,7 +168,7 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
           />
           {dates.length === 0 ? (
             <p className="text-xs text-muted">
-              Добавьте одну или несколько дат проведения.
+              {t("league.create.no_dates_hint")}
             </p>
           ) : (
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
@@ -172,7 +178,7 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
                   className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-white text-sm"
                 >
                   <span className="text-black tabular-nums">
-                    Сессия {idx + 1} · {d}
+                    {t("league.create.session_row", { n: idx + 1, date: d })}
                   </span>
                   <Button
                     size="sm"
@@ -180,7 +186,7 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
                     type="button"
                     onClick={() => removeDate(d)}
                   >
-                    Удалить
+                    {t("league.create.remove_date")}
                   </Button>
                 </li>
               ))}
@@ -189,9 +195,9 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Уровень от">
+          <Field label={t("create.field.level_min")}>
             <Select name="level_min" defaultValue="">
-              <option value="">Любой</option>
+              <option value="">{t("league.create.level_any")}</option>
               {PADEL_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -199,9 +205,9 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
               ))}
             </Select>
           </Field>
-          <Field label="Уровень до">
+          <Field label={t("create.field.level_max")}>
             <Select name="level_max" defaultValue="">
-              <option value="">Любой</option>
+              <option value="">{t("league.create.level_any")}</option>
               {PADEL_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -212,7 +218,10 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Макс. игроков в сессии" hint="Должно быть кратно 4">
+          <Field
+            label={t("league.create.field.max_session_players")}
+            hint={t("create.max_players_hint")}
+          >
             <Input
               type="number"
               name="max_players"
@@ -222,8 +231,8 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
             />
           </Field>
           <Field
-            label="Квалификационных мест"
-            hint="Должно быть степенью двойки для корректной финальной сетки"
+            label={t("league.create.field.qualification_spots")}
+            hint={t("league.create.qualification_spots_hint")}
           >
             <Select name="qualification_spots" defaultValue="8">
               {[2, 4, 8, 16, 32].map((n) => (
@@ -237,11 +246,11 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <Field
-            label="Время начала сессий"
-            hint="По умолчанию для каждой сессии; можно изменить перед стартом"
+            label={t("league.create.field.default_start_time")}
+            hint={t("league.create.default_start_time_hint")}
           >
             <Select name="default_start_time" defaultValue="">
-              <option value="">Не указано</option>
+              <option value="">{t("create.start_time_unset")}</option>
               {TIME_SLOTS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -249,14 +258,17 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
               ))}
             </Select>
           </Field>
-          <Field label="Дата финала" hint="Можно задать позже">
+          <Field
+            label={t("league.create.field.finals_date")}
+            hint={t("league.create.finals_date_hint")}
+          >
             <Input type="date" name="finals_date" />
           </Field>
         </div>
 
         <Field
-          label="Длительность сессии, часов"
-          hint="Используется для отображения сессий в календаре"
+          label={t("league.create.field.duration")}
+          hint={t("league.create.duration_hint")}
         >
           <Input
             type="number"
@@ -268,22 +280,22 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
           />
         </Field>
 
-        <Field label="Взнос, ₽">
+        <Field label={t("create.field.entry_fee")}>
           <Input type="number" name="entry_fee" min={0} placeholder="0" />
         </Field>
 
-        <Field label="Приз">
+        <Field label={t("create.field.prize")}>
           <Input
             name="prize_description"
             maxLength={200}
-            placeholder="Например: призовой фонд по итогам финала"
+            placeholder={t("league.create.prize_placeholder")}
           />
         </Field>
 
         <Field
-          label="Корты"
+          label={t("create.field.courts")}
           required
-          hint="Выберите хотя бы один корт. По умолчанию выбраны все активные."
+          hint={t("create.courts_hint_default")}
         >
           <div className="flex flex-col gap-1.5 border border-border rounded-[var(--radius-button)] bg-subtle p-2.5">
             {courts.map((c) => (
@@ -305,27 +317,28 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
                   </span>
                 </span>
                 <span className="text-xs text-muted">
-                  {COURT_SURFACE_LABEL_RU[c.surface]}
+                  {t(COURT_SURFACE_KEY[c.surface])}
                 </span>
               </label>
             ))}
           </div>
         </Field>
 
-        <Field label="Заметки">
+        <Field label={t("create.field.notes")}>
           <Textarea
             name="notes"
             maxLength={500}
-            placeholder="Любая служебная информация"
+            placeholder={t("create.notes_placeholder")}
           />
         </Field>
       </Card>
 
       <Card className="flex flex-col gap-3">
-        <h3 className="font-semibold text-black">Таблица очков</h3>
+        <h3 className="font-semibold text-black">
+          {t("league.create.points_table_title")}
+        </h3>
         <p className="text-xs text-muted">
-          Очки начисляются по месту в финальной таблице сессии. Значения по
-          умолчанию; редактирование появится позже.
+          {t("league.create.points_table_copy")}
         </p>
         <PointsTablePreview table={DEFAULT_POINTS_TABLE} />
       </Card>
@@ -341,11 +354,11 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending || dates.length === 0}>
-          {pending ? "Сохранение…" : "Создать лигу"}
+          {pending ? t("btn.saving") : t("league.create.submit")}
         </Button>
         <Link href="/">
           <Button type="button" variant="secondary" disabled={pending}>
-            Отмена
+            {t("btn.cancel")}
           </Button>
         </Link>
       </div>
@@ -354,6 +367,7 @@ export function CreateLeagueForm({ courts }: { courts: Court[] }) {
 }
 
 function PointsTablePreview({ table }: { table: PointsTable }) {
+  const { t } = useTranslation();
   const sizes = Object.keys(table).sort((a, b) => Number(b) - Number(a));
   return (
     <div className="grid gap-2 sm:grid-cols-2">
@@ -368,7 +382,7 @@ function PointsTablePreview({ table }: { table: PointsTable }) {
             className="border border-border rounded-[var(--radius-button)] p-3 bg-subtle"
           >
             <div className="text-xs text-muted uppercase tracking-wider mb-1.5">
-              {size} игроков
+              {t("league.create.points_size_label", { n: size })}
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm tabular-nums">
               {sorted.map(([pos, pts]) => (

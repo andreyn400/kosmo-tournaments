@@ -21,6 +21,8 @@ import {
 } from "@/lib/scoring-systems";
 import { advanceWinnerPatch } from "@/lib/finals-advance";
 import { applyFinalsEloForMatch } from "@/lib/finals-elo";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import type { ScoringSystem } from "@/lib/types";
 
 export interface SubmitBracketScoreInput {
@@ -35,11 +37,13 @@ export interface SubmitBracketScoreInput {
 export async function submitBracketScoreAction(
   input: SubmitBracketScoreInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const match = await getBracketMatch(input.matchId);
-  if (!match) return { error: "Матч не найден" };
-  if (match.status === "bye") return { error: "У матча BYE нельзя изменить счёт" };
+  if (!match) return { error: dict["error.not_found.match"] };
+  if (match.status === "bye")
+    return { error: dict["error.state.bye_match_no_score"] };
   if (!match.team1_player1_id || !match.team2_player1_id) {
-    return { error: "Матч ещё не готов — ждём соперников" };
+    return { error: dict["error.state.match_not_ready"] };
   }
 
   const group = scoringGroup(input.scoringSystem);
@@ -49,9 +53,9 @@ export async function submitBracketScoreAction(
   let scoreDetail: SetsDetail | null = null;
 
   if (group === "sets") {
-    if (!input.scoreDetail) return { error: "Введите счёт сетов" };
+    if (!input.scoreDetail) return { error: dict["error.score.sets_required"] };
     const v = validateSetsScore(input.scoringSystem, input.scoreDetail);
-    if (!v.ok) return { error: v.error };
+    if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
     const [a, b] = setsWon(input.scoreDetail);
     t1Score = a;
     t2Score = b;
@@ -59,20 +63,21 @@ export async function submitBracketScoreAction(
   } else {
     const a = input.team1Score;
     const b = input.team2Score;
-    if (a == null || b == null) return { error: "Введите счёт для обеих команд" };
+    if (a == null || b == null)
+      return { error: dict["error.score.both_teams_required"] };
     const v =
       group === "points"
         ? validatePointsScore(input.scoringSystem, a, b)
         : group === "combined"
           ? validateCombinedScore(input.scoringSystem, a, b)
           : validateGamesScore(input.scoringSystem, a, b);
-    if (!v.ok) return { error: v.error };
+    if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
     t1Score = a;
     t2Score = b;
   }
 
   if (t1Score === t2Score) {
-    return { error: "В сетке не может быть ничьей" };
+    return { error: dict["error.score.bracket_no_tie"] };
   }
   const winner: 1 | 2 = t1Score > t2Score ? 1 : 2;
 
@@ -89,7 +94,7 @@ export async function submitBracketScoreAction(
   try {
     await updateBracketMatch(match.id, patch);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Ошибка сохранения счёта";
+    const msg = e instanceof Error ? e.message : dict["error.failed.save_score"];
     return { error: msg };
   }
 
@@ -99,7 +104,8 @@ export async function submitBracketScoreAction(
     try {
       await updateBracketMatch(advance.nextMatchId, advance.patch);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Ошибка продвижения победителя";
+      const msg =
+        e instanceof Error ? e.message : dict["error.failed.advance_winner"];
       return { error: msg };
     }
   }
@@ -119,8 +125,14 @@ export async function submitBracketScoreAction(
         winner,
       });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Ошибка обновления ELO";
-      return { error: `Счёт сохранён, но ELO не обновился: ${msg}` };
+      const reason =
+        e instanceof Error ? e.message : dict["error.failed.elo_update"];
+      return {
+        error: dict["error.finals.score_saved_but_elo_failed"].replace(
+          "{reason}",
+          reason,
+        ),
+      };
     }
   }
 
@@ -137,7 +149,8 @@ export async function submitBracketScoreAction(
           finals_champion_player_ids: championIds,
         });
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Ошибка завершения финала";
+        const msg =
+          e instanceof Error ? e.message : dict["error.failed.finals_completion"];
         return { error: msg };
       }
     }

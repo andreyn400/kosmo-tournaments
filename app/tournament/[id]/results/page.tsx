@@ -19,12 +19,14 @@ import {
   sortStrategyForFormat,
 } from "@/lib/leaderboard";
 import { aggregateEloChanges } from "@/lib/aggregate-elo-changes";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
+import { formatDateRange } from "@/lib/i18n/format";
 import {
-  DIVISION_CATEGORY_LABEL_RU,
-  FORMAT_LABEL_RU,
-  STATUS_LABEL_RU,
-} from "@/lib/constants";
-import { formatDateRangeRu } from "@/lib/format-date";
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
+import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
 import { statusTone } from "@/lib/status-tone";
 import { ShareButton } from "./ShareButton";
 
@@ -38,6 +40,11 @@ export default async function ResultsPage({
   if (!tournament) notFound();
 
   const divisions = await listDivisions(id);
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
 
   if (divisions.length > 0) {
     return (
@@ -48,7 +55,7 @@ export default async function ResultsPage({
             <ShareButton />
             <Link href={`/tournament/${id}`}>
               <Button variant="secondary" size="md">
-                К турниру
+                {tr("results.back_to_tournament")}
               </Button>
             </Link>
           </div>
@@ -58,17 +65,24 @@ export default async function ResultsPage({
           <Card className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={statusTone(tournament.status)}>
-                {STATUS_LABEL_RU[tournament.status]}
+                {tr(TOURNAMENT_STATUS_KEY[tournament.status])}
               </Badge>
             </div>
             <p className="text-sm text-muted">
-              {formatDateRangeRu(tournament.date_start, tournament.date_end)} ·{" "}
-              Дивизионов: {divisions.length}
+              {formatDateRange(
+                tournament.date_start,
+                tournament.date_end,
+                lang,
+              )}
+              {" · "}
+              {tr("results.divisions_count", { n: divisions.length })}
             </p>
           </Card>
 
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Дивизионы</h2>
+            <h2 className="font-semibold text-black">
+              {tr("results.divisions_title")}
+            </h2>
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
               {divisions.map((d) => (
                 <li
@@ -81,11 +95,13 @@ export default async function ResultsPage({
                     </span>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Badge tone="neutral">
-                        {DIVISION_CATEGORY_LABEL_RU[d.category]}
+                        {tr(DIVISION_CATEGORY_KEY[d.category])}
                       </Badge>
-                      <Badge tone="format">{FORMAT_LABEL_RU[d.format]}</Badge>
+                      <Badge tone="format">
+                        {tr(TOURNAMENT_FORMAT_KEY[d.format])}
+                      </Badge>
                       <Badge tone={statusTone(d.status)}>
-                        {STATUS_LABEL_RU[d.status]}
+                        {tr(TOURNAMENT_STATUS_KEY[d.status])}
                       </Badge>
                     </div>
                   </div>
@@ -94,7 +110,7 @@ export default async function ResultsPage({
                     className="shrink-0"
                   >
                     <Button variant="secondary" size="sm">
-                      Итоги →
+                      {tr("results.division.results_cta")}
                     </Button>
                   </Link>
                 </li>
@@ -105,7 +121,7 @@ export default async function ResultsPage({
           {tournament.prize_description ? (
             <Card className="flex flex-col gap-1">
               <span className="text-xs text-muted uppercase tracking-wider">
-                Приз
+                {tr("results.prize_title")}
               </span>
               <p className="text-black">{tournament.prize_description}</p>
             </Card>
@@ -146,6 +162,22 @@ export default async function ResultsPage({
   const eloChanges = aggregateEloChanges(history);
   const playerCount = isTeamFormat ? pairs.length * 2 : leaderboard.length;
 
+  const rowMeta = (
+    wins: number,
+    matches: number,
+    plusMinus: number,
+  ): string =>
+    strategy === "wins"
+      ? tr("results.row_meta_wins", {
+          wins,
+          matches,
+          pm: formatSigned(plusMinus),
+        })
+      : tr("results.row_meta_matches", {
+          matches,
+          pm: formatSigned(plusMinus),
+        });
+
   return (
     <PageShell
       title={tournament.name}
@@ -154,7 +186,7 @@ export default async function ResultsPage({
           <ShareButton />
           <Link href={`/tournament/${id}`}>
             <Button variant="secondary" size="md">
-              К турниру
+              {tr("results.back_to_tournament")}
             </Button>
           </Link>
         </div>
@@ -163,23 +195,31 @@ export default async function ResultsPage({
       <div className="flex flex-col gap-6 max-w-3xl">
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="format">{FORMAT_LABEL_RU[tournament.format]}</Badge>
+            <Badge tone="format">
+              {tr(TOURNAMENT_FORMAT_KEY[tournament.format])}
+            </Badge>
             <Badge tone={statusTone(tournament.status)}>
-              {STATUS_LABEL_RU[tournament.status]}
+              {tr(TOURNAMENT_STATUS_KEY[tournament.status])}
             </Badge>
           </div>
           <p className="text-sm text-muted">
-            {formatDateRangeRu(tournament.date_start, tournament.date_end)} ·{" "}
-            {playerCount} игроков · {completedMatches.length} матчей
+            {formatDateRange(tournament.date_start, tournament.date_end, lang)}
+            {" · "}
+            {tr("results.summary", {
+              players: playerCount,
+              matches: completedMatches.length,
+            })}
           </p>
         </Card>
 
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Итоговая таблица</h2>
+          <h2 className="font-semibold text-black">
+            {tr("results.leaderboard_title")}
+          </h2>
 
           {isTeamFormat ? (
             pairLeaderboard.length === 0 ? (
-              <p className="text-sm text-muted">Нет завершённых матчей.</p>
+              <p className="text-sm text-muted">{tr("results.no_matches")}</p>
             ) : (
               <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
                 {pairLeaderboard.map((row, idx) => {
@@ -211,9 +251,7 @@ export default async function ResultsPage({
                           {row.playerNames[0]} / {row.playerNames[1]}
                         </span>
                         <span className="text-xs text-muted">
-                          {strategy === "wins"
-                            ? `${row.wins} побед · ${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`
-                            : `${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`}
+                          {rowMeta(row.wins, row.matchesPlayed, row.plusMinus)}
                         </span>
                         {elo1 || elo2 ? (
                           <span className="text-xs text-muted hidden sm:block">
@@ -236,7 +274,7 @@ export default async function ResultsPage({
               </ul>
             )
           ) : leaderboard.length === 0 ? (
-            <p className="text-sm text-muted">Нет завершённых матчей.</p>
+            <p className="text-sm text-muted">{tr("results.no_matches")}</p>
           ) : (
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
               {leaderboard.map((row, idx) => {
@@ -262,9 +300,7 @@ export default async function ResultsPage({
                         {player?.name ?? row.playerName}
                       </span>
                       <span className="text-xs text-muted">
-                        {strategy === "wins"
-                          ? `${row.wins} побед · ${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`
-                          : `${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`}
+                        {rowMeta(row.wins, row.matchesPlayed, row.plusMinus)}
                       </span>
                     </div>
                     {elo ? (
@@ -292,7 +328,7 @@ export default async function ResultsPage({
         {tournament.prize_description ? (
           <Card className="flex flex-col gap-1">
             <span className="text-xs text-muted uppercase tracking-wider">
-              Приз
+              {tr("results.prize_title")}
             </span>
             <p className="text-black">{tournament.prize_description}</p>
           </Card>

@@ -5,16 +5,17 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import {
+  RENTAL_SCHEDULE_TYPE_KEY,
+  RENTAL_STATUS_KEY,
+} from "@/lib/i18n/rental-keys";
 import type {
   RentalClientType,
   RentalContract,
   RentalContractStatus,
   RentalPaymentScheduleType,
 } from "@/lib/types";
-import {
-  PAYMENT_SCHEDULE_LABELS,
-  STATUS_LABELS,
-} from "../format";
 import type { RawContractInput } from "./contract-input";
 
 interface ContractEditFormProps {
@@ -24,6 +25,21 @@ interface ContractEditFormProps {
   onDelete: () => Promise<void>;
   pending: boolean;
 }
+
+const STATUS_OPTIONS: RentalContractStatus[] = [
+  "draft",
+  "active",
+  "paused",
+  "ended",
+  "cancelled",
+];
+
+const SCHEDULE_OPTIONS: RentalPaymentScheduleType[] = [
+  "one_time",
+  "monthly",
+  "quarterly",
+  "custom",
+];
 
 function makeInitial(c: RentalContract): RawContractInput {
   return {
@@ -54,6 +70,7 @@ export function ContractEditForm({
   onDelete,
   pending,
 }: ContractEditFormProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<RawContractInput>(() =>
     makeInitial(contract),
   );
@@ -81,48 +98,51 @@ export function ContractEditForm({
       className="rounded-card border border-border bg-surface p-5 flex flex-col gap-4"
     >
       <h2 className="text-sm font-semibold text-black">
-        Редактирование контракта
+        {t("contract.edit.title")}
       </h2>
 
-      {/* Client section */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Название клиента *">
+        <Field label={t("contract.edit.field.client_name")}>
           <Input
             value={state.client_name}
             onChange={(e) => set("client_name", e.target.value)}
-            placeholder="Газпром"
+            placeholder={t("contract.edit.placeholder.client_name")}
             autoFocus
           />
         </Field>
-        <Field label="Тип клиента">
+        <Field label={t("contract.edit.field.client_type")}>
           <Select
             value={state.client_type}
             onChange={(e) =>
               set("client_type", e.target.value as RentalClientType)
             }
           >
-            <option value="individual">Физическое лицо</option>
-            <option value="legal_entity">Юридическое лицо</option>
+            <option value="individual">
+              {t("rentals.wizard.client.type.individual")}
+            </option>
+            <option value="legal_entity">
+              {t("rentals.wizard.client.type.legal_entity")}
+            </option>
           </Select>
         </Field>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Контактное лицо">
+        <Field label={t("contract.edit.field.contact_person")}>
           <Input
             value={state.contact_person}
             onChange={(e) => set("contact_person", e.target.value)}
-            placeholder="Иван Иванов"
+            placeholder={t("rentals.wizard.client.placeholder.contact_person")}
           />
         </Field>
-        <Field label="Телефон">
+        <Field label={t("contract.edit.field.phone")}>
           <Input
             value={state.contact_phone}
             onChange={(e) => set("contact_phone", e.target.value)}
             placeholder="+7 ..."
           />
         </Field>
-        <Field label="Email">
+        <Field label={t("contract.edit.field.email")}>
           <Input
             type="email"
             value={state.contact_email}
@@ -134,18 +154,18 @@ export function ContractEditForm({
 
       {isLegal && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Юридическое наименование">
+          <Field label={t("contract.edit.field.legal_name")}>
             <Input
               value={state.legal_entity_name}
               onChange={(e) => set("legal_entity_name", e.target.value)}
-              placeholder="ПАО Газпром"
+              placeholder={t("rentals.wizard.client.placeholder.legal_name")}
             />
           </Field>
-          <Field label="ИНН (10 или 12 цифр)">
+          <Field label={t("contract.edit.field.inn")}>
             <Input
               value={state.inn}
               onChange={(e) => set("inn", e.target.value)}
-              placeholder="7708503727"
+              placeholder={t("rentals.wizard.client.placeholder.inn")}
               inputMode="numeric"
             />
           </Field>
@@ -154,27 +174,24 @@ export function ContractEditForm({
 
       <hr className="border-border" />
 
-      {/* Contract section */}
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Номер контракта">
+        <Field label={t("contract.edit.field.contract_number")}>
           <Input
             value={state.contract_number}
             onChange={(e) => set("contract_number", e.target.value)}
             placeholder="RC-2026-001"
           />
         </Field>
-        <Field label="Статус">
+        <Field label={t("contract.edit.field.status")}>
           <Select
             value={state.status}
             onChange={(e) =>
               set("status", e.target.value as RentalContractStatus)
             }
           >
-            {(
-              Object.keys(STATUS_LABELS) as RentalContractStatus[]
-            ).map((s) => (
+            {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {STATUS_LABELS[s]}
+                {t(RENTAL_STATUS_KEY[s])}
               </option>
             ))}
           </Select>
@@ -182,14 +199,14 @@ export function ContractEditForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Дата начала *">
+        <Field label={t("contract.edit.field.start_date")}>
           <Input
             type="date"
             value={state.start_date}
             onChange={(e) => set("start_date", e.target.value)}
           />
         </Field>
-        <Field label="Дата окончания *">
+        <Field label={t("contract.edit.field.end_date")}>
           <Input
             type="date"
             value={state.end_date}
@@ -199,7 +216,7 @@ export function ContractEditForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Стоимость, ₽ *">
+        <Field label={t("contract.edit.field.total_value")}>
           <Input
             type="number"
             min={0}
@@ -208,7 +225,7 @@ export function ContractEditForm({
             inputMode="numeric"
           />
         </Field>
-        <Field label="Депозит, ₽">
+        <Field label={t("contract.edit.field.deposit")}>
           <Input
             type="number"
             min={0}
@@ -217,7 +234,7 @@ export function ContractEditForm({
             inputMode="numeric"
           />
         </Field>
-        <Field label="График платежей">
+        <Field label={t("contract.edit.field.payment_schedule")}>
           <Select
             value={state.payment_schedule_type}
             onChange={(e) =>
@@ -227,20 +244,16 @@ export function ContractEditForm({
               )
             }
           >
-            {(
-              Object.keys(
-                PAYMENT_SCHEDULE_LABELS,
-              ) as RentalPaymentScheduleType[]
-            ).map((t) => (
-              <option key={t} value={t}>
-                {PAYMENT_SCHEDULE_LABELS[t]}
+            {SCHEDULE_OPTIONS.map((sch) => (
+              <option key={sch} value={sch}>
+                {t(RENTAL_SCHEDULE_TYPE_KEY[sch])}
               </option>
             ))}
           </Select>
         </Field>
       </div>
 
-      <Field label="Ссылка на документ">
+      <Field label={t("contract.edit.field.document_url")}>
         <Input
           type="url"
           value={state.document_url}
@@ -250,14 +263,14 @@ export function ContractEditForm({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Заметки (видны в карточке)">
+        <Field label={t("contract.edit.field.notes")}>
           <Textarea
             rows={3}
             value={state.notes}
             onChange={(e) => set("notes", e.target.value)}
           />
         </Field>
-        <Field label="Служебные заметки (только для ops)">
+        <Field label={t("contract.edit.field.internal_notes")}>
           <Textarea
             rows={3}
             value={state.internal_notes}
@@ -277,7 +290,7 @@ export function ContractEditForm({
           disabled={pending}
           className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
         >
-          Удалить контракт
+          {t("contract.edit.delete_cta")}
         </Button>
         <Button
           type="button"
@@ -286,10 +299,10 @@ export function ContractEditForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Сохранение…" : "Сохранить"}
+          {pending ? t("btn.saving") : t("btn.save")}
         </Button>
       </div>
     </form>

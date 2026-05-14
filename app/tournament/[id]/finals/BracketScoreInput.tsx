@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   scoringGroup,
   scoringTarget,
@@ -97,18 +98,25 @@ function PointsOrGamesEntry({
   pending: boolean;
   startTransition: (cb: () => void) => void;
 }) {
+  const { t } = useTranslation();
   const [t1, setT1] = useState<string>(initialT1 != null ? String(initialT1) : "");
   const [t2, setT2] = useState<string>(initialT2 != null ? String(initialT2) : "");
   const target = scoringTarget(scoringSystem);
   const group = scoringGroup(scoringSystem);
   const unit =
-    group === "points" ? "очков" : group === "combined" ? "в сумме" : "геймов";
-  const helper = target ? `До ${target} ${unit}` : "";
+    group === "points"
+      ? t("match.unit.points")
+      : group === "combined"
+        ? t("match.unit.combined")
+        : t("match.unit.games");
+  const helper = target
+    ? t("match.helper.target_with_unit", { target, unit })
+    : "";
 
   const submit = () => {
     setError(null);
     if (t1 === "" || t2 === "") {
-      setError("Введите счёт для обеих команд");
+      setError(t("match.error.enter_both"));
       return;
     }
     const a = Number(t1);
@@ -120,11 +128,11 @@ function PointsOrGamesEntry({
           ? validateCombinedScore(scoringSystem, a, b)
           : validateGamesScore(scoringSystem, a, b);
     if (!v.ok) {
-      setError(v.error);
+      setError(t(v.error.key, v.error.vars));
       return;
     }
     if (a === b) {
-      setError("В сетке не может быть ничьей");
+      setError(t("finals.bracket.no_tie"));
       return;
     }
     startTransition(async () => {
@@ -144,8 +152,18 @@ function PointsOrGamesEntry({
     <div className="flex flex-col gap-2.5">
       {helper ? <p className="text-xs text-muted">{helper}</p> : null}
       <div className="grid grid-cols-2 gap-2">
-        <ScoreBox label="К1" value={t1} onChange={setT1} disabled={pending} />
-        <ScoreBox label="К2" value={t2} onChange={setT2} disabled={pending} />
+        <ScoreBox
+          label={t("finals.bracket.team_1")}
+          value={t1}
+          onChange={setT1}
+          disabled={pending}
+        />
+        <ScoreBox
+          label={t("finals.bracket.team_2")}
+          value={t2}
+          onChange={setT2}
+          disabled={pending}
+        />
       </div>
       {error ? (
         <div
@@ -157,10 +175,10 @@ function PointsOrGamesEntry({
       ) : null}
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={submit} disabled={pending}>
-          {pending ? "Сохранение…" : "Сохранить"}
+          {pending ? t("match.saving") : t("btn.save")}
         </Button>
         <Button size="sm" variant="secondary" onClick={onCancel} disabled={pending}>
-          Отмена
+          {t("btn.cancel")}
         </Button>
       </div>
     </div>
@@ -190,6 +208,7 @@ function SetsEntry({
   pending: boolean;
   startTransition: (cb: () => void) => void;
 }) {
+  const { t } = useTranslation();
   const [s1a, setS1a] = useState(
     initial?.sets[0]?.[0] != null ? String(initial.sets[0][0]) : "",
   );
@@ -229,12 +248,14 @@ function SetsEntry({
     (set2Filled && Number(s2b) > Number(s2a) ? 1 : 0);
   const needsThird = set1Filled && set2Filled && t1Wins === 1 && t2Wins === 1;
   const thirdLabel =
-    scoringSystem === "sets_supertiebreak" ? "Супер тай-брейк" : "Сет 3";
+    scoringSystem === "sets_supertiebreak"
+      ? t("match.field.supertiebreak")
+      : t("match.field.set3");
 
   const submit = () => {
     setError(null);
     if (!set1Filled || !set2Filled) {
-      setError("Введите счёт первых двух сетов");
+      setError(t("match.error.enter_first_two"));
       return;
     }
     const detail: SetsDetail = {
@@ -245,7 +266,7 @@ function SetsEntry({
     };
     if (needsThird) {
       if (s3a === "" || s3b === "") {
-        setError(`Введите ${thirdLabel.toLowerCase()}`);
+        setError(t("match.error.enter_label", { label: thirdLabel }));
         return;
       }
       if (scoringSystem === "sets_supertiebreak") {
@@ -256,12 +277,12 @@ function SetsEntry({
     }
     const v = validateSetsScore(scoringSystem, detail);
     if (!v.ok) {
-      setError(v.error);
+      setError(t(v.error.key, v.error.vars));
       return;
     }
     const [a, b] = setsWon(detail);
     if (a === b) {
-      setError("В сетке не может быть ничьей");
+      setError(t("finals.bracket.no_tie"));
       return;
     }
     startTransition(async () => {
@@ -278,8 +299,22 @@ function SetsEntry({
 
   return (
     <div className="flex flex-col gap-2">
-      <SetRow label="Сет 1" a={s1a} b={s1b} onA={setS1a} onB={setS1b} disabled={pending} />
-      <SetRow label="Сет 2" a={s2a} b={s2b} onA={setS2a} onB={setS2b} disabled={pending} />
+      <SetRow
+        label={t("match.field.set1")}
+        a={s1a}
+        b={s1b}
+        onA={setS1a}
+        onB={setS1b}
+        disabled={pending}
+      />
+      <SetRow
+        label={t("match.field.set2")}
+        a={s2a}
+        b={s2b}
+        onA={setS2a}
+        onB={setS2b}
+        disabled={pending}
+      />
       {needsThird ? (
         <SetRow
           label={thirdLabel}
@@ -301,10 +336,10 @@ function SetsEntry({
       ) : null}
       <div className="flex items-center gap-2 pt-1">
         <Button size="sm" onClick={submit} disabled={pending}>
-          {pending ? "Сохранение…" : "Сохранить"}
+          {pending ? t("match.saving") : t("btn.save")}
         </Button>
         <Button size="sm" variant="secondary" onClick={onCancel} disabled={pending}>
-          Отмена
+          {t("btn.cancel")}
         </Button>
       </div>
     </div>

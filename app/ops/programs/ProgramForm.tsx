@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { ALL_PROGRAM_TYPES } from "@/lib/program-groups";
 import type { Program } from "@/lib/types";
 import type { RawProgramInput } from "./program-input";
@@ -60,9 +61,7 @@ export function ProgramForm({
   pending,
   onDelete,
 }: ProgramFormProps) {
-  // State initialised once at mount; parent unmounts the form when
-  // switching between create / edit / different row, so a prop-sync useEffect
-  // here would only risk silently clobbering operator input.
+  const { t } = useTranslation();
   const [state, setState] = useState(() => makeInitial(program, defaultType));
   const [error, setError] = useState<string | null>(null);
 
@@ -96,22 +95,22 @@ export function ProgramForm({
       className="grid gap-3 p-4 rounded-md bg-subtle border border-border"
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_minmax(0,16rem)]">
-        <Field label="Название">
+        <Field label={t("programs.form.field.name")}>
           <Input
             value={state.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="Например, Турнир C-C+ на 12 игроков"
+            placeholder={t("programs.form.placeholder.name")}
             autoFocus={mode === "create"}
           />
         </Field>
-        <Field label="Тип">
+        <Field label={t("programs.form.field.type")}>
           <Select
             value={state.type}
             onChange={(e) => set("type", e.target.value)}
           >
-            {ALL_PROGRAM_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
+            {ALL_PROGRAM_TYPES.map((tp) => (
+              <option key={tp} value={tp}>
+                {tp}
               </option>
             ))}
             {!ALL_PROGRAM_TYPES.includes(state.type) && (
@@ -122,7 +121,7 @@ export function ProgramForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <Field label="Длительность, мин">
+        <Field label={t("programs.form.field.duration")}>
           <Input
             type="number"
             min={15}
@@ -132,7 +131,7 @@ export function ProgramForm({
             onChange={(e) => set("duration", e.target.value)}
           />
         </Field>
-        <Field label="Кортов">
+        <Field label={t("programs.form.field.courts")}>
           <Input
             type="number"
             min={1}
@@ -141,7 +140,7 @@ export function ProgramForm({
             onChange={(e) => set("courts", e.target.value)}
           />
         </Field>
-        <Field label="Макс. игроков">
+        <Field label={t("programs.form.field.max_players")}>
           <Input
             type="number"
             min={1}
@@ -159,13 +158,13 @@ export function ProgramForm({
               onChange={(e) => set("isActive", e.target.checked)}
               className="h-4 w-4 accent-[var(--color-accent)]"
             />
-            Активна
+            {t("programs.form.is_active")}
           </label>
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Цена пик, ₽">
+        <Field label={t("programs.form.field.price_peak")}>
           <Input
             type="number"
             min={0}
@@ -173,7 +172,7 @@ export function ProgramForm({
             onChange={(e) => set("pricePeak", e.target.value)}
           />
         </Field>
-        <Field label="Цена вне пика, ₽">
+        <Field label={t("programs.form.field.price_offpeak")}>
           <Input
             type="number"
             min={0}
@@ -183,12 +182,12 @@ export function ProgramForm({
         </Field>
       </div>
 
-      <Field label="Описание / код">
+      <Field label={t("programs.form.field.description")}>
         <Textarea
           rows={2}
           value={state.description}
           onChange={(e) => set("description", e.target.value)}
-          placeholder="Внутренний код или короткое описание"
+          placeholder={t("programs.form.placeholder.description")}
         />
       </Field>
 
@@ -206,7 +205,7 @@ export function ProgramForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -216,10 +215,14 @@ export function ProgramForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Сохранение…" : mode === "create" ? "Создать" : "Сохранить"}
+          {pending
+            ? t("btn.saving")
+            : mode === "create"
+              ? t("programs.form.create_cta")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

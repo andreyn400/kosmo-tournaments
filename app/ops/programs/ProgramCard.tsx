@@ -2,9 +2,11 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDuration, formatRub } from "@/lib/i18n/format";
 import type { Program } from "@/lib/types";
 import { groupForType } from "@/lib/program-groups";
-import { formatDuration, formatRub, perPlayer } from "./format";
+import { perPlayer } from "./format";
 import { ProgramForm } from "./ProgramForm";
 import { updateProgramAction } from "./update-program-action";
 import { deleteProgramAction } from "./delete-program-action";
@@ -18,6 +20,7 @@ interface ProgramCardProps {
 
 export function ProgramCard({ program, expanded, onToggle }: ProgramCardProps) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
   const [pending, startTransition] = useTransition();
   const group = groupForType(program.type);
 
@@ -26,7 +29,7 @@ export function ProgramCard({ program, expanded, onToggle }: ProgramCardProps) {
       startTransition(async () => {
         const res = await updateProgramAction(program.id, input);
         if (!res.error) {
-          onToggle(); // collapse on success
+          onToggle();
           router.refresh();
         }
         resolve(res);
@@ -35,7 +38,10 @@ export function ProgramCard({ program, expanded, onToggle }: ProgramCardProps) {
   }
 
   function handleDelete() {
-    if (!confirm(`Удалить программу «${program.name}»?`)) return;
+    if (
+      !confirm(t("programs.row.delete_confirm", { name: program.name }))
+    )
+      return;
     startTransition(async () => {
       const res = await deleteProgramAction(program.id);
       if (res.error) {
@@ -46,10 +52,15 @@ export function ProgramCard({ program, expanded, onToggle }: ProgramCardProps) {
     });
   }
 
-  const perPlayerPeak = perPlayer(program.price_peak_rub, program.max_players);
+  const perPlayerPeak = perPlayer(
+    program.price_peak_rub,
+    program.max_players,
+    lang,
+  );
   const perPlayerOff = perPlayer(
     program.price_offpeak_rub,
     program.max_players,
+    lang,
   );
 
   return (
@@ -81,7 +92,7 @@ export function ProgramCard({ program, expanded, onToggle }: ProgramCardProps) {
               </h3>
               {!program.is_active && (
                 <span className="inline-flex items-center px-1.5 h-5 rounded text-[10px] font-semibold tracking-wider uppercase bg-subtle text-muted border border-border">
-                  не активна
+                  {t("programs.inactive_chip")}
                 </span>
               )}
             </div>
@@ -100,34 +111,39 @@ export function ProgramCard({ program, expanded, onToggle }: ProgramCardProps) {
         </div>
 
         <dl className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-          <Stat label="Длительность" value={formatDuration(program.duration_minutes)} />
           <Stat
-            label="Кортов"
+            label={t("programs.card.duration")}
+            value={formatDuration(program.duration_minutes, lang)}
+          />
+          <Stat
+            label={t("programs.card.courts")}
             value={String(program.courts_needed)}
           />
           <Stat
-            label="Игроков"
+            label={t("programs.card.players")}
             value={program.max_players != null ? String(program.max_players) : "—"}
           />
           <div className="flex flex-col gap-0.5">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-              Цена
+              {t("programs.card.price")}
             </span>
             <span className="text-black tabular-nums">
               <span className="font-semibold">
-                {formatRub(program.price_peak_rub)}
+                {formatRub(program.price_peak_rub, lang)}
               </span>{" "}
-              <span className="text-fade">пик</span>
+              <span className="text-fade">{t("programs.card.peak_short")}</span>
             </span>
             <span className="text-secondary tabular-nums">
               <span className="font-semibold">
-                {formatRub(program.price_offpeak_rub)}
+                {formatRub(program.price_offpeak_rub, lang)}
               </span>{" "}
-              <span className="text-fade">вне пика</span>
+              <span className="text-fade">
+                {t("programs.card.off_peak_short")}
+              </span>
             </span>
             {(perPlayerPeak || perPlayerOff) && (
               <span className="text-[11px] text-fade tabular-nums">
-                {perPlayerPeak}/{perPlayerOff} с игрока
+                {perPlayerPeak}/{perPlayerOff} {t("programs.card.per_player_suffix")}
               </span>
             )}
           </div>

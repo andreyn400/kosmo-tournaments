@@ -1,6 +1,8 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { BracketMatch, ScoringSystem } from "@/lib/types";
+import type { TranslationKey } from "@/lib/i18n";
 import { BracketMatchCard } from "./BracketMatchCard";
 
 const COLUMN_WIDTH = 240;
@@ -9,14 +11,17 @@ const UNIT_SPACING = 128;
 const CHAMPION_WIDTH = 240;
 const LINE_COLOR = "var(--color-border-strong)";
 
-function roundLabel(round: number, totalRounds: number): string {
+function roundLabelKey(round: number, totalRounds: number): {
+  key: TranslationKey;
+  vars?: Record<string, string | number>;
+} {
   const remaining = totalRounds - round;
-  if (remaining === 0) return "Финал";
-  if (remaining === 1) return "Полуфинал";
-  if (remaining === 2) return "Четвертьфинал";
-  if (remaining === 3) return "1/8 финала";
-  if (remaining === 4) return "1/16 финала";
-  return `Раунд ${round}`;
+  if (remaining === 0) return { key: "finals.final" };
+  if (remaining === 1) return { key: "finals.semifinal" };
+  if (remaining === 2) return { key: "finals.quarterfinal" };
+  if (remaining === 3) return { key: "finals.eighth_final" };
+  if (remaining === 4) return { key: "finals.sixteenth_final" };
+  return { key: "finals.round_n", vars: { n: round } };
 }
 
 function centerY(round: number, position: number): number {
@@ -42,8 +47,10 @@ export function Bracket({
   courtLabelById: Record<string, string>;
   readOnly?: boolean;
 }) {
+  const { t } = useTranslation();
+
   if (matches.length === 0) {
-    return <p className="text-sm text-muted">Сетка пуста.</p>;
+    return <p className="text-sm text-muted">{t("finals.bracket_empty")}</p>;
   }
 
   const rounds = Array.from(new Set(matches.map((m) => m.round_number))).sort(
@@ -101,20 +108,23 @@ export function Bracket({
     <div className="overflow-x-auto -mx-4 px-4 pb-4">
       <div style={{ width: bracketWidth, minWidth: bracketWidth }}>
         <div className="relative mb-4" style={{ width: bracketWidth, height: 16 }}>
-          {rounds.map((r) => (
-            <div
-              key={`label-${r}`}
-              className="absolute text-[11px] font-semibold text-muted uppercase tracking-[0.1em]"
-              style={{ left: columnLeft(r), width: COLUMN_WIDTH }}
-            >
-              {roundLabel(r, totalRounds)}
-            </div>
-          ))}
+          {rounds.map((r) => {
+            const lbl = roundLabelKey(r, totalRounds);
+            return (
+              <div
+                key={`label-${r}`}
+                className="absolute text-[11px] font-semibold text-muted uppercase tracking-[0.1em]"
+                style={{ left: columnLeft(r), width: COLUMN_WIDTH }}
+              >
+                {t(lbl.key, lbl.vars)}
+              </div>
+            );
+          })}
           <div
             className="absolute text-[11px] font-semibold uppercase tracking-[0.1em]"
             style={{ left: championLeft, width: CHAMPION_WIDTH, color: "#b45309" }}
           >
-            Чемпион
+            {t("finals.champion")}
           </div>
         </div>
 
@@ -188,6 +198,7 @@ export function Bracket({
 }
 
 function ChampionCard({ label }: { label: string | null }) {
+  const { t } = useTranslation();
   return (
     <div
       className="rounded-lg bg-white px-4 py-5 flex flex-col items-center gap-2 text-center"
@@ -202,14 +213,14 @@ function ChampionCard({ label }: { label: string | null }) {
         className="text-[10px] font-semibold uppercase tracking-[0.12em]"
         style={{ color: "#b45309" }}
       >
-        Чемпион
+        {t("finals.champion")}
       </span>
       {label ? (
         <span className="text-base font-bold text-black leading-tight">
           {label}
         </span>
       ) : (
-        <span className="text-sm text-muted">Ожидается</span>
+        <span className="text-sm text-muted">{t("finals.awaiting")}</span>
       )}
     </div>
   );

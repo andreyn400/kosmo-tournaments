@@ -13,6 +13,7 @@ import { listCourtsByIds } from "@/lib/queries/courts";
 import { listRegistrationsByDivision } from "@/lib/queries/registrations";
 import { totalRoundsFor } from "@/lib/total-rounds";
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
+import { getServerDict } from "@/lib/i18n/server";
 import { LivePlayBoard } from "../../../play/LivePlayBoard";
 
 export default async function DivisionPlayPage({
@@ -31,6 +32,7 @@ export default async function DivisionPlayPage({
     redirect(`/tournament/${id}/division/${divisionId}`);
   }
 
+  const dict = await getServerDict();
   const sessions = await listSessionsByTournament(id);
   const activeSession =
     sessions.find((s) => s.status === "in_progress") ??
@@ -47,14 +49,14 @@ export default async function DivisionPlayPage({
         action={
           <Link href={backHref}>
             <Button variant="secondary" size="md">
-              К дивизиону
+              {dict["play.back_to_division"]}
             </Button>
           </Link>
         }
       >
         <Card>
           <p className="text-sm text-muted">
-            Дивизион ещё не запущен. Запустите его со страницы дивизиона.
+            {dict["play.division_not_started_copy"]}
           </p>
         </Card>
       </PageShell>
@@ -102,13 +104,17 @@ export default async function DivisionPlayPage({
         <div className="flex items-center gap-1.5">
           <Link href={`${backHref}/play/scoreboard`} target="_blank">
             <Button variant="ghost" size="md">
-              Табло
+              {dict["play.scoreboard_cta"]}
             </Button>
           </Link>
           <Link href={backHref}>
             <Button variant="secondary" size="md">
-              <span className="hidden sm:inline">К дивизиону</span>
-              <span className="sm:hidden">← Назад</span>
+              <span className="hidden sm:inline">
+                {dict["play.back_to_division"]}
+              </span>
+              <span className="sm:hidden">
+                {dict["play.back_to_tournament_short"]}
+              </span>
             </Button>
           </Link>
         </div>
@@ -119,7 +125,11 @@ export default async function DivisionPlayPage({
           href={backHref}
           className="text-sm text-muted hover:text-black inline-flex items-center gap-1.5 self-start"
         >
-          <span aria-hidden>←</span> К дивизиону · {division.name}
+          <span aria-hidden>←</span>{" "}
+          {dict["play.back_to_division_with_name"].replace(
+            "{name}",
+            division.name,
+          )}
         </Link>
         <LivePlayBoard
           tournament={tournament}

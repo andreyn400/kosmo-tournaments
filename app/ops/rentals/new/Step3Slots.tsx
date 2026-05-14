@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { getWeekdayLongLabels } from "@/lib/i18n/format";
 import type { Court } from "@/lib/types";
-import { DAY_LABELS_LONG } from "../../coaches/format";
 import type { WizardSlot, WizardState } from "./WizardShell";
 
 interface Step3Props {
@@ -29,6 +30,8 @@ function blankDraft(courts: Court[]): WizardSlot {
 }
 
 export function Step3Slots({ state, setState, courts }: Step3Props) {
+  const { t, lang } = useTranslation();
+  const dayLong = getWeekdayLongLabels(lang);
   const [draft, setDraft] = useState<WizardSlot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const courtById = new Map(courts.map((c) => [c.id, c]));
@@ -41,11 +44,11 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
   function commitDraft() {
     if (!draft) return;
     if (draft.court_ids.length === 0) {
-      setError("Выберите хотя бы один корт");
+      setError(t("rentals.wizard.slots.error.no_court"));
       return;
     }
     if (draft.end_time <= draft.start_time) {
-      setError("Время окончания должно быть позже начала");
+      setError(t("rentals.wizard.slots.error.end_not_after_start"));
       return;
     }
     setState((s) => ({ ...s, slots: [...s.slots, draft] }));
@@ -66,11 +69,10 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
     <div className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
         <h2 className="text-base font-semibold text-black">
-          Повторяющиеся слоты
+          {t("rentals.wizard.slots.title")}
         </h2>
         <p className="text-[11.5px] text-muted">
-          Каждый слот повторяется каждую неделю в течение срока контракта.
-          Можно оставить пустым и добавить слоты позже на странице контракта.
+          {t("rentals.wizard.slots.help")}
         </p>
       </header>
 
@@ -86,7 +88,7 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
                 className={`flex items-center gap-3 px-4 py-2.5 ${i % 2 === 1 ? "bg-subtle/30" : ""}`}
               >
                 <span className="text-sm font-semibold text-black w-28 flex-shrink-0">
-                  {DAY_LABELS_LONG[s.day_of_week]}
+                  {dayLong[s.day_of_week]}
                 </span>
                 <span className="text-xs text-secondary tabular-nums flex-shrink-0">
                   {s.start_time}–{s.end_time}
@@ -102,7 +104,7 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
                 <button
                   type="button"
                   onClick={() => removeSlot(s._id)}
-                  aria-label="Удалить слот"
+                  aria-label={t("rentals.wizard.slots.remove_slot_aria")}
                   className="text-muted hover:text-[var(--color-danger)] flex-shrink-0 transition-colors"
                 >
                   <svg
@@ -127,7 +129,7 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
       {draft ? (
         <div className="rounded-md bg-subtle border border-border p-3 grid gap-3">
           <div className="grid gap-3 sm:grid-cols-[1fr_5.5rem_5.5rem]">
-            <Field label="День недели">
+            <Field label={t("rentals.wizard.slots.field.day")}>
               <select
                 value={draft.day_of_week}
                 onChange={(e) =>
@@ -138,14 +140,14 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
                 }
                 className="w-full h-9 px-3 rounded-[var(--radius-button)] bg-surface border border-border text-black text-sm"
               >
-                {DAY_LABELS_LONG.map((d, i) => (
+                {dayLong.map((d, i) => (
                   <option key={d} value={i}>
                     {d}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Начало">
+            <Field label={t("rentals.wizard.slots.field.start")}>
               <Input
                 type="time"
                 value={draft.start_time}
@@ -155,7 +157,7 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
                 className="!h-9"
               />
             </Field>
-            <Field label="Конец">
+            <Field label={t("rentals.wizard.slots.field.end")}>
               <Input
                 type="time"
                 value={draft.end_time}
@@ -167,11 +169,11 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
             </Field>
           </div>
 
-          <Field label="Корты">
+          <Field label={t("rentals.wizard.slots.field.courts")}>
             <div className="flex flex-wrap gap-1.5">
               {courts.length === 0 ? (
                 <span className="text-[11px] text-fade">
-                  Нет активных кортов.
+                  {t("rentals.wizard.slots.no_active_courts")}
                 </span>
               ) : (
                 courts.map((c) => {
@@ -204,11 +206,11 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
             </div>
           </Field>
 
-          <Field label="Заметка">
+          <Field label={t("rentals.wizard.slots.field.notes")}>
             <Input
               value={draft.notes}
               onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-              placeholder="Необязательная заметка к слоту"
+              placeholder={t("rentals.wizard.slots.placeholder.notes")}
               className="!h-9"
             />
           </Field>
@@ -224,10 +226,10 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
               size="sm"
               onClick={cancelDraft}
             >
-              Отмена
+              {t("btn.cancel")}
             </Button>
             <Button type="button" size="sm" onClick={commitDraft}>
-              Добавить слот
+              {t("rentals.wizard.slots.add_commit")}
             </Button>
           </div>
         </div>
@@ -239,13 +241,13 @@ export function Step3Slots({ state, setState, courts }: Step3Props) {
           onClick={startAdding}
           className="self-start"
         >
-          + Добавить слот
+          {t("rentals.wizard.slots.add_cta")}
         </Button>
       )}
 
       {state.slots.length === 0 && !draft && (
         <p className="text-[11.5px] text-muted -mt-2">
-          Без слотов контракт можно создать как черновик и заполнить позже.
+          {t("rentals.wizard.slots.empty_hint")}
         </p>
       )}
     </div>

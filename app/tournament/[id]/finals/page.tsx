@@ -8,8 +8,10 @@ import { getLeagueSeason } from "@/lib/queries/league-seasons";
 import { listBracketMatches } from "@/lib/queries/bracket-matches";
 import { listPlayers } from "@/lib/queries/players";
 import { listCourtsByIds } from "@/lib/queries/courts";
-import { formatDateRu } from "@/lib/format-date";
-import { SCORING_SYSTEM_LABEL_RU } from "@/lib/scoring-systems";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
+import { formatDate } from "@/lib/i18n/format";
+import { SCORING_SYSTEM_LABEL_KEY } from "@/lib/i18n/scoring-keys";
 import { Bracket } from "./Bracket";
 
 export default async function FinalsPage({
@@ -47,40 +49,55 @@ export default async function FinalsPage({
 
   const scoringSystem = league.finals_scoring_system ?? "sets_best3";
 
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
+
   const header = (
     <Link href={`/tournament/${id}`}>
       <Button variant="secondary" size="md">
-        К лиге
+        {tr("finals.back_to_league_short")}
       </Button>
     </Link>
   );
 
   return (
-    <PageShell title={`Финалы · ${tournament.name}`} action={header}>
+    <PageShell
+      title={tr("finals.title_with_name", { name: tournament.name })}
+      action={header}
+    >
       <div className="flex flex-col gap-6">
         <Card className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
             <InfoItem
-              label="Система счёта"
-              value={SCORING_SYSTEM_LABEL_RU[scoringSystem]}
+              label={tr("finals.info.scoring")}
+              value={tr(SCORING_SYSTEM_LABEL_KEY[scoringSystem])}
             />
             <InfoItem
-              label="Размер сетки"
+              label={tr("finals.info.bracket_size")}
               value={
                 league.finals_bracket_size
-                  ? `${league.finals_bracket_size} пар`
+                  ? tr("finals.info.bracket_pairs", {
+                      n: league.finals_bracket_size,
+                    })
                   : "—"
               }
             />
             <InfoItem
-              label="Дата финала"
-              value={league.finals_date ? formatDateRu(league.finals_date) : "—"}
+              label={tr("finals.info.date")}
+              value={
+                league.finals_date ? formatDate(league.finals_date, lang) : "—"
+              }
             />
           </div>
         </Card>
 
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Сетка финала</h2>
+          <h2 className="font-semibold text-black">
+            {tr("finals.bracket_title")}
+          </h2>
           <Bracket
             tournamentId={id}
             matches={matches}

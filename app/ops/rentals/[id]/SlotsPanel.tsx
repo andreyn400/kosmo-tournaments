@@ -3,12 +3,13 @@
 import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { getWeekdayLongLabels } from "@/lib/i18n/format";
 import type {
   Court,
   RentalSlot,
   RentalSlotException,
 } from "@/lib/types";
-import { DAY_LABELS_LONG } from "../../coaches/format";
 import { SlotForm } from "./SlotForm";
 import { ExceptionForm } from "./ExceptionForm";
 import {
@@ -34,6 +35,7 @@ export function SlotsPanel({
   courts,
 }: SlotsPanelProps) {
   const router = useRouter();
+  const { t, tPlural } = useTranslation();
   const [creating, setCreating] = useState(false);
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [exceptionForSlotId, setExceptionForSlotId] = useState<string | null>(
@@ -41,7 +43,6 @@ export function SlotsPanel({
   );
   const [pending, startTransition] = useTransition();
 
-  // Group exceptions by slot for quick lookup.
   const exceptionsBySlot = useMemo(() => {
     const m = new Map<string, RentalSlotException[]>();
     for (const e of exceptions) {
@@ -84,8 +85,7 @@ export function SlotsPanel({
   }
 
   async function handleDeleteSlot(slotId: string) {
-    if (!confirm("Удалить этот слот? Все его исключения тоже удалятся."))
-      return;
+    if (!confirm(t("slots.delete_confirm"))) return;
     startTransition(async () => {
       const res = await deleteSlotAction(contractId, slotId);
       if (res.error) {
@@ -116,7 +116,7 @@ export function SlotsPanel({
   }
 
   async function handleDeleteException(exceptionId: string) {
-    if (!confirm("Удалить это исключение?")) return;
+    if (!confirm(t("slots.exception.delete_confirm"))) return;
     startTransition(async () => {
       const res = await deleteExceptionAction(contractId, exceptionId);
       if (res.error) {
@@ -130,11 +130,15 @@ export function SlotsPanel({
   return (
     <section className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold text-black">Расписание</h2>
+        <h2 className="text-sm font-semibold text-black">{t("slots.title")}</h2>
         <span className="text-xs text-muted">
           {slots.length === 0
-            ? "Слотов нет"
-            : `${slots.length} ${pluralSlots(slots.length)}`}
+            ? t("slots.count_empty")
+            : `${slots.length} ${tPlural(slots.length, {
+                one: "slots.slots.one",
+                few: "slots.slots.few",
+                many: "slots.slots.many",
+              })}`}
         </span>
         <Button
           size="sm"
@@ -142,15 +146,11 @@ export function SlotsPanel({
           disabled={creating}
           className="ml-auto"
         >
-          + Добавить слот
+          {t("slots.add_cta")}
         </Button>
       </header>
 
-      <p className="text-[11px] text-muted -mt-1">
-        Слот повторяется каждую неделю в течение срока контракта. Изменения
-        применяются ко всей истории слота — для частичных правок добавьте
-        паузу или отмену.
-      </p>
+      <p className="text-[11px] text-muted -mt-1">{t("slots.help")}</p>
 
       {creating && (
         <SlotForm
@@ -164,10 +164,7 @@ export function SlotsPanel({
 
       {slots.length === 0 && !creating ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-6 text-center">
-          <p className="text-sm text-muted">
-            Слотов пока нет. Добавьте первый — он начнёт отображаться в общем
-            расписании на странице «Расписание».
-          </p>
+          <p className="text-sm text-muted">{t("slots.empty_copy")}</p>
         </div>
       ) : slots.length > 0 ? (
         <div className="rounded-card border border-border bg-surface overflow-hidden">
@@ -235,6 +232,8 @@ function SlotRow({
   onDeleteException,
   pending,
 }: SlotRowProps) {
+  const { t, tPlural, lang } = useTranslation();
+  const dayLong = getWeekdayLongLabels(lang);
   const courtsById = new Map(courts.map((c) => [c.id, c]));
   const courtLabels = slot.court_ids
     .map((id) => courtsById.get(id)?.name ?? "?")
@@ -248,7 +247,7 @@ function SlotRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-semibold text-black">
-              {DAY_LABELS_LONG[slot.day_of_week]}
+              {dayLong[slot.day_of_week]}
             </span>
             <span className="text-xs text-secondary tabular-nums">
               {slot.start_time.slice(0, 5)}–{slot.end_time.slice(0, 5)}
@@ -257,7 +256,11 @@ function SlotRow({
             {exceptions.length > 0 && (
               <span className="inline-flex items-center px-1.5 h-5 rounded text-[9.5px] font-semibold uppercase tracking-wider bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
                 {exceptions.length}{" "}
-                {pluralExceptions(exceptions.length)}
+                {tPlural(exceptions.length, {
+                  one: "slots.exceptions.one",
+                  few: "slots.exceptions.few",
+                  many: "slots.exceptions.many",
+                })}
               </span>
             )}
           </div>
@@ -276,7 +279,7 @@ function SlotRow({
                 disabled={pending}
                 className="text-[11px] font-semibold text-secondary hover:text-accent px-2 h-7 rounded transition-colors"
               >
-                + Исключение
+                {t("slots.row.add_exception")}
               </button>
               <button
                 type="button"
@@ -284,7 +287,7 @@ function SlotRow({
                 disabled={pending}
                 className="text-[11px] font-semibold text-secondary hover:text-accent px-2 h-7 rounded transition-colors"
               >
-                Изменить
+                {t("slots.row.edit")}
               </button>
             </>
           )}
@@ -305,7 +308,9 @@ function SlotRow({
                     : "bg-[var(--color-danger)] text-white"
                 }`}
               >
-                {e.exception_type === "pause" ? "Пауза" : "Отмена"}
+                {e.exception_type === "pause"
+                  ? t("slots.exception.pause")
+                  : t("slots.exception.cancellation")}
               </span>
               <span className="tabular-nums text-secondary">
                 {e.from_date === e.to_date
@@ -319,7 +324,7 @@ function SlotRow({
                 type="button"
                 onClick={() => onDeleteException(e.id)}
                 disabled={pending}
-                aria-label="Удалить исключение"
+                aria-label={t("slots.exception.remove_aria")}
                 className="ml-auto text-muted hover:text-[var(--color-danger)] transition-colors"
               >
                 <svg
@@ -364,22 +369,4 @@ function SlotRow({
       )}
     </div>
   );
-}
-
-function pluralSlots(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "слотов";
-  if (mod10 === 1) return "слот";
-  if (mod10 >= 2 && mod10 <= 4) return "слота";
-  return "слотов";
-}
-
-function pluralExceptions(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "исключений";
-  if (mod10 === 1) return "исключение";
-  if (mod10 >= 2 && mod10 <= 4) return "исключения";
-  return "исключений";
 }

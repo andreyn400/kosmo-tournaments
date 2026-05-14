@@ -7,6 +7,8 @@ import {
   createSlot,
   deleteContract,
 } from "@/lib/queries/rentals";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import { validateContractInput, type RawContractInput } from "../[id]/contract-input";
 import { validateSlotInput, type RawSlotInput } from "../[id]/slot-input";
 import { validateScheduleEntryInput, type RawScheduleEntryInput } from "../[id]/payment-input";
@@ -26,22 +28,33 @@ export interface CreateContractBundle {
 export async function createContractWithBundleAction(
   bundle: CreateContractBundle,
 ): Promise<{ id?: string; error?: string }> {
+  const dict = await getServerDict();
   // Validate everything up front so we never even create the contract if
   // anything downstream is malformed.
   const contractV = validateContractInput(bundle.contract);
-  if (!contractV.ok) return { error: contractV.error };
+  if (!contractV.ok) return { error: resolveErrorWithDict(contractV.error, dict) };
 
   const slotValues = [];
   for (const s of bundle.slots) {
     const v = validateSlotInput(s);
-    if (!v.ok) return { error: `Слот: ${v.error}` };
+    if (!v.ok) {
+      const msg = resolveErrorWithDict(v.error, dict);
+      return {
+        error: dict["error.contract.slot_prefix"].replace("{msg}", msg),
+      };
+    }
     slotValues.push(v.value);
   }
 
   const scheduleValues = [];
   for (const e of bundle.schedule) {
     const v = validateScheduleEntryInput(e);
-    if (!v.ok) return { error: `График: ${v.error}` };
+    if (!v.ok) {
+      const msg = resolveErrorWithDict(v.error, dict);
+      return {
+        error: dict["error.contract.schedule_prefix"].replace("{msg}", msg),
+      };
+    }
     scheduleValues.push(v.value);
   }
 
@@ -70,7 +83,8 @@ export async function createContractWithBundleAction(
       }
     }
     return {
-      error: e instanceof Error ? e.message : "Не удалось создать контракт.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.create.contract"],
     };
   }
 }

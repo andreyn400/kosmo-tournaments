@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { DisplayEvent } from "@/lib/queries/display";
 import { Avatar, OverflowPill } from "@/components/ui/Avatar";
 
@@ -8,6 +11,7 @@ type CompletedBodyProps = {
 };
 
 export function CompletedBody({ event }: CompletedBodyProps) {
+  const { t } = useTranslation();
   const visible = event.registeredPlayers.slice(0, MAX_VISIBLE);
   const overflow = Math.max(0, event.registeredPlayers.length - MAX_VISIBLE);
 
@@ -16,7 +20,7 @@ export function CompletedBody({ event }: CompletedBodyProps) {
       <span className="text-5xl">🥇</span>
       <div className="flex flex-col">
         <span className="text-[0.75rem] tracking-[0.2em] text-muted uppercase">
-          Победитель
+          {t("display.completed.winner")}
         </span>
         <span className="text-2xl font-bold text-black">
           {event.winner.name}
@@ -24,7 +28,9 @@ export function CompletedBody({ event }: CompletedBodyProps) {
       </div>
     </div>
   ) : (
-    <p className="text-muted text-base italic">Турнир завершён</p>
+    <p className="text-muted text-base italic">
+      {t("display.completed.tournament_done")}
+    </p>
   );
 
   return (

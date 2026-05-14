@@ -1,6 +1,7 @@
 "use client";
 
-import { formatRub } from "../../coaches/format";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 
 interface BalanceStripProps {
   balance: number;
@@ -17,10 +18,10 @@ export function BalanceStrip({
   refunds,
   entryCount,
 }: BalanceStripProps) {
+  const { t, lang } = useTranslation();
   const owes = balance > 0;
   const credit = balance < 0;
 
-  // The "hero" balance card switches color and label so the state reads at a glance.
   const heroBg = owes
     ? "bg-[var(--color-danger-soft)] border-[var(--color-danger)]/30"
     : credit
@@ -32,22 +33,22 @@ export function BalanceStrip({
       ? "text-[var(--color-success)]"
       : "text-secondary";
   const heroLabel = owes
-    ? "Должен клубу"
+    ? t("organizer.balance.label.owes")
     : credit
-      ? "Кредит организатора"
-      : "Расчёт сведён";
+      ? t("organizer.balance.label.credit")
+      : t("organizer.balance.label.settled");
   const heroAmount = owes
-    ? formatRub(balance)
+    ? formatRub(balance, lang)
     : credit
-      ? formatRub(-balance)
+      ? formatRub(-balance, lang)
       : "0 ₽";
   const heroHint = owes
-    ? "Сумма, которую организатор должен оплатить."
+    ? t("organizer.balance.hint.owes")
     : credit
-      ? "Сумма, оставшаяся на счёте организатора."
+      ? t("organizer.balance.hint.credit")
       : entryCount > 0
-        ? "Все начисления покрыты."
-        : "Записей пока нет.";
+        ? t("organizer.balance.hint.all_covered")
+        : t("organizer.balance.hint.no_entries");
 
   return (
     <section className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,2fr)]">
@@ -67,23 +68,23 @@ export function BalanceStrip({
 
       <div className="rounded-card border border-border bg-surface p-5 grid grid-cols-3 gap-3">
         <Breakdown
-          label="Начислено"
-          sublabel="за корты / турниры"
-          value={charges > 0 ? formatRub(charges) : "—"}
+          label={t("organizer.balance.breakdown.charges_label")}
+          sublabel={t("organizer.balance.breakdown.charges_sublabel")}
+          value={charges > 0 ? formatRub(charges, lang) : "—"}
           icon="↗"
           tone="neutral"
         />
         <Breakdown
-          label="Получено"
-          sublabel="депозиты"
-          value={deposits > 0 ? formatRub(deposits) : "—"}
+          label={t("organizer.balance.breakdown.deposits_label")}
+          sublabel={t("organizer.balance.breakdown.deposits_sublabel")}
+          value={deposits > 0 ? formatRub(deposits, lang) : "—"}
           icon="↘"
           tone="success"
         />
         <Breakdown
-          label="Возвращено"
-          sublabel="refunds"
-          value={refunds > 0 ? formatRub(refunds) : "—"}
+          label={t("organizer.balance.breakdown.refunds_label")}
+          sublabel={t("organizer.balance.breakdown.refunds_sublabel")}
+          value={refunds > 0 ? formatRub(refunds, lang) : "—"}
           icon="↻"
           tone="warning"
         />

@@ -4,6 +4,8 @@ import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import type { TranslationKey } from "@/lib/i18n";
 import type {
   Court,
   RentalClientType,
@@ -40,7 +42,6 @@ export interface WizardScheduleEntry {
 }
 
 export interface WizardState {
-  // Step 1 — client
   client_name: string;
   client_type: RentalClientType;
   contact_person: string;
@@ -48,7 +49,6 @@ export interface WizardState {
   contact_email: string;
   legal_entity_name: string;
   inn: string;
-  // Step 2 — contract
   contract_number: string;
   start_date: string;
   end_date: string;
@@ -59,21 +59,16 @@ export interface WizardState {
   status: RentalContractStatus;
   notes: string;
   internal_notes: string;
-  // Step 3 — slots
   slots: WizardSlot[];
-  // Step 4 — schedule
   schedule: WizardScheduleEntry[];
-  // Internal: which (start_date, end_date, total, type) the schedule was
-  // last auto-generated from. Used to detect when terms changed and prompt
-  // a regenerate.
   scheduleStamp: string | null;
 }
 
-const STEPS = [
-  { key: 1, label: "Клиент" },
-  { key: 2, label: "Условия" },
-  { key: 3, label: "Слоты" },
-  { key: 4, label: "График" },
+const STEPS: { key: number; labelKey: TranslationKey }[] = [
+  { key: 1, labelKey: "rentals.wizard.step.client" },
+  { key: 2, labelKey: "rentals.wizard.step.terms" },
+  { key: 3, labelKey: "rentals.wizard.step.slots" },
+  { key: 4, labelKey: "rentals.wizard.step.schedule" },
 ];
 
 function nextLocalId(): string {
@@ -126,6 +121,7 @@ function termsStamp(s: WizardState): string {
 
 export function WizardShell({ courts }: WizardShellProps) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
   const [step, setStep] = useState(1);
   const [state, setState] = useState<WizardState>(makeInitial);
   const [stepError, setStepError] = useState<string | null>(null);
@@ -137,10 +133,6 @@ export function WizardShell({ courts }: WizardShellProps) {
     setStepError(null);
   }, []);
 
-  // Auto-generate the schedule from current terms when entering step 4 if
-  // the operator hasn't yet (or if terms changed since the last generation).
-  // Implemented as a step-transition side-effect — NOT a useEffect — so
-  // setState only runs in response to user input, not on every re-render.
   const ensureScheduleForStep4 = useCallback(() => {
     setState((s) => {
       const stamp = termsStamp(s);
@@ -151,6 +143,10 @@ export function WizardShell({ courts }: WizardShellProps) {
         end_date: s.end_date,
         total_value_rub: total,
         payment_schedule_type: s.payment_schedule_type,
+        labels: {
+          fullPayment: t("rental.schedule.full_payment_label"),
+          lang,
+        },
       });
       return {
         ...s,
@@ -164,36 +160,37 @@ export function WizardShell({ courts }: WizardShellProps) {
         })),
       };
     });
-  }, []);
+  }, [t, lang]);
 
   function validateStep(n: number): string | null {
     if (n === 1) {
-      if (!state.client_name.trim()) return "Введите название клиента";
+      if (!state.client_name.trim()) {
+        return t("rentals.wizard.client.error.name_required");
+      }
       const email = state.contact_email.trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return "Неверный формат email";
+        return t("rentals.wizard.client.error.email_invalid");
       }
       const inn = state.inn.trim();
       if (inn && !/^\d{10}$|^\d{12}$/.test(inn)) {
-        return "ИНН: 10 цифр (юрлицо) или 12 (ИП)";
+        return t("rentals.wizard.client.error.inn_invalid");
       }
       return null;
     }
     if (n === 2) {
       if (!state.start_date || !state.end_date) {
-        return "Укажите даты начала и окончания";
+        return t("rentals.wizard.terms.error.dates_required");
       }
       if (state.end_date < state.start_date) {
-        return "Дата окончания должна быть не раньше начала";
+        return t("rentals.wizard.terms.error.end_before_start");
       }
       const total = Number.parseInt(state.total_value_rub, 10);
       if (!Number.isFinite(total) || total < 0) {
-        return "Стоимость: целое число ≥ 0";
+        return t("rentals.wizard.terms.error.total_invalid");
       }
       return null;
     }
     if (n === 3) {
-      // Slots optional — operator can add later.
       return null;
     }
     return null;
@@ -222,6 +219,10 @@ export function WizardShell({ courts }: WizardShellProps) {
       end_date: state.end_date,
       total_value_rub: total,
       payment_schedule_type: state.payment_schedule_type,
+      labels: {
+        fullPayment: t("rental.schedule.full_payment_label"),
+        lang,
+      },
     });
     setState((s) => ({
       ...s,
@@ -237,8 +238,6 @@ export function WizardShell({ courts }: WizardShellProps) {
   }
 
   function handleSubmit() {
-    // Final cross-step validation already happened on Next clicks; the form
-    // can still fail server-side, so capture that error inline.
     setSubmitError(null);
     startTransition(async () => {
       const res = await createContractWithBundleAction({
@@ -283,23 +282,29 @@ export function WizardShell({ courts }: WizardShellProps) {
     });
   }
 
+  const stepsForIndicator = STEPS.map((s) => ({
+    key: s.key,
+    label: t(s.labelKey),
+  }));
+
   return (
     <div className="max-w-3xl mx-auto flex flex-col gap-5">
-      {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
         <Link
           href="/ops/rentals"
           className="hover:text-black transition-colors inline-flex items-center gap-1"
         >
           <BackArrow />
-          Аренда
+          {t("rentals.wizard.breadcrumb_rentals")}
         </Link>
         <span className="text-fade">/</span>
-        <span className="text-secondary">Новый контракт</span>
+        <span className="text-secondary">
+          {t("rentals.wizard.breadcrumb_new")}
+        </span>
       </div>
 
       <div className="rounded-card border border-border bg-surface px-5 py-4">
-        <StepIndicator steps={STEPS} current={step} />
+        <StepIndicator steps={stepsForIndicator} current={step} />
       </div>
 
       <div className="rounded-card border border-border bg-surface p-6">
@@ -331,7 +336,7 @@ export function WizardShell({ courts }: WizardShellProps) {
       <div className="flex items-center gap-2 justify-end">
         <Link href="/ops/rentals">
           <Button type="button" variant="ghost" size="sm" disabled={pending}>
-            Отменить
+            {t("rentals.wizard.btn.cancel")}
           </Button>
         </Link>
         {step > 1 && (
@@ -342,12 +347,12 @@ export function WizardShell({ courts }: WizardShellProps) {
             onClick={goBack}
             disabled={pending}
           >
-            Назад
+            {t("rentals.wizard.btn.back")}
           </Button>
         )}
         {step < 4 && (
           <Button type="button" size="sm" onClick={goNext} disabled={pending}>
-            Далее
+            {t("rentals.wizard.btn.next")}
           </Button>
         )}
         {step === 4 && (
@@ -357,7 +362,9 @@ export function WizardShell({ courts }: WizardShellProps) {
             onClick={handleSubmit}
             disabled={pending}
           >
-            {pending ? "Создание…" : "Создать контракт"}
+            {pending
+              ? t("rentals.wizard.btn.submitting")
+              : t("rentals.wizard.btn.submit")}
           </Button>
         )}
       </div>

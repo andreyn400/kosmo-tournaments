@@ -4,6 +4,7 @@ import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type {
   Court,
   Match,
@@ -45,6 +46,7 @@ export function RoundPanel({
   allRoundsComplete: boolean;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -79,7 +81,7 @@ export function RoundPanel({
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-black">
-          Раунд {round.round_number}
+          {t("round.title_n", { n: round.round_number })}
         </h2>
         <RoundBadge round={round} />
       </div>
@@ -101,7 +103,7 @@ export function RoundPanel({
       {isCurrent && allCompleted && !isLast ? (
         <div className="flex flex-col gap-2">
           <Button size="lg" fullWidth disabled={pending} onClick={advance}>
-            {pending ? "Переход…" : "Следующий раунд →"}
+            {pending ? t("round.advancing") : t("round.advance_next")}
           </Button>
           {error ? <ErrorBanner message={error} /> : null}
         </div>
@@ -110,7 +112,7 @@ export function RoundPanel({
       {isCurrent && allCompleted && isLast ? (
         <div className="flex flex-col gap-2">
           <Button size="lg" fullWidth disabled={pending} onClick={advance}>
-            {pending ? "Завершение…" : "Завершить последний раунд"}
+            {pending ? t("round.finalizing") : t("round.advance_last")}
           </Button>
           {error ? <ErrorBanner message={error} /> : null}
         </div>
@@ -126,15 +128,15 @@ export function RoundPanel({
             onClick={finalize}
           >
             {pending
-              ? "Обновление рейтингов…"
+              ? t("round.elo_updating")
               : tournamentType === "league_season"
-                ? "Завершить сессию"
-                : "Завершить турнир"}
+                ? t("round.finalize_session")
+                : t("round.finalize_tournament")}
           </Button>
           <p className="text-xs text-muted">
             {tournamentType === "league_season"
-              ? "Будет обновлён ELO участников сессии и начислены очки в таблицу лиги."
-              : "Будет обновлён ELO всех игроков и создана страница итогов."}
+              ? t("round.session_summary")
+              : t("round.tournament_summary")}
           </p>
           {error ? <ErrorBanner message={error} /> : null}
         </div>
@@ -144,11 +146,12 @@ export function RoundPanel({
 }
 
 function RoundBadge({ round }: { round: Round }) {
+  const { t } = useTranslation();
   if (round.status === "in_progress")
-    return <Badge tone="status-progress">Идёт</Badge>;
+    return <Badge tone="status-progress">{t("round.badge.in_progress")}</Badge>;
   if (round.status === "completed")
-    return <Badge tone="status-completed">Завершён</Badge>;
-  return <Badge tone="neutral">Ожидание</Badge>;
+    return <Badge tone="status-completed">{t("round.badge.completed")}</Badge>;
+  return <Badge tone="neutral">{t("round.badge.pending")}</Badge>;
 }
 
 function ErrorBanner({ message }: { message: string }) {

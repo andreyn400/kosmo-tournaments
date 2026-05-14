@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { PADEL_LEVELS } from "@/lib/constants";
 import type { Player } from "@/lib/types";
 import { addPlayerAction } from "./add-player-action";
@@ -45,6 +46,7 @@ export function AddPlayerPanel({
   levelMax?: string | null;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -105,7 +107,7 @@ export function AddPlayerPanel({
   return (
     <div className="flex flex-col gap-3">
       <Input
-        placeholder="Поиск игрока по имени…"
+        placeholder={t("add_player.search_placeholder")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
@@ -126,7 +128,7 @@ export function AddPlayerPanel({
                   </span>
                   {outOfRange ? (
                     <span className="text-xs text-[var(--color-warning)] flex-shrink-0">
-                      вне уровня
+                      {t("add_player.out_of_range")}
                     </span>
                   ) : null}
                 </div>
@@ -136,7 +138,7 @@ export function AddPlayerPanel({
                   disabled={pending}
                   onClick={() => add(p.id)}
                 >
-                  Добавить
+                  {t("add_player.add_cta")}
                 </Button>
               </li>
             );
@@ -145,16 +147,20 @@ export function AddPlayerPanel({
       ) : (
         <p className="text-sm text-muted">
           {trimmedQuery
-            ? "Игроки не найдены."
-            : "Начните вводить имя или добавьте нового игрока ниже."}
+            ? t("add_player.no_results")
+            : t("add_player.start_typing")}
         </p>
       )}
 
       <div className="mt-2 pt-4 border-t border-border flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-black">Новый игрок</h3>
+        <h3 className="text-sm font-semibold text-black">
+          {t("add_player.new_player_title")}
+        </h3>
         <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
           <Input
-            placeholder={showCreatePrompt ? trimmedQuery : "Имя"}
+            placeholder={
+              showCreatePrompt ? trimmedQuery : t("add_player.name_placeholder")
+            }
             value={newName || (showCreatePrompt ? trimmedQuery : "")}
             onChange={(e) => setNewName(e.target.value)}
           />
@@ -173,7 +179,7 @@ export function AddPlayerPanel({
             disabled={pending || !(newName.trim() || showCreatePrompt)}
             onClick={createAndAdd}
           >
-            Создать и добавить
+            {t("add_player.create_and_add")}
           </Button>
         </div>
       </div>

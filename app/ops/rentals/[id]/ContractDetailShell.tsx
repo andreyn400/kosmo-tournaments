@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { RENTAL_STATUS_KEY } from "@/lib/i18n/rental-keys";
 import type {
   Court,
   RentalContract,
@@ -20,7 +22,6 @@ import { ContractEditForm } from "./ContractEditForm";
 import { SlotsPanel } from "./SlotsPanel";
 import { SchedulePanel } from "./SchedulePanel";
 import { LedgerPanel } from "./LedgerPanel";
-import { STATUS_LABELS } from "../format";
 import {
   deleteContractAction,
   updateContractAction,
@@ -45,12 +46,10 @@ export function ContractDetailShell({
   courts,
 }: ContractDetailShellProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  // Balance aggregates — same formula as the list page, but recomputed
-  // locally so the hero stays in sync after edits without a full server fetch
-  // round-trip on every keystroke.
   const aggregates = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     let scheduledDueToday = 0;
@@ -90,7 +89,7 @@ export function ContractDetailShell({
 
   async function handleDelete() {
     const ok = confirm(
-      `Удалить контракт «${contract.client_name}»? Это удалит ВСЕ слоты, исключения, график и платежи. Действие нельзя отменить.`,
+      t("contract.delete_confirm", { name: contract.client_name }),
     );
     if (!ok) return;
     startTransition(async () => {
@@ -105,14 +104,13 @@ export function ContractDetailShell({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/ops/rentals"
           className="inline-flex items-center gap-1 text-xs text-muted hover:text-black transition-colors"
         >
           <BackArrow />
-          Аренда
+          {t("contract.breadcrumb_rentals")}
         </Link>
         <span className="text-fade">/</span>
         <span className="text-xs text-secondary truncate">
@@ -126,7 +124,7 @@ export function ContractDetailShell({
               size="sm"
               onClick={() => setEditing(true)}
             >
-              Изменить
+              {t("contract.edit_cta")}
             </Button>
           )}
         </div>
@@ -178,6 +176,7 @@ export function ContractDetailShell({
 }
 
 function StatusBadge({ status }: { status: RentalContractStatus }) {
+  const { t } = useTranslation();
   const map: Record<
     RentalContractStatus,
     { bg: string; text: string }
@@ -202,7 +201,7 @@ function StatusBadge({ status }: { status: RentalContractStatus }) {
     <span
       className={`inline-flex items-center px-2 h-6 rounded text-[10.5px] font-semibold uppercase tracking-wider ${cfg.bg} ${cfg.text}`}
     >
-      {STATUS_LABELS[status]}
+      {t(RENTAL_STATUS_KEY[status])}
     </span>
   );
 }

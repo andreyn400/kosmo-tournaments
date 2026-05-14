@@ -2,12 +2,18 @@
 
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { PADEL_LEVELS } from "@/lib/constants";
 import {
-  DOMINANT_HAND_LABEL_RU,
-  GENDER_LABEL_RU,
-  MEMBERSHIP_LABEL_RU,
-  PADEL_LEVELS,
-} from "@/lib/constants";
+  DOMINANT_HAND_KEY,
+  GENDER_KEY,
+  MEMBERSHIP_KEY,
+} from "@/lib/i18n/player-keys";
+import type {
+  DominantHand,
+  Gender,
+  MembershipStatus,
+} from "@/lib/types";
 
 export type PlayerFormValues = {
   name: string;
@@ -70,6 +76,10 @@ function Label({
   );
 }
 
+const MEMBERSHIP_VALUES: MembershipStatus[] = ["member", "non_member", "guest"];
+const GENDER_VALUES: Gender[] = ["male", "female", "other"];
+const HAND_VALUES: DominantHand[] = ["right", "left"];
+
 export function PlayerFields({
   values,
   onChange,
@@ -78,16 +88,22 @@ export function PlayerFields({
   showLevel = true,
   showPhone = true,
 }: PlayerFieldsProps) {
-  const set = (field: keyof PlayerFormValues) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+  const { t } = useTranslation();
+  const set =
+    (field: keyof PlayerFormValues) =>
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+      >,
+    ) =>
       onChange(field, e.target.value);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {showName && (
-        <Label label="Имя" wide>
+        <Label label={t("players.field.name")} wide>
           <Input
-            placeholder="Имя игрока"
+            placeholder={t("players.placeholder_player_name")}
             value={values.name}
             onChange={set("name")}
             disabled={disabled}
@@ -96,7 +112,7 @@ export function PlayerFields({
       )}
 
       {showLevel && (
-        <Label label="Уровень">
+        <Label label={t("players.field.level")}>
           <Select
             value={values.level}
             onChange={set("level")}
@@ -111,22 +127,22 @@ export function PlayerFields({
         </Label>
       )}
 
-      <Label label="Членство">
+      <Label label={t("players.field.membership")}>
         <Select
           value={values.membership_status}
           onChange={set("membership_status")}
           disabled={disabled}
         >
-          {Object.entries(MEMBERSHIP_LABEL_RU).map(([k, label]) => (
-            <option key={k} value={k}>
-              {label}
+          {MEMBERSHIP_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {t(MEMBERSHIP_KEY[value])}
             </option>
           ))}
         </Select>
       </Label>
 
       {showPhone && (
-        <Label label="Телефон">
+        <Label label={t("players.field.phone")}>
           <Input
             placeholder="+7 ..."
             value={values.phone}
@@ -136,7 +152,7 @@ export function PlayerFields({
         </Label>
       )}
 
-      <Label label="Email">
+      <Label label={t("players.field.email")}>
         <Input
           type="email"
           placeholder="name@example.com"
@@ -146,22 +162,22 @@ export function PlayerFields({
         />
       </Label>
 
-      <Label label="Пол">
+      <Label label={t("players.field.gender")}>
         <Select
           value={values.gender}
           onChange={set("gender")}
           disabled={disabled}
         >
-          <option value="">— не указан —</option>
-          {Object.entries(GENDER_LABEL_RU).map(([k, label]) => (
-            <option key={k} value={k}>
-              {label}
+          <option value="">{t("players.gender_unspecified")}</option>
+          {GENDER_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {t(GENDER_KEY[value])}
             </option>
           ))}
         </Select>
       </Label>
 
-      <Label label="Дата рождения">
+      <Label label={t("players.field.date_of_birth")}>
         <Input
           type="date"
           value={values.date_of_birth}
@@ -170,31 +186,31 @@ export function PlayerFields({
         />
       </Label>
 
-      <Label label="Гражданство">
+      <Label label={t("players.field.nationality")}>
         <Input
-          placeholder="Например, Россия"
+          placeholder={t("players.placeholder_nationality")}
           value={values.nationality}
           onChange={set("nationality")}
           disabled={disabled}
         />
       </Label>
 
-      <Label label="Рабочая рука">
+      <Label label={t("players.field.dominant_hand")}>
         <Select
           value={values.dominant_hand}
           onChange={set("dominant_hand")}
           disabled={disabled}
         >
-          <option value="">— не указана —</option>
-          {Object.entries(DOMINANT_HAND_LABEL_RU).map(([k, label]) => (
-            <option key={k} value={k}>
-              {label}
+          <option value="">{t("players.hand_unspecified")}</option>
+          {HAND_VALUES.map((value) => (
+            <option key={value} value={value}>
+              {t(DOMINANT_HAND_KEY[value])}
             </option>
           ))}
         </Select>
       </Label>
 
-      <Label label="Фото (URL)" wide>
+      <Label label={t("players.field.photo_url")} wide>
         <Input
           type="url"
           placeholder="https://..."
@@ -204,7 +220,7 @@ export function PlayerFields({
         />
       </Label>
 
-      <Label label="Заметки" wide>
+      <Label label={t("players.field.notes")} wide>
         <textarea
           rows={3}
           value={values.notes}

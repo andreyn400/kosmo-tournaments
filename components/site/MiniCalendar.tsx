@@ -2,25 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatMonth, getWeekdayShortLabels } from "@/lib/i18n/format";
 import type { EventKind } from "@/lib/queries/calendar";
 import { MINI_CALENDAR_KIND_COLOR } from "@/lib/calendar-events";
-
-const MONTHS_RU = [
-  "Январь",
-  "Февраль",
-  "Март",
-  "Апрель",
-  "Май",
-  "Июнь",
-  "Июль",
-  "Август",
-  "Сентябрь",
-  "Октябрь",
-  "Ноябрь",
-  "Декабрь",
-];
-
-const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 function toIso(year: number, monthZeroBased: number, day: number): string {
   const mm = String(monthZeroBased + 1).padStart(2, "0");
@@ -33,6 +18,8 @@ export function MiniCalendar({
 }: {
   eventKindsByDate: Record<string, EventKind[]>;
 }) {
+  const { t, lang } = useTranslation();
+  const weekdaysShort = getWeekdayShortLabels(lang);
   const today = useMemo(() => new Date(), []);
   const todayIso = toIso(today.getFullYear(), today.getMonth(), today.getDate());
 
@@ -109,7 +96,7 @@ export function MiniCalendar({
         <button
           type="button"
           onClick={prev}
-          aria-label="Предыдущий месяц"
+          aria-label={t("calendar.mini.aria.prev_month")}
           className="h-6 w-6 inline-flex items-center justify-center rounded text-muted hover:text-black hover:bg-subtle"
         >
           <svg
@@ -130,15 +117,15 @@ export function MiniCalendar({
           type="button"
           onClick={goToday}
           disabled={isCurrentMonthView}
-          aria-label="К текущему месяцу"
+          aria-label={t("calendar.mini.aria.current_month")}
           className="text-[11px] font-semibold text-black uppercase tracking-wide tabular-nums px-1.5 rounded hover:bg-subtle disabled:hover:bg-transparent disabled:cursor-default"
         >
-          {MONTHS_RU[view.month]} {view.year}
+          {formatMonth(view.year, view.month, lang)}
         </button>
         <button
           type="button"
           onClick={next}
-          aria-label="Следующий месяц"
+          aria-label={t("calendar.mini.aria.next_month")}
           className="h-6 w-6 inline-flex items-center justify-center rounded text-muted hover:text-black hover:bg-subtle"
         >
           <svg
@@ -158,7 +145,7 @@ export function MiniCalendar({
       </div>
 
       <div className="grid grid-cols-7 gap-0.5 text-center text-[9px] font-medium text-fade uppercase tracking-wider mb-1">
-        {WEEKDAYS_RU.map((w) => (
+        {weekdaysShort.map((w) => (
           <span key={w} className="py-0.5">
             {w}
           </span>
@@ -183,7 +170,7 @@ export function MiniCalendar({
               key={cell.key}
               href={`/calendar?view=day&date=${cell.iso}`}
               className={`${base} ${tone}`}
-              title={hasEvent ? "Есть события" : undefined}
+              title={hasEvent ? t("calendar.mini.has_events") : undefined}
             >
               <span className="leading-none">{cell.day}</span>
               {hasEvent && !cell.isToday ? (

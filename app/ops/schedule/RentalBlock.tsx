@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { RentalBlockForGrid } from "@/lib/types";
 import { minutesFromTime, OPS_OPEN_HOUR } from "@/lib/ops-constants";
 import {
@@ -24,11 +25,11 @@ interface RentalBlockProps {
 }
 
 const TEAL_FILL = "#0d9488"; // teal-600
-const TEAL_FILL_DARK = "#0f766e"; // teal-700 for the AРЕНДА tag bg
+const TEAL_FILL_DARK = "#0f766e"; // teal-700 for the rental tag bg
 
 /**
  * Read-only recurring-rental block. Visually distinct from session blocks:
- * teal fill, white diagonal-stripe overlay for texture, prominent АРЕНДА
+ * teal fill, white diagonal-stripe overlay for texture, prominent RENTAL
  * tag in the top-left, dashed bottom-edge accent. Click opens the read-only
  * rental info popover with a deep link to the contract.
  */
@@ -40,6 +41,7 @@ export function RentalBlock({
   showCourtSpan,
   onClick,
 }: RentalBlockProps) {
+  const { t } = useTranslation();
   const startMin = minutesFromTime(block.start_time);
   const endMin = minutesFromTime(block.end_time);
   const startSlotFrac = (startMin - OPS_OPEN_HOUR * 60) / 30;
@@ -59,7 +61,11 @@ export function RentalBlock({
       onClick={(e) =>
         onClick(block, e.currentTarget.getBoundingClientRect())
       }
-      aria-label={`Аренда — ${block.client_name} ${block.start_time.slice(0, 5)}–${block.end_time.slice(0, 5)}`}
+      aria-label={t("schedule.rental.aria", {
+        name: block.client_name,
+        start: block.start_time.slice(0, 5),
+        end: block.end_time.slice(0, 5),
+      })}
       className="absolute text-left cursor-pointer transition-transform hover:scale-[1.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-accent"
       style={{
         top,
@@ -82,11 +88,13 @@ export function RentalBlock({
           className="inline-flex items-center px-1.5 h-4 rounded text-[9px] font-bold uppercase tracking-wider"
           style={{ background: TEAL_FILL_DARK, color: "#ffffff" }}
         >
-          Аренда
+          {t("schedule.rental.label")}
         </span>
         {showCourtSpan && colSpan > 1 && (
           <span className="text-[10px] font-semibold opacity-95">
-            К{colIndex + 1}–К{colIndex + colSpan}
+            {t("tournament.card.court_short_prefix")}
+            {colIndex + 1}–{t("tournament.card.court_short_prefix")}
+            {colIndex + colSpan}
           </span>
         )}
       </div>

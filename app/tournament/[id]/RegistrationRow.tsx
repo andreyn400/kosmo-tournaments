@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Player } from "@/lib/types";
 import { removePlayerAction } from "./remove-player-action";
 
@@ -25,6 +26,7 @@ export function RegistrationRow({
   divisionId?: string | null;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [pending, startTransition] = useTransition();
 
   const remove = () => {
@@ -54,7 +56,7 @@ export function RegistrationRow({
           </div>
           {partnerName ? (
             <span className="text-xs text-muted truncate">
-              в паре с {partnerName}
+              {t("registration.partner_with", { name: partnerName })}
             </span>
           ) : null}
         </div>
@@ -65,9 +67,9 @@ export function RegistrationRow({
           variant="ghost"
           disabled={pending}
           onClick={remove}
-          aria-label={`Удалить ${player.name}`}
+          aria-label={t("registration.delete_aria", { name: player.name })}
         >
-          Удалить
+          {t("btn.delete")}
         </Button>
       ) : null}
     </li>

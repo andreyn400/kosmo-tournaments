@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { startTournamentAction } from "./start-tournament-action";
 
 export function StartTournamentButton({
@@ -11,6 +12,7 @@ export function StartTournamentButton({
   tournamentId: string;
   playerCount: number;
 }) {
+  const { t } = useTranslation();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -32,15 +34,15 @@ export function StartTournamentButton({
         onClick={start}
         title={
           isReady
-            ? "Сгенерировать расписание и начать матчи"
-            : "Число игроков должно быть кратно 4 (и не менее 4)"
+            ? t("start_tournament.ready_title")
+            : t("start_tournament.not_ready_title")
         }
       >
-        {pending ? "Запуск…" : "Начать турнир"}
+        {pending ? t("start_tournament.starting") : t("start_tournament.cta")}
       </Button>
       {!isReady ? (
         <p className="text-xs text-muted">
-          Игроков: {playerCount}. Нужно кратное 4 число (минимум 4).
+          {t("start_tournament.not_ready_hint", { n: playerCount })}
         </p>
       ) : null}
       {error ? (

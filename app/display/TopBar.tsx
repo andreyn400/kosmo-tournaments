@@ -1,37 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const WEEKDAYS_RU = [
-  "Воскресенье",
-  "Понедельник",
-  "Вторник",
-  "Среда",
-  "Четверг",
-  "Пятница",
-  "Суббота",
-];
-
-const MONTHS_GENITIVE_RU = [
-  "января",
-  "февраля",
-  "марта",
-  "апреля",
-  "мая",
-  "июня",
-  "июля",
-  "августа",
-  "сентября",
-  "октября",
-  "ноября",
-  "декабря",
-];
-
-function formatLongDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const weekday = WEEKDAYS_RU[new Date(y, m - 1, d).getDay()];
-  return `${weekday}, ${d} ${MONTHS_GENITIVE_RU[m - 1]} ${y}`;
-}
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatLongDateWithWeekday } from "@/lib/i18n/format";
 
 function formatClock(now: Date): string {
   const h = String(now.getHours()).padStart(2, "0");
@@ -44,6 +15,7 @@ type TopBarProps = {
 };
 
 export function TopBar({ todayIso }: TopBarProps) {
+  const { lang } = useTranslation();
   const [clock, setClock] = useState(() => formatClock(new Date()));
 
   useEffect(() => {
@@ -68,7 +40,7 @@ export function TopBar({ todayIso }: TopBarProps) {
 
       <div className="flex justify-end">
         <span className="text-[1.1rem] font-medium text-secondary">
-          {formatLongDate(todayIso)}
+          {formatLongDateWithWeekday(todayIso, lang)}
         </span>
       </div>
     </header>

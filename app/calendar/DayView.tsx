@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Card } from "@/components/ui/Card";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { CalendarEvent } from "@/lib/queries/calendar";
 import type { Court } from "@/lib/types";
 import {
@@ -31,6 +32,7 @@ export function DayView({
   courts: Court[];
   onSelectEvent?: (event: CalendarEvent) => void;
 }) {
+  const { t } = useTranslation();
   const isToday = date === todayIso();
 
   const sortedCourts = useMemo(
@@ -98,17 +100,19 @@ export function DayView({
   if (columns.length === 0) {
     return (
       <Card className="flex flex-col items-center justify-center text-center gap-2 py-16">
-        <p className="text-base font-semibold text-black">Нет активных кортов</p>
-        <p className="text-xs text-muted">
-          Добавьте корты, чтобы видеть сетку расписания.
+        <p className="text-base font-semibold text-black">
+          {t("calendar.no_courts_title")}
         </p>
+        <p className="text-xs text-muted">{t("calendar.no_courts_copy")}</p>
       </Card>
     );
   }
 
   const columnKey = (c: ColumnSpec) => (c.kind === "court" ? c.court.id : NO_COURT);
   const columnLabel = (c: ColumnSpec) =>
-    c.kind === "court" ? `Корт ${c.court.number}` : "Без корта";
+    c.kind === "court"
+      ? t("calendar.court_label", { n: c.court.number })
+      : t("calendar.no_court");
 
   const gridTemplateColumns = `56px repeat(${columns.length}, minmax(120px, 1fr))`;
   const gridTemplateRows = `40px repeat(${TOTAL_ROWS}, 32px)`;
@@ -118,12 +122,12 @@ export function DayView({
       {untimedForColumns.length > 0 && (
         <Card padded={false} className="p-3">
           <div className="text-[11px] uppercase tracking-wide text-muted mb-2">
-            Без времени
+            {t("calendar.untimed")}
           </div>
           <div className="flex flex-col gap-1.5">
             {untimedForColumns.map(({ event, columnKey: ck }) => {
               const col = columns.find((c) => columnKey(c) === ck);
-              const tag = col ? columnLabel(col) : "Без корта";
+              const tag = col ? columnLabel(col) : t("calendar.no_court");
               return (
                 <div
                   key={`${event.key}:${ck}`}

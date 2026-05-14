@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createCourt } from "@/lib/queries/courts";
 import type { CourtStatus, CourtSurface } from "@/lib/types";
-import { COURT_STATUS_LABEL_RU, COURT_SURFACE_LABEL_RU } from "@/lib/constants";
+import {
+  COURT_STATUS_VALUES,
+  COURT_SURFACE_VALUES,
+} from "@/lib/i18n/court-keys";
+import { getServerDict } from "@/lib/i18n/server";
 
 export async function createCourtAction(input: {
   name: string;
@@ -12,16 +16,17 @@ export async function createCourtAction(input: {
   status: string;
   notes: string;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const name = input.name.trim();
-  if (!name) return { error: "Введите название корта." };
+  if (!name) return { error: dict["error.required.court_name"] };
   if (!Number.isInteger(input.number) || input.number < 1 || input.number > 10) {
-    return { error: "Номер корта должен быть от 1 до 10." };
+    return { error: dict["error.invalid.court_number_1_10"] };
   }
-  if (!(input.surface in COURT_SURFACE_LABEL_RU)) {
-    return { error: "Неверное покрытие." };
+  if (!COURT_SURFACE_VALUES.includes(input.surface as CourtSurface)) {
+    return { error: dict["error.invalid.surface_unknown"] };
   }
-  if (!(input.status in COURT_STATUS_LABEL_RU)) {
-    return { error: "Неверный статус." };
+  if (!COURT_STATUS_VALUES.includes(input.status as CourtStatus)) {
+    return { error: dict["error.invalid.status_unknown"] };
   }
 
   try {
@@ -33,7 +38,9 @@ export async function createCourtAction(input: {
       notes: input.notes.trim() || null,
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Не удалось создать корт." };
+    return {
+      error: e instanceof Error ? e.message : dict["error.failed.create.court"],
+    };
   }
 
   revalidatePath("/courts");

@@ -1,13 +1,15 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type { OrganizerWithBalance } from "@/lib/types";
-import { formatRub } from "../coaches/format";
 
 interface OrganizersSummaryProps {
   organizers: OrganizerWithBalance[];
 }
 
 export function OrganizersSummary({ organizers }: OrganizersSummaryProps) {
+  const { t, tPlural, lang } = useTranslation();
   const total = organizers.length;
   const owingCount = organizers.filter((o) => o.balance_rub > 0).length;
   const creditCount = organizers.filter((o) => o.balance_rub < 0).length;
@@ -25,29 +27,35 @@ export function OrganizersSummary({ organizers }: OrganizersSummaryProps) {
     0,
   );
 
+  const organizerWord = tPlural(total, {
+    one: "organizers.organizers.one",
+    few: "organizers.organizers.few",
+    many: "organizers.organizers.many",
+  });
+
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px]">
       <Stat
-        label="Всего"
+        label={t("organizers.summary.total")}
         value={String(total)}
-        suffix={pluralOrganizers(total)}
+        suffix={organizerWord}
       />
       <Sep />
       <Stat
-        label="Должны клубу"
-        value={`${owingCount} · ${outstanding > 0 ? formatRub(outstanding) : "—"}`}
+        label={t("organizers.summary.owing_to_club")}
+        value={`${owingCount} · ${outstanding > 0 ? formatRub(outstanding, lang) : "—"}`}
         tone={outstanding > 0 ? "danger" : "muted"}
       />
       <Sep />
       <Stat
-        label="С предоплатой"
-        value={`${creditCount} · ${credit > 0 ? formatRub(credit) : "—"}`}
+        label={t("organizers.summary.with_credit")}
+        value={`${creditCount} · ${credit > 0 ? formatRub(credit, lang) : "—"}`}
         tone={credit > 0 ? "success" : "muted"}
       />
       <Sep />
       <Stat
-        label="Всего депозитов"
-        value={depositsTotal > 0 ? formatRub(depositsTotal) : "—"}
+        label={t("organizers.summary.deposits_total")}
+        value={depositsTotal > 0 ? formatRub(depositsTotal, lang) : "—"}
       />
     </div>
   );
@@ -87,13 +95,4 @@ function Sep() {
       ·
     </span>
   );
-}
-
-function pluralOrganizers(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "организаторов";
-  if (mod10 === 1) return "организатор";
-  if (mod10 >= 2 && mod10 <= 4) return "организатора";
-  return "организаторов";
 }

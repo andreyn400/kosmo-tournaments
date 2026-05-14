@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { CalendarEvent } from "@/lib/queries/calendar";
 import {
   eventBlockStyle,
@@ -46,9 +47,11 @@ export function EventBlock({
   blockHeightPx?: number;
   onClick?: () => void;
 }) {
-  const title = eventTitle(event);
-  const subtitle = eventSubtitle(event);
+  const { t } = useTranslation();
+  const title = eventTitle(event, t);
+  const subtitle = eventSubtitle(event, t);
   const style = eventBlockStyle(event);
+  const badge = style.badgeKey ? t(style.badgeKey) : null;
 
   if (density === "pill") {
     return (
@@ -116,7 +119,7 @@ export function EventBlock({
         className="relative flex items-start"
         style={{ gap: 4, padding: "4px 6px", zIndex: 1 }}
       >
-        {style.badge && (
+        {badge && (
           <span
             className="shrink-0 font-semibold uppercase tracking-wide"
             style={{
@@ -128,7 +131,7 @@ export function EventBlock({
               lineHeight: 1.4,
             }}
           >
-            {style.badge}
+            {badge}
           </span>
         )}
         <span

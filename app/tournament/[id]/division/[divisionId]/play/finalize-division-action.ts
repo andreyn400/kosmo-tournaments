@@ -14,11 +14,13 @@ import {
   updateSessionStatus,
 } from "@/lib/queries/sessions";
 import { listRoundsByDivision } from "@/lib/queries/rounds";
+import { getServerDict } from "@/lib/i18n/server";
 
 export async function finalizeDivisionAction(input: {
   tournamentId: string;
   divisionId: string;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const { tournamentId, divisionId } = input;
 
   try {
@@ -26,17 +28,17 @@ export async function finalizeDivisionAction(input: {
       getTournament(tournamentId),
       getDivision(divisionId),
     ]);
-    if (!tournament) return { error: "Турнир не найден" };
+    if (!tournament) return { error: dict["error.not_found.tournament"] };
     if (!division || division.tournament_id !== tournamentId) {
-      return { error: "Дивизион не найден" };
+      return { error: dict["error.not_found.division"] };
     }
     if (division.status !== "in_progress") {
-      return { error: "Дивизион не запущен" };
+      return { error: dict["error.state.division_not_started"] };
     }
 
     const divisionRounds = await listRoundsByDivision(divisionId);
     const sessionId = divisionRounds[0]?.session_id ?? null;
-    if (!sessionId) return { error: "Нет раундов в дивизионе" };
+    if (!sessionId) return { error: dict["error.state.no_division_rounds"] };
 
     await finalizeSessionElo({ sessionId, tournamentId, divisionId });
     await updateDivisionStatus(divisionId, "completed");
@@ -53,8 +55,13 @@ export async function finalizeDivisionAction(input: {
     }
   } catch (e) {
     if (isRedirectError(e)) throw e;
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось завершить: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.finalize_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
 
   revalidatePath("/");

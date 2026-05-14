@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Player } from "@/lib/types";
 import {
   PlayerFields,
@@ -28,6 +29,7 @@ function fromPlayer(p: Player): PlayerFormValues {
 }
 
 export function PlayerEditForm({ player }: { player: Player }) {
+  const { t } = useTranslation();
   const [values, setValues] = useState<PlayerFormValues>(() => fromPlayer(player));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -59,11 +61,11 @@ export function PlayerEditForm({ player }: { player: Player }) {
       <div className="flex items-center justify-end gap-2">
         <Link href={`/players/${player.id}`}>
           <Button variant="secondary" disabled={pending}>
-            Отмена
+            {t("btn.cancel")}
           </Button>
         </Link>
         <Button onClick={submit} disabled={pending || !values.name.trim()}>
-          {pending ? "Сохранение…" : "Сохранить"}
+          {pending ? t("btn.saving") : t("btn.save")}
         </Button>
       </div>
     </Card>

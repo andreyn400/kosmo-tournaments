@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { generateTimeSlots, normalizeTime } from "@/lib/time-slots";
+import { SCORING_SYSTEMS, scoringGroup } from "@/lib/scoring-systems";
 import {
-  SCORING_GROUP_LABEL_RU,
-  SCORING_SYSTEM_HELPER_RU,
-  SCORING_SYSTEM_LABEL_RU,
-  SCORING_SYSTEMS,
-  scoringGroup,
-} from "@/lib/scoring-systems";
+  SCORING_GROUP_LABEL_KEY,
+  SCORING_SYSTEM_HELPER_KEY,
+  SCORING_SYSTEM_LABEL_KEY,
+} from "@/lib/i18n/scoring-keys";
 import {
   snakePairsForBracket,
   swapPairMembers,
@@ -56,6 +56,7 @@ export function SetupWizard({
   allowedBracketSizes: number[];
   defaultBracketSize: number;
 }) {
+  const { t } = useTranslation();
   const [bracketSize, setBracketSize] = useState<number>(defaultBracketSize);
   const [scoringSystem, setScoringSystem] = useState<ScoringSystem>(
     "sets_best3",
@@ -165,31 +166,40 @@ export function SetupWizard({
     <div className="flex flex-col gap-6 max-w-3xl">
       <Card className="flex flex-col gap-5">
         <div className="flex flex-col gap-1">
-          <h2 className="font-semibold text-black">Параметры финала</h2>
+          <h2 className="font-semibold text-black">
+            {t("finals.setup.params_title")}
+          </h2>
           <p className="text-sm text-muted">
             {isIndividual
-              ? `Квалифицировано игроков: ${qualification.individuals.length}`
-              : `Квалифицировано пар: ${qualification.pairs.length}`}
+              ? t("finals.setup.qualified_individuals", {
+                  n: qualification.individuals.length,
+                })
+              : t("finals.setup.qualified_pairs", {
+                  n: qualification.pairs.length,
+                })}
           </p>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Размер сетки" required>
+          <Field label={t("finals.setup.field.bracket_size")} required>
             <Select
               value={String(bracketSize)}
               onChange={(e) => setBracketSize(Number(e.target.value))}
             >
               {allowedBracketSizes.map((s) => (
                 <option key={s} value={s}>
-                  {s} пар ({Math.log2(s)} раундов)
+                  {t("finals.setup.bracket_option", {
+                    n: s,
+                    rounds: Math.log2(s),
+                  })}
                 </option>
               ))}
             </Select>
           </Field>
 
           <Field
-            label="Система счёта"
-            hint={SCORING_SYSTEM_HELPER_RU[scoringSystem]}
+            label={t("finals.setup.field.scoring")}
+            hint={t(SCORING_SYSTEM_HELPER_KEY[scoringSystem])}
           >
             <Select
               value={scoringSystem}
@@ -197,38 +207,38 @@ export function SetupWizard({
                 setScoringSystem(e.target.value as ScoringSystem)
               }
             >
-              <optgroup label={SCORING_GROUP_LABEL_RU.sets}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.sets)}>
                 {SCORING_GROUPED.sets.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label={SCORING_GROUP_LABEL_RU.games}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.games)}>
                 {SCORING_GROUPED.games.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label={SCORING_GROUP_LABEL_RU.combined}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.combined)}>
                 {SCORING_GROUPED.combined.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label={SCORING_GROUP_LABEL_RU.points}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.points)}>
                 {SCORING_GROUPED.points.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
             </Select>
           </Field>
 
-          <Field label="Дата финала">
+          <Field label={t("finals.setup.field.finals_date")}>
             <Input
               type="date"
               value={scheduledDate}
@@ -236,12 +246,12 @@ export function SetupWizard({
             />
           </Field>
 
-          <Field label="Время начала">
+          <Field label={t("finals.setup.field.start_time")}>
             <Select
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
             >
-              <option value="">Не указано</option>
+              <option value="">{t("finals.setup.start_time_unset")}</option>
               {TIME_SLOTS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -251,11 +261,11 @@ export function SetupWizard({
           </Field>
         </div>
 
-        <Field label="Корты" required>
+        <Field label={t("finals.setup.field.courts")} required>
           <div className="flex flex-col gap-1.5 border border-border rounded-[var(--radius-button)] bg-surface p-2.5">
             {courts.length === 0 ? (
               <p className="text-xs text-muted px-2 py-1">
-                У турнира не выбрано ни одного корта.
+                {t("finals.setup.no_tournament_courts")}
               </p>
             ) : (
               courts.map((c) => (
@@ -286,14 +296,18 @@ export function SetupWizard({
         <Card className="flex flex-col gap-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-black">Пары для финала</h2>
+              <h2 className="font-semibold text-black">
+                {t("finals.setup.pairs_title")}
+              </h2>
               <p className="text-xs text-muted">
-                Авто-формирование: сильный + слабый (1+{bracketSize * 2}, 2+
-                {bracketSize * 2 - 1}, …). Можно поменять партнёров местами.
+                {t("finals.setup.pairs_hint", {
+                  a: bracketSize * 2,
+                  b: bracketSize * 2 - 1,
+                })}
               </p>
             </div>
             <Button size="sm" variant="secondary" onClick={resetPairs}>
-              Сбросить к авто
+              {t("finals.setup.reset_pairs")}
             </Button>
           </div>
           <ul className="flex flex-col gap-2">
@@ -311,7 +325,7 @@ export function SetupWizard({
                       {p.player1_name}
                     </span>
                     <SwapButton
-                      label="↕ сильный"
+                      label={t("finals.setup.swap_top")}
                       onSelect={(target) => swapTop(idx, target)}
                       pairs={pairs}
                       excludeIndex={idx}
@@ -323,7 +337,7 @@ export function SetupWizard({
                       {p.player2_name}
                     </span>
                     <SwapButton
-                      label="↕ слабый"
+                      label={t("finals.setup.swap_bottom")}
                       onSelect={(target) => swapBottom(idx, target)}
                       pairs={pairs}
                       excludeIndex={idx}
@@ -337,7 +351,9 @@ export function SetupWizard({
         </Card>
       ) : (
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Посев пар</h2>
+          <h2 className="font-semibold text-black">
+            {t("finals.setup.seed_title")}
+          </h2>
           <ul className="flex flex-col gap-2">
             {activePairs.map((p) => (
               <li
@@ -367,7 +383,9 @@ export function SetupWizard({
 
       <div className="flex items-center gap-3">
         <Button size="lg" disabled={!canSubmit} onClick={submit}>
-          {pending ? "Создание…" : "Создать финальную сетку"}
+          {pending
+            ? t("finals.setup.creating")
+            : t("finals.setup.create_cta_long")}
         </Button>
       </div>
     </div>
@@ -387,6 +405,7 @@ function SwapButton({
   side: "top" | "bottom";
   onSelect: (targetIndex: number) => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
@@ -400,7 +419,7 @@ function SwapButton({
       {open ? (
         <div className="absolute z-10 left-0 top-full mt-1 w-56 rounded-[var(--radius-button)] border border-border bg-surface shadow-md p-1">
           <p className="text-[11px] text-muted px-2 py-1">
-            Поменять с парой:
+            {t("finals.setup.swap_with_pair")}
           </p>
           {pairs.map((p, i) => {
             if (i === excludeIndex) return null;

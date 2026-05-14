@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { Avatar } from "@/components/ui/Avatar";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type { CoachWithMonthlyStats } from "@/lib/queries/coaches";
-import { formatRub } from "./format";
 
 export function CoachCard({ coach }: { coach: CoachWithMonthlyStats }) {
+  const { t, lang } = useTranslation();
   return (
     <Link
       href={`/ops/coaches/${coach.id}`}
@@ -42,7 +44,7 @@ export function CoachCard({ coach }: { coach: CoachWithMonthlyStats }) {
             )}
             {!coach.is_active && (
               <span className="inline-flex items-center px-1.5 h-5 rounded text-[10px] font-semibold tracking-wider uppercase bg-subtle text-muted border border-border">
-                неактивен
+                {t("coaches.inactive_chip_lower")}
               </span>
             )}
           </div>
@@ -62,15 +64,15 @@ export function CoachCard({ coach }: { coach: CoachWithMonthlyStats }) {
       <RateBadge coach={coach} />
 
       <dl className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
-        <Stat label="Сессий" value={String(coach.monthSessions)} />
+        <Stat label={t("coaches.card.stat.sessions")} value={String(coach.monthSessions)} />
         <Stat
-          label="Выручка"
-          value={coach.monthRevenue > 0 ? formatRub(coach.monthRevenue) : "—"}
+          label={t("coaches.card.stat.revenue")}
+          value={coach.monthRevenue > 0 ? formatRub(coach.monthRevenue, lang) : "—"}
         />
         <Stat
-          label="Выплата"
+          label={t("coaches.card.stat.payout")}
           value={
-            coach.monthEarnings > 0 ? formatRub(coach.monthEarnings) : "—"
+            coach.monthEarnings > 0 ? formatRub(coach.monthEarnings, lang) : "—"
           }
           emphasize
         />
@@ -80,31 +82,32 @@ export function CoachCard({ coach }: { coach: CoachWithMonthlyStats }) {
 }
 
 function RateBadge({ coach }: { coach: CoachWithMonthlyStats }) {
+  const { t, lang } = useTranslation();
   if (coach.rate_type === "flat") {
     return (
       <div className="inline-flex items-center gap-2 px-2.5 h-7 w-fit rounded-md bg-subtle border border-border text-xs">
-        <span className="text-muted">Фикс.</span>
+        <span className="text-muted">{t("coaches.rate.flat_short")}</span>
         <span className="text-black font-semibold tabular-nums">
-          {formatRub(coach.flat_rate_rub)}
+          {formatRub(coach.flat_rate_rub, lang)}
         </span>
-        <span className="text-fade">/ сессия</span>
+        <span className="text-fade">{t("coaches.rate.flat_per_session")}</span>
       </div>
     );
   }
   return (
     <div className="inline-flex items-center gap-2 px-2.5 h-7 w-fit rounded-md bg-subtle border border-border text-xs">
-      <span className="text-muted">Процент:</span>
+      <span className="text-muted">{t("coaches.rate.percent_short")}</span>
       <span className="text-black font-semibold tabular-nums">
         {coach.rate_court_percent}%
       </span>
-      <span className="text-fade">корт</span>
+      <span className="text-fade">{t("coaches.rate.court_short")}</span>
       <span className="text-border" aria-hidden>
         •
       </span>
       <span className="text-black font-semibold tabular-nums">
         {coach.rate_coaching_percent}%
       </span>
-      <span className="text-fade">тренировка</span>
+      <span className="text-fade">{t("coaches.rate.coaching_short")}</span>
     </div>
   );
 }

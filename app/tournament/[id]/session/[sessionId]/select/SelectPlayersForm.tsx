@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Player } from "@/lib/types";
 import { generateTimeSlots } from "@/lib/time-slots";
 import {
@@ -27,6 +28,7 @@ export function SelectPlayersForm({
   candidates: Player[];
   defaultStartTime: string | null;
 }) {
+  const { t } = useTranslation();
   const [state, formAction, pending] = useActionState(
     startSessionAction,
     initial,
@@ -44,8 +46,7 @@ export function SelectPlayersForm({
 
   const count = selected.size;
   const isMultipleOfFour = count > 0 && count % 4 === 0;
-  const allSelected =
-    candidates.length > 0 && count === candidates.length;
+  const allSelected = candidates.length > 0 && count === candidates.length;
 
   const toggleAll = () => {
     if (allSelected) {
@@ -66,10 +67,13 @@ export function SelectPlayersForm({
       <Card className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <span className="text-sm font-medium text-black">
-            Время начала
+            {t("create.field.start_time")}
           </span>
-          <Select name="start_time" defaultValue={defaultStartTime?.slice(0, 5) ?? ""}>
-            <option value="">Не указано</option>
+          <Select
+            name="start_time"
+            defaultValue={defaultStartTime?.slice(0, 5) ?? ""}
+          >
+            <option value="">{t("create.start_time_unset")}</option>
             {TIME_SLOTS.map((s) => (
               <option key={s} value={s}>
                 {s}
@@ -82,9 +86,11 @@ export function SelectPlayersForm({
       <Card className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
-            <h2 className="font-semibold text-black">Выберите игроков</h2>
+            <h2 className="font-semibold text-black">
+              {t("session_select.select_players")}
+            </h2>
             <p className="text-xs text-muted">
-              Число должно быть кратно 4. Минимум — 4.
+              {t("session_select.help_count")}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -95,11 +101,18 @@ export function SelectPlayersForm({
                 variant="secondary"
                 onClick={toggleAll}
               >
-                {allSelected ? "Снять выбор" : "Выбрать всех"}
+                {allSelected
+                  ? t("session_select.clear_all")
+                  : t("session_select.select_all")}
               </Button>
             ) : null}
             <div className="text-sm tabular-nums">
-              <span className="text-muted">Выбрано: </span>
+              <span className="text-muted">
+                {t("session_select.players_count", { n: "" }).replace(
+                  /\s*$/,
+                  " ",
+                )}
+              </span>
               <span
                 className={
                   isMultipleOfFour || count === 0
@@ -115,8 +128,7 @@ export function SelectPlayersForm({
 
         {candidates.length === 0 ? (
           <p className="text-sm text-muted">
-            В лиге ещё нет игроков. Сначала добавьте участников в разделе
-            лиги.
+            {t("session_select.empty_no_players")}
           </p>
         ) : (
           <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
@@ -156,15 +168,14 @@ export function SelectPlayersForm({
       ) : null}
 
       <div className="flex items-center gap-3">
-        <Button
-          type="submit"
-          disabled={pending || !isMultipleOfFour}
-        >
-          {pending ? "Запуск…" : `Запустить сессию (${count})`}
+        <Button type="submit" disabled={pending || !isMultipleOfFour}>
+          {pending
+            ? t("session_select.starting")
+            : t("session_select.start_with_count", { n: count })}
         </Button>
         <Link href={`/tournament/${tournamentId}`}>
           <Button type="button" variant="secondary" disabled={pending}>
-            Отмена
+            {t("btn.cancel")}
           </Button>
         </Link>
       </div>

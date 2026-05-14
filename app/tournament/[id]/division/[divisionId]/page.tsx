@@ -11,11 +11,13 @@ import { listPlayers } from "@/lib/queries/players";
 import { listCourtsByIds } from "@/lib/queries/courts";
 import { listRoundsByDivision } from "@/lib/queries/rounds";
 import { listMatchesByDivision } from "@/lib/queries/matches";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
+import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
 import {
-  DIVISION_CATEGORY_LABEL_RU,
-  FORMAT_LABEL_RU,
-  STATUS_LABEL_RU,
-} from "@/lib/constants";
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
 import { statusTone } from "@/lib/status-tone";
 import { AddPlayerPanel } from "../../AddPlayerPanel";
 import { AddPairPanel } from "../../AddPairPanel";
@@ -33,6 +35,12 @@ export default async function DivisionDetailPage({
     getDivision(divisionId),
   ]);
   if (!t || !division || division.tournament_id !== id) notFound();
+
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
 
   const [registrations, allPlayers, divisionCourts, siblingDivisions] =
     await Promise.all([
@@ -95,10 +103,14 @@ export default async function DivisionDetailPage({
   const levelRange =
     division.level_min && division.level_max
       ? division.level_min === division.level_max
-        ? `Уровень ${division.level_min}`
-        : `${division.level_min} – ${division.level_max}`
-      : "Все уровни";
+        ? tr("level.level_one", { level: division.level_min })
+        : tr("level.level_range", {
+            min: division.level_min,
+            max: division.level_max,
+          })
+      : tr("level.all_levels");
 
+  const courtPrefix = tr("court.prefix");
   const courtNums = divisionCourts
     .map((c) => c.number)
     .sort((a, b) => a - b);
@@ -106,7 +118,7 @@ export default async function DivisionDetailPage({
   const headerAction = (
     <Link href={`/tournament/${t.id}`}>
       <Button variant="secondary" size="md">
-        Назад к турниру
+        {tr("division.detail.back_to_tournament")}
       </Button>
     </Link>
   );
@@ -119,26 +131,31 @@ export default async function DivisionDetailPage({
         <Card className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="neutral">
-              {DIVISION_CATEGORY_LABEL_RU[division.category]}
+              {tr(DIVISION_CATEGORY_KEY[division.category])}
             </Badge>
-            <Badge tone="format">{FORMAT_LABEL_RU[division.format]}</Badge>
+            <Badge tone="format">
+              {tr(TOURNAMENT_FORMAT_KEY[division.format])}
+            </Badge>
             <Badge tone={statusTone(division.status)}>
-              {STATUS_LABEL_RU[division.status]}
+              {tr(TOURNAMENT_STATUS_KEY[division.status])}
             </Badge>
           </div>
 
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            <Row label="Уровни" value={levelRange} />
             <Row
-              label="Макс. игроков"
+              label={tr("division.detail.field.levels")}
+              value={levelRange}
+            />
+            <Row
+              label={tr("division.detail.field.max_players")}
               value={division.max_players ? String(division.max_players) : "—"}
             />
             <Row
-              label="Корты"
+              label={tr("division.detail.field.courts")}
               value={
                 courtNums.length > 0
-                  ? courtNums.map((n) => `К${n}`).join(" ")
-                  : "Не выбраны"
+                  ? courtNums.map((n) => `${courtPrefix}${n}`).join(" ")
+                  : tr("division.detail.courts_not_chosen")
               }
             />
           </dl>
@@ -146,9 +163,11 @@ export default async function DivisionDetailPage({
 
         {canAdd ? (
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Запуск дивизиона</h2>
+            <h2 className="font-semibold text-black">
+              {tr("division.detail.start_title")}
+            </h2>
             <p className="text-sm text-muted">
-              Сгенерировать расписание матчей и начать игру.
+              {tr("division.detail.start_copy")}
             </p>
             <StartDivisionButton
               tournamentId={t.id}
@@ -161,13 +180,20 @@ export default async function DivisionDetailPage({
 
         {division.status === "in_progress" ? (
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Дивизион идёт</h2>
+            <h2 className="font-semibold text-black">
+              {tr("division.detail.in_progress_title")}
+            </h2>
             <p className="text-sm text-muted">
-              Раундов: {rounds.length}, матчей: {divisionMatches.length}.
+              {tr("division.detail.rounds_matches", {
+                rounds: rounds.length,
+                matches: divisionMatches.length,
+              })}
             </p>
             <div>
               <Link href={`/tournament/${t.id}/division/${division.id}/play`}>
-                <Button size="lg">Экран живой игры</Button>
+                <Button size="lg">
+                  {tr("tournament.detail.live_screen_cta")}
+                </Button>
               </Link>
             </div>
           </Card>
@@ -175,15 +201,22 @@ export default async function DivisionDetailPage({
 
         {division.status === "completed" ? (
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Дивизион завершён</h2>
+            <h2 className="font-semibold text-black">
+              {tr("division.detail.completed_title")}
+            </h2>
             <p className="text-sm text-muted">
-              Раундов: {rounds.length}, матчей: {divisionMatches.length}.
+              {tr("division.detail.rounds_matches", {
+                rounds: rounds.length,
+                matches: divisionMatches.length,
+              })}
             </p>
             <div>
               <Link
                 href={`/tournament/${t.id}/division/${division.id}/results`}
               >
-                <Button size="lg">Итоги дивизиона</Button>
+                <Button size="lg">
+                  {tr("division.detail.results_cta")}
+                </Button>
               </Link>
             </div>
           </Card>
@@ -192,13 +225,15 @@ export default async function DivisionDetailPage({
         <Card className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-black">
-              Игроки · {registrations.length}
+              {tr("division.detail.players_title")} · {registrations.length}
               {division.max_players ? ` / ${division.max_players}` : ""}
             </h2>
           </div>
 
           {registrations.length === 0 ? (
-            <p className="text-sm text-muted">Игроков пока нет.</p>
+            <p className="text-sm text-muted">
+              {tr("tournament.detail.no_players")}
+            </p>
           ) : (
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
               {registrations.map((r, idx) => (

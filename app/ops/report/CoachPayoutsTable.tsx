@@ -1,29 +1,39 @@
+"use client";
+
 import { Card } from "@/components/ui/Card";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type { WeeklyReport } from "@/lib/queries/report";
-import { formatRub } from "./format";
 
 export function CoachPayoutsTable({
   payouts,
 }: {
   payouts: WeeklyReport["coachPayouts"];
 }) {
+  const { t, lang } = useTranslation();
   return (
     <Card padded={false} className="overflow-hidden flex flex-col">
       <div className="px-5 pt-5 pb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-        Выплаты тренерам
+        {t("report.payouts.title")}
       </div>
       {payouts.length === 0 ? (
         <p className="px-5 pb-5 text-sm text-muted">
-          Нет сессий тренеров за эту неделю.
+          {t("report.payouts.empty")}
         </p>
       ) : (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-t border-border text-[11px] font-semibold uppercase tracking-wide text-muted">
-              <th className="text-left px-5 py-2">Тренер</th>
-              <th className="text-right px-3 py-2">Сессий</th>
-              <th className="text-right px-3 py-2">Сбор</th>
-              <th className="text-right px-5 py-2">Выплата</th>
+              <th className="text-left px-5 py-2">{t("report.payouts.col.coach")}</th>
+              <th className="text-right px-3 py-2">
+                {t("report.payouts.col.sessions")}
+              </th>
+              <th className="text-right px-3 py-2">
+                {t("report.payouts.col.gross")}
+              </th>
+              <th className="text-right px-5 py-2">
+                {t("report.payouts.col.payout")}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -48,10 +58,10 @@ export function CoachPayoutsTable({
                   {p.sessions}
                 </td>
                 <td className="px-3 text-right text-secondary tabular-nums">
-                  {formatRub(p.gross_revenue_rub)}
+                  {formatRub(p.gross_revenue_rub, lang)}
                 </td>
                 <td className="px-5 text-right text-black font-semibold tabular-nums">
-                  {formatRub(p.payout_rub)}
+                  {formatRub(p.payout_rub, lang)}
                 </td>
               </tr>
             ))}

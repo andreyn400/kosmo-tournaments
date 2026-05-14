@@ -8,6 +8,7 @@ import {
   todayIso,
   weekRange,
 } from "@/lib/calendar-range";
+import { st } from "@/lib/i18n/server";
 import { CalendarClient } from "./CalendarClient";
 import {
   CALENDAR_VIEWS,
@@ -36,13 +37,14 @@ export default async function CalendarPage({
         ? weekRange(date)
         : monthGridRange(date);
 
-  const [events, courts] = await Promise.all([
+  const [events, courts, title] = await Promise.all([
     listCalendarEventsInRange(range.start, range.end),
     listActiveCourts(),
+    st("calendar.title"),
   ]);
 
   return (
-    <PageShell title="Календарь">
+    <PageShell title={title}>
       <CalendarClient
         view={view}
         date={date}

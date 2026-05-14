@@ -1,8 +1,9 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type { Coach, ScheduleSessionWithMeta } from "@/lib/types";
 import { computeEarnings } from "@/lib/coach-earnings";
-import { formatRub } from "../format";
 
 interface MonthlyStripProps {
   coach: Coach;
@@ -10,6 +11,7 @@ interface MonthlyStripProps {
 }
 
 export function MonthlyStrip({ coach, sessions }: MonthlyStripProps) {
+  const { t, lang } = useTranslation();
   const live = sessions.filter((s) => s.status !== "cancelled");
   const count = live.length;
   const revenue = live.reduce((acc, s) => acc + s.revenue_rub, 0);
@@ -20,25 +22,29 @@ export function MonthlyStrip({ coach, sessions }: MonthlyStripProps) {
 
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-3 grid grid-cols-2 sm:grid-cols-6 gap-4">
-      <Metric label="Сессий" value={String(count)} />
+      <Metric label={t("coach.metric.sessions")} value={String(count)} />
       <Metric
-        label="Выручка"
-        value={revenue > 0 ? formatRub(revenue) : "—"}
+        label={t("coach.metric.revenue")}
+        value={revenue > 0 ? formatRub(revenue, lang) : "—"}
       />
-      <Metric label="Корт" value={court > 0 ? formatRub(court) : "—"} muted />
       <Metric
-        label="Тренировка"
-        value={coachingFee > 0 ? formatRub(coachingFee) : "—"}
+        label={t("coach.metric.court")}
+        value={court > 0 ? formatRub(court, lang) : "—"}
         muted
       />
       <Metric
-        label="Тренеру"
-        value={payout > 0 ? formatRub(payout) : "—"}
+        label={t("coach.metric.coaching")}
+        value={coachingFee > 0 ? formatRub(coachingFee, lang) : "—"}
+        muted
+      />
+      <Metric
+        label={t("coach.metric.coach")}
+        value={payout > 0 ? formatRub(payout, lang) : "—"}
         tone="accent"
       />
       <Metric
-        label="Клубу"
-        value={clubNet > 0 ? formatRub(clubNet) : revenue > 0 ? "—" : "—"}
+        label={t("coach.metric.club")}
+        value={clubNet > 0 ? formatRub(clubNet, lang) : "—"}
         tone="success"
       />
     </div>

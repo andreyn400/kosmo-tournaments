@@ -1,6 +1,7 @@
 "use client";
 
-import { formatRub } from "../../coaches/format";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 
 interface HeroBalanceCardProps {
   totalValueRub: number;
@@ -10,14 +11,6 @@ interface HeroBalanceCardProps {
   lastPaymentDate: string | null;
 }
 
-/**
- * Big colour-coded contract balance display. Three states:
- *   overdue       — should-have-paid > has-paid: red
- *   paid_ahead    — net-received > scheduled-due-today: green
- *   settled       — equal (or contract not yet started): neutral
- *
- * Also shows a breakdown row: получено, начислено, остаток, last-payment.
- */
 export function HeroBalanceCard({
   totalValueRub,
   netReceivedRub,
@@ -25,6 +18,7 @@ export function HeroBalanceCard({
   scheduledDueTodayRub,
   lastPaymentDate,
 }: HeroBalanceCardProps) {
+  const { t, lang } = useTranslation();
   const owedToDate = scheduledDueTodayRub + penaltiesRub;
   const overdueAmount = Math.max(0, owedToDate - netReceivedRub);
   const aheadAmount = Math.max(0, netReceivedRub - owedToDate);
@@ -52,15 +46,15 @@ export function HeroBalanceCard({
         : "text-secondary";
   const heroLabel =
     state === "overdue"
-      ? "Просрочено по контракту"
+      ? t("contract.hero.label.overdue")
       : state === "ahead"
-        ? "Предоплата"
-        : "Расчёт сведён";
+        ? t("contract.hero.label.ahead")
+        : t("contract.hero.label.settled");
   const heroAmount =
     state === "overdue"
-      ? formatRub(overdueAmount)
+      ? formatRub(overdueAmount, lang)
       : state === "ahead"
-        ? formatRub(aheadAmount)
+        ? formatRub(aheadAmount, lang)
         : "0 ₽";
 
   return (
@@ -78,43 +72,46 @@ export function HeroBalanceCard({
         </span>
         {state === "overdue" && (
           <span className="text-xs text-secondary mt-1">
-            Клиент должен оплатить по графику до сегодняшнего дня.
+            {t("contract.hero.hint.overdue")}
           </span>
         )}
         {state === "ahead" && (
           <span className="text-xs text-secondary mt-1">
-            Клиент заплатил больше, чем должно было прийти к этой дате.
+            {t("contract.hero.hint.ahead")}
           </span>
         )}
         {state === "settled" && (
           <span className="text-xs text-secondary mt-1">
-            Все запланированные платежи поступили.
+            {t("contract.hero.hint.settled")}
           </span>
         )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 content-center">
-        <Metric label="Стоимость" value={formatRub(totalValueRub)} />
         <Metric
-          label="Получено"
-          value={netReceivedRub > 0 ? formatRub(netReceivedRub) : "—"}
+          label={t("contract.hero.metric.total")}
+          value={formatRub(totalValueRub, lang)}
+        />
+        <Metric
+          label={t("contract.hero.metric.received")}
+          value={netReceivedRub > 0 ? formatRub(netReceivedRub, lang) : "—"}
           tone={netReceivedRub > 0 ? "success" : undefined}
         />
         <Metric
-          label="Начислено по графику"
+          label={t("contract.hero.metric.scheduled")}
           value={
             scheduledDueTodayRub > 0
-              ? formatRub(scheduledDueTodayRub)
+              ? formatRub(scheduledDueTodayRub, lang)
               : "—"
           }
         />
         <Metric
-          label="Остаток"
+          label={t("contract.hero.metric.remaining")}
           value={
             remainingOutstanding > 0
-              ? formatRub(remainingOutstanding)
+              ? formatRub(remainingOutstanding, lang)
               : remainingOutstanding < 0
-                ? `−${formatRub(-remainingOutstanding)}`
+                ? `−${formatRub(-remainingOutstanding, lang)}`
                 : "0 ₽"
           }
           tone={
@@ -129,7 +126,7 @@ export function HeroBalanceCard({
 
       {lastPaymentDate && (
         <div className="md:col-span-2 text-[11px] text-muted -mt-1">
-          Последний платёж: <span className="tabular-nums">{lastPaymentDate}</span>
+          {t("contract.hero.last_payment", { date: lastPaymentDate })}
         </div>
       )}
     </section>

@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { DisplayEvent } from "@/lib/queries/display";
 import { Avatar, OverflowPill } from "@/components/ui/Avatar";
 
@@ -8,18 +11,19 @@ type LiveBodyProps = {
 };
 
 export function LiveBody({ event }: LiveBodyProps) {
+  const { t } = useTranslation();
   const visible = event.registeredPlayers.slice(0, MAX_VISIBLE);
   const overflow = Math.max(0, event.registeredPlayers.length - MAX_VISIBLE);
 
   const board =
     event.leaderboard.length === 0 ? (
       <p className="text-muted text-base italic">
-        Ожидаем первые результаты...
+        {t("display.live.empty_results")}
       </p>
     ) : (
       <div className="flex flex-col gap-2">
         <h3 className="text-[0.75rem] font-semibold tracking-[0.2em] text-muted uppercase">
-          Лидеры
+          {t("display.live.leaders")}
         </h3>
         <ol className="flex flex-col">
           {event.leaderboard.map((row, idx) => (

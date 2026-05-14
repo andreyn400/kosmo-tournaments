@@ -6,17 +6,19 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub, formatShortDateWithWeekday } from "@/lib/i18n/format";
+import {
+  RENTAL_PAYMENT_METHOD_KEY,
+  RENTAL_PAYMENT_TYPE_KEY,
+} from "@/lib/i18n/rental-keys";
+import { todayIso } from "../../coaches/format";
 import type {
   RentalPayment,
   RentalPaymentMethod,
   RentalPaymentScheduleEntry,
   RentalPaymentType,
 } from "@/lib/types";
-import { formatDateRu, formatRub, todayIso } from "../../coaches/format";
-import {
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_TYPE_LABELS,
-} from "../format";
 import {
   createPaymentAction,
   deletePaymentAction,
@@ -30,12 +32,25 @@ interface LedgerPanelProps {
   schedule: RentalPaymentScheduleEntry[];
 }
 
+const PAYMENT_TYPE_OPTIONS: RentalPaymentType[] = [
+  "payment",
+  "deposit",
+  "penalty",
+  "refund",
+];
+const PAYMENT_METHOD_OPTIONS: RentalPaymentMethod[] = [
+  "cash",
+  "card",
+  "transfer",
+];
+
 export function LedgerPanel({
   contractId,
   payments,
   schedule,
 }: LedgerPanelProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -74,7 +89,7 @@ export function LedgerPanel({
   }
 
   async function handleDelete(paymentId: string) {
-    if (!confirm("Удалить эту запись из ленты платежей?")) return;
+    if (!confirm(t("ledger.delete_confirm"))) return;
     startTransition(async () => {
       const res = await deletePaymentAction(contractId, paymentId);
       if (res.error) {
@@ -88,11 +103,11 @@ export function LedgerPanel({
   return (
     <section className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold text-black">Лента платежей</h2>
+        <h2 className="text-sm font-semibold text-black">{t("ledger.title")}</h2>
         <span className="text-xs text-muted">
           {payments.length === 0
-            ? "Записей нет"
-            : `Всего записей: ${payments.length}`}
+            ? t("ledger.count_empty")
+            : t("ledger.count_total", { count: payments.length })}
         </span>
         <Button
           size="sm"
@@ -100,7 +115,7 @@ export function LedgerPanel({
           disabled={creating}
           className="ml-auto"
         >
-          + Добавить запись
+          {t("ledger.add_cta")}
         </Button>
       </header>
 
@@ -118,10 +133,7 @@ export function LedgerPanel({
 
       {payments.length === 0 && !creating ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-6 text-center">
-          <p className="text-sm text-muted">
-            Записей пока нет. Платежи, депозит, возвраты и штрафы — всё в
-            одной ленте.
-          </p>
+          <p className="text-sm text-muted">{t("ledger.empty")}</p>
         </div>
       ) : payments.length > 0 ? (
         <div className="rounded-card border border-border bg-surface overflow-x-auto">
@@ -129,16 +141,20 @@ export function LedgerPanel({
             <thead>
               <tr className="border-b border-border bg-subtle/30 text-[10.5px] uppercase tracking-wider text-muted font-semibold">
                 <th className="pl-4 pr-2 py-2 text-left whitespace-nowrap">
-                  Дата
+                  {t("ledger.col.date")}
                 </th>
-                <th className="px-2 py-2 text-left">Тип</th>
-                <th className="px-2 py-2 text-left">Период / Описание</th>
+                <th className="px-2 py-2 text-left">{t("ledger.col.type")}</th>
+                <th className="px-2 py-2 text-left">
+                  {t("ledger.col.period_description")}
+                </th>
                 <th className="px-2 py-2 text-left whitespace-nowrap">
-                  Способ
+                  {t("ledger.col.method")}
                 </th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">№ док.</th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">
+                  {t("ledger.col.doc_no")}
+                </th>
                 <th className="pl-2 pr-4 py-2 text-right whitespace-nowrap">
-                  Сумма
+                  {t("ledger.col.amount")}
                 </th>
               </tr>
             </thead>
@@ -185,27 +201,28 @@ export function LedgerPanel({
 }
 
 function LegendBar() {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px] text-secondary">
       <LegendItem
         color="var(--color-success)"
-        label="Платёж"
-        hint="клиент оплатил"
+        label={t("ledger.payment.type.payment")}
+        hint={t("ledger.legend.payment_hint")}
       />
       <LegendItem
         color="var(--color-success)"
-        label="Депозит"
-        hint="оплата вперёд"
+        label={t("ledger.payment.type.deposit")}
+        hint={t("ledger.legend.deposit_hint")}
       />
       <LegendItem
         color="var(--color-danger)"
-        label="Штраф"
-        hint="дополнительное начисление"
+        label={t("ledger.payment.type.penalty")}
+        hint={t("ledger.legend.penalty_hint")}
       />
       <LegendItem
         color="var(--color-warning)"
-        label="Возврат"
-        hint="возвращено клиенту"
+        label={t("ledger.payment.type.refund")}
+        hint={t("ledger.legend.refund_hint")}
       />
     </div>
   );
@@ -246,15 +263,13 @@ function LedgerRow({
   zebra: boolean;
   onToggle: () => void;
 }) {
-  // Sign + colour by type. Convention: positive sign = adds to what client
-  // owes (penalty, refund); negative sign = reduces what client owes
-  // (payment, deposit).
-  const t = p.payment_type;
-  const isInflow = t === "payment" || t === "deposit";
+  const { t, lang } = useTranslation();
+  const ptype = p.payment_type;
+  const isInflow = ptype === "payment" || ptype === "deposit";
   const sign = isInflow ? "−" : "+";
   const amountCls = isInflow
     ? "text-[var(--color-success)]"
-    : t === "penalty"
+    : ptype === "penalty"
       ? "text-[var(--color-danger)]"
       : "text-[var(--color-warning)]";
 
@@ -271,7 +286,7 @@ function LedgerRow({
       style={{ height: "44px" }}
     >
       <td className="pl-4 pr-2 align-middle text-xs tabular-nums whitespace-nowrap text-black">
-        {formatDateRu(p.payment_date)}
+        {formatShortDateWithWeekday(p.payment_date, lang)}
       </td>
       <td className="px-2 align-middle">
         <TypePill type={p.payment_type} />
@@ -290,7 +305,7 @@ function LedgerRow({
         )}
       </td>
       <td className="px-2 align-middle text-xs text-secondary whitespace-nowrap">
-        {p.method ? PAYMENT_METHOD_LABELS[p.method] : "—"}
+        {p.method ? t(RENTAL_PAYMENT_METHOD_KEY[p.method]) : "—"}
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums whitespace-nowrap">
         {p.invoice_number || "—"}
@@ -299,13 +314,14 @@ function LedgerRow({
         className={`pl-2 pr-4 align-middle text-sm font-bold tabular-nums text-right whitespace-nowrap ${amountCls}`}
       >
         {sign}
-        {formatRub(p.amount_rub)}
+        {formatRub(p.amount_rub, lang)}
       </td>
     </tr>
   );
 }
 
 function TypePill({ type }: { type: RentalPaymentType }) {
+  const { t } = useTranslation();
   const map: Record<RentalPaymentType, { bg: string; text: string }> = {
     payment: {
       bg: "bg-[var(--color-success-soft)]",
@@ -329,7 +345,7 @@ function TypePill({ type }: { type: RentalPaymentType }) {
     <span
       className={`inline-flex items-center px-2 h-6 rounded text-[10.5px] font-semibold uppercase tracking-wider ${cfg.bg} ${cfg.text}`}
     >
-      {PAYMENT_TYPE_LABELS[type]}
+      {t(RENTAL_PAYMENT_TYPE_KEY[type])}
     </span>
   );
 }
@@ -351,6 +367,7 @@ function PaymentForm({
   onDelete?: () => void;
   pending: boolean;
 }) {
+  const { t, lang } = useTranslation();
   const [state, setState] = useState<RawRentalPaymentInput>({
     schedule_id: payment?.schedule_id ?? "",
     payment_date: payment?.payment_date ?? todayIso(),
@@ -383,7 +400,7 @@ function PaymentForm({
       className="grid gap-3 p-3 rounded-md bg-surface border border-border"
     >
       <div className="grid gap-3 sm:grid-cols-4">
-        <Field label="Тип">
+        <Field label={t("ledger.form.field.type")}>
           <Select
             value={state.payment_type}
             onChange={(e) =>
@@ -391,16 +408,14 @@ function PaymentForm({
             }
             className="!h-9"
           >
-            {(
-              Object.keys(PAYMENT_TYPE_LABELS) as RentalPaymentType[]
-            ).map((t) => (
-              <option key={t} value={t}>
-                {PAYMENT_TYPE_LABELS[t]}
+            {PAYMENT_TYPE_OPTIONS.map((tp) => (
+              <option key={tp} value={tp}>
+                {t(RENTAL_PAYMENT_TYPE_KEY[tp])}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Дата">
+        <Field label={t("ledger.form.field.date")}>
           <Input
             type="date"
             value={state.payment_date}
@@ -408,7 +423,7 @@ function PaymentForm({
             className="!h-9"
           />
         </Field>
-        <Field label="Сумма, ₽">
+        <Field label={t("ledger.form.field.amount")}>
           <Input
             type="number"
             min={1}
@@ -419,7 +434,7 @@ function PaymentForm({
             autoFocus={mode === "create"}
           />
         </Field>
-        <Field label="Способ">
+        <Field label={t("ledger.form.field.method")}>
           <Select
             value={state.method}
             onChange={(e) =>
@@ -427,13 +442,9 @@ function PaymentForm({
             }
             className="!h-9"
           >
-            {(
-              Object.keys(
-                PAYMENT_METHOD_LABELS,
-              ) as RentalPaymentMethod[]
-            ).map((m) => (
+            {PAYMENT_METHOD_OPTIONS.map((m) => (
               <option key={m} value={m}>
-                {PAYMENT_METHOD_LABELS[m]}
+                {t(RENTAL_PAYMENT_METHOD_KEY[m])}
               </option>
             ))}
           </Select>
@@ -441,16 +452,16 @@ function PaymentForm({
       </div>
 
       {state.payment_type === "payment" && schedule.length > 0 && (
-        <Field label="Период (необязательно)">
+        <Field label={t("ledger.form.field.period_optional")}>
           <Select
             value={state.schedule_id}
             onChange={(e) => set("schedule_id", e.target.value)}
             className="!h-9"
           >
-            <option value="">Не привязан</option>
+            <option value="">{t("ledger.form.period_unlinked")}</option>
             {schedule.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.period_label} — {s.due_date} — {formatRub(s.amount_due_rub)}
+                {s.period_label} — {s.due_date} — {formatRub(s.amount_due_rub, lang)}
               </option>
             ))}
           </Select>
@@ -458,15 +469,15 @@ function PaymentForm({
       )}
 
       <div className="grid gap-3 sm:grid-cols-[1fr_2fr]">
-        <Field label="№ документа">
+        <Field label={t("ledger.form.field.invoice_number")}>
           <Input
             value={state.invoice_number}
             onChange={(e) => set("invoice_number", e.target.value)}
-            placeholder="ПП-1234"
+            placeholder={t("ledger.form.placeholder.invoice_number")}
             className="!h-9"
           />
         </Field>
-        <Field label="Заметка">
+        <Field label={t("ledger.form.field.notes")}>
           <Textarea
             rows={2}
             value={state.notes}
@@ -487,7 +498,7 @@ function PaymentForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -497,14 +508,14 @@ function PaymentForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Записать"
-              : "Сохранить"}
+              ? t("ledger.form.submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

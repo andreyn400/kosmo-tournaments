@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { formatMonth } from "../format";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatMonthStr } from "@/lib/i18n/format";
 
 function shiftMonth(monthStr: string, delta: number): string {
   const [yStr, mStr] = monthStr.split("-");
@@ -22,6 +23,7 @@ export function MonthSelector({ month }: { month: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
+  const { t, lang } = useTranslation();
 
   function go(next: string) {
     const params = new URLSearchParams(search.toString());
@@ -34,18 +36,18 @@ export function MonthSelector({ month }: { month: string }) {
       <button
         type="button"
         onClick={() => go(shiftMonth(month, -1))}
-        aria-label="Предыдущий месяц"
+        aria-label={t("coach.month_selector.aria.prev")}
         className="inline-flex h-8 w-8 items-center justify-center text-muted hover:text-black hover:bg-subtle rounded-l-md"
       >
         ◀
       </button>
       <span className="px-3 h-8 inline-flex items-center text-xs font-semibold text-black tabular-nums">
-        {formatMonth(month)}
+        {formatMonthStr(month, lang)}
       </span>
       <button
         type="button"
         onClick={() => go(shiftMonth(month, 1))}
-        aria-label="Следующий месяц"
+        aria-label={t("coach.month_selector.aria.next")}
         className="inline-flex h-8 w-8 items-center justify-center text-muted hover:text-black hover:bg-subtle rounded-r-md"
       >
         ▶

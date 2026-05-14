@@ -3,6 +3,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   NAV_SECTIONS,
   type NavSection,
@@ -19,7 +20,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   return (
     <nav className="flex flex-col p-3 pt-1">
       {NAV_SECTIONS.map((section, idx) => (
-        <Fragment key={section.title}>
+        <Fragment key={section.titleKey}>
           {section.dividerAbove && (
             <hr
               aria-hidden
@@ -49,6 +50,7 @@ function SectionGroup({
   isFirst: boolean;
   onNavigate?: () => void;
 }) {
+  const { t } = useTranslation();
   const sectionActive = isSectionActive(pathname, section);
   return (
     <div className={isFirst ? "" : "mt-4"}>
@@ -58,7 +60,7 @@ function SectionGroup({
           sectionActive ? "text-[var(--color-accent)]" : "text-muted",
         ].join(" ")}
       >
-        {section.title}
+        {t(section.titleKey)}
       </div>
       <div className="flex flex-col gap-0.5">
         {section.links.map((link) => {
@@ -87,7 +89,7 @@ function SectionGroup({
                   {link.icon}
                 </span>
               )}
-              <span>{link.label}</span>
+              <span>{t(link.labelKey)}</span>
             </Link>
           );
         })}

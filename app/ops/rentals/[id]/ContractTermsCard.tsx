@@ -1,9 +1,12 @@
 "use client";
 
-import type { RentalContract } from "@/lib/types";
-import { formatRub } from "../../coaches/format";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import {
-  PAYMENT_SCHEDULE_LABELS,
+  RENTAL_SCHEDULE_TYPE_KEY,
+} from "@/lib/i18n/rental-keys";
+import type { RentalContract } from "@/lib/types";
+import {
   formatContractPeriod,
   monthsBetween,
 } from "../format";
@@ -13,35 +16,47 @@ export function ContractTermsCard({
 }: {
   contract: RentalContract;
 }) {
+  const { t, lang } = useTranslation();
   const months = monthsBetween(contract.start_date, contract.end_date);
   return (
     <section className="rounded-card border border-border bg-surface p-5 flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-black">Условия контракта</h2>
+      <h2 className="text-sm font-semibold text-black">
+        {t("contract.terms.title")}
+      </h2>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
-          label="Номер контракта"
+          label={t("contract.terms.field.contract_number")}
           value={contract.contract_number}
           mono
         />
         <Field
-          label="Срок"
-          value={`${formatContractPeriod(contract.start_date, contract.end_date)} · ${months} мес.`}
+          label={t("contract.terms.field.period")}
+          value={t("contract.terms.field.period_value", {
+            period: formatContractPeriod(contract.start_date, contract.end_date),
+            months,
+          })}
         />
         <Field
-          label="Стоимость"
-          value={contract.total_value_rub > 0 ? formatRub(contract.total_value_rub) : "—"}
+          label={t("contract.terms.field.total_value")}
+          value={
+            contract.total_value_rub > 0
+              ? formatRub(contract.total_value_rub, lang)
+              : "—"
+          }
         />
         <Field
-          label="Депозит"
-          value={contract.deposit_rub > 0 ? formatRub(contract.deposit_rub) : "—"}
+          label={t("contract.terms.field.deposit")}
+          value={
+            contract.deposit_rub > 0 ? formatRub(contract.deposit_rub, lang) : "—"
+          }
         />
         <Field
-          label="График платежей"
-          value={PAYMENT_SCHEDULE_LABELS[contract.payment_schedule_type]}
+          label={t("contract.terms.field.payment_schedule")}
+          value={t(RENTAL_SCHEDULE_TYPE_KEY[contract.payment_schedule_type])}
         />
         <Field
-          label="Документ"
+          label={t("contract.terms.field.document")}
           value={
             contract.document_url ? (
               <a
@@ -51,7 +66,7 @@ export function ContractTermsCard({
                 className="text-accent hover:underline inline-flex items-center gap-1"
               >
                 <DocIcon />
-                Открыть
+                {t("contract.terms.document_open")}
               </a>
             ) : null
           }
@@ -61,11 +76,14 @@ export function ContractTermsCard({
       {(contract.notes || contract.internal_notes) && (
         <div className="grid gap-3 sm:grid-cols-2 mt-1">
           {contract.notes && (
-            <NoteBlock label="Заметки" value={contract.notes} />
+            <NoteBlock
+              label={t("contract.terms.note.public")}
+              value={contract.notes}
+            />
           )}
           {contract.internal_notes && (
             <NoteBlock
-              label="Служебные заметки"
+              label={t("contract.terms.note.internal")}
               value={contract.internal_notes}
               tone="internal"
             />

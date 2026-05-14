@@ -7,23 +7,25 @@ import { getDivision, listDivisions } from "@/lib/queries/divisions";
 import { listRegistrationsByDivision } from "@/lib/queries/registrations";
 import { startDivision } from "@/lib/start-division";
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
+import { getServerDict } from "@/lib/i18n/server";
 import type { Pair } from "@/lib/algorithms/teamAmericano";
 
 export async function startDivisionAction(input: {
   tournamentId: string;
   divisionId: string;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const [tournament, division, siblingDivisions] = await Promise.all([
     getTournament(input.tournamentId),
     getDivision(input.divisionId),
     listDivisions(input.tournamentId),
   ]);
-  if (!tournament) return { error: "Турнир не найден" };
+  if (!tournament) return { error: dict["error.not_found.tournament"] };
   if (!division || division.tournament_id !== input.tournamentId) {
-    return { error: "Дивизион не найден" };
+    return { error: dict["error.not_found.division"] };
   }
   if (division.status !== "draft" && division.status !== "registration_open") {
-    return { error: "Дивизион нельзя запустить в текущем статусе" };
+    return { error: dict["error.state.division_cant_start"] };
   }
 
   const courtIdSet = new Set(division.court_ids);
@@ -35,7 +37,10 @@ export async function startDivisionAction(input: {
   );
   if (conflict) {
     return {
-      error: `Невозможно запустить: корт уже используется дивизионом «${conflict.name}». Выберите другие корты для этого дивизиона.`,
+      error: dict["error.division.start_conflict_court"].replace(
+        "{name}",
+        conflict.name,
+      ),
     };
   }
 
@@ -50,16 +55,14 @@ export async function startDivisionAction(input: {
   if (isTeamFormat) {
     pairs = pairsFromRegistrations(registrations);
     if (pairs.length !== playerIds.length / 2) {
-      return {
-        error: "У некоторых игроков нет партнёра — не удалось собрать пары",
-      };
+      return { error: dict["error.player.partner_some_missing"] };
     }
   }
 
   try {
     await startDivision({ tournament, division, playerIds, pairs });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
+    const msg = e instanceof Error ? e.message : dict["error.unknown"];
     return { error: msg };
   }
 

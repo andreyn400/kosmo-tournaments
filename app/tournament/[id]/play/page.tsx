@@ -12,6 +12,7 @@ import { listCourtsByIds } from "@/lib/queries/courts";
 import { listRegistrations } from "@/lib/queries/registrations";
 import { totalRoundsFor } from "@/lib/total-rounds";
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
+import { getServerDict } from "@/lib/i18n/server";
 import type { Match } from "@/lib/types";
 import { LivePlayBoard } from "./LivePlayBoard";
 
@@ -28,6 +29,7 @@ export default async function LivePlayPage({
     redirect(`/tournament/${id}/results`);
   }
 
+  const dict = await getServerDict();
   const sessions = await listSessionsByTournament(id);
   const activeSession =
     sessions.find((s) => s.status === "in_progress") ??
@@ -42,7 +44,7 @@ export default async function LivePlayPage({
         action={
           <Link href={`/tournament/${id}`}>
             <Button variant="secondary" size="md">
-              К турниру
+              {dict["play.back_to_tournament"]}
             </Button>
           </Link>
         }
@@ -50,8 +52,8 @@ export default async function LivePlayPage({
         <Card>
           <p className="text-sm text-muted">
             {tournament.type === "league_season"
-              ? "Нет запущенной сессии. Откройте лигу и запустите нужную сессию."
-              : "Сессия не создана. Запустите турнир, чтобы начать раунды."}
+              ? dict["play.no_session_league"]
+              : dict["play.no_session"]}
           </p>
         </Card>
       </PageShell>
@@ -100,13 +102,17 @@ export default async function LivePlayPage({
         <div className="flex items-center gap-1.5">
           <Link href={`/tournament/${id}/play/scoreboard`} target="_blank">
             <Button variant="ghost" size="md">
-              Табло
+              {dict["play.scoreboard_cta"]}
             </Button>
           </Link>
           <Link href={`/tournament/${id}`}>
             <Button variant="secondary" size="md">
-              <span className="hidden sm:inline">К турниру</span>
-              <span className="sm:hidden">← Назад</span>
+              <span className="hidden sm:inline">
+                {dict["play.back_to_tournament"]}
+              </span>
+              <span className="sm:hidden">
+                {dict["play.back_to_tournament_short"]}
+              </span>
             </Button>
           </Link>
         </div>
@@ -117,7 +123,11 @@ export default async function LivePlayPage({
           href={`/tournament/${id}`}
           className="text-sm text-muted hover:text-black inline-flex items-center gap-1.5 self-start"
         >
-          <span aria-hidden>←</span> К турниру · {tournament.name}
+          <span aria-hidden>←</span>{" "}
+          {dict["play.back_to_tournament_with_name"].replace(
+            "{name}",
+            tournament.name,
+          )}
         </Link>
         <LivePlayBoard
           tournament={tournament}

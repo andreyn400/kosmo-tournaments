@@ -10,6 +10,9 @@ import {
   DEFAULT_SCORING_SYSTEM,
   SCORING_SYSTEMS,
 } from "@/lib/scoring-systems";
+import { getServerDict, getServerLang } from "@/lib/i18n/server";
+import { translate, type TranslationKey } from "@/lib/i18n";
+import { pluralize } from "@/lib/i18n/format";
 import type {
   PadelLevel,
   ScoringSystem,
@@ -50,6 +53,8 @@ export async function createTournamentAction(
   _prev: CreateTournamentState,
   formData: FormData,
 ): Promise<CreateTournamentState> {
+  const dict = await getServerDict();
+  const lang = await getServerLang();
   const name = String(formData.get("name") ?? "").trim();
   const typeRaw = String(formData.get("type") ?? "one_day");
   const formatRaw = String(formData.get("format") ?? "americano");
@@ -69,43 +74,56 @@ export async function createTournamentAction(
   const start_time_raw = String(formData.get("start_time") ?? "").trim();
   const start_time = start_time_raw ? normalizeTime(start_time_raw) : null;
   if (start_time_raw && start_time === null)
-    return { error: "Неверное время начала" };
+    return { error: dict["error.invalid.start_time"] };
 
-  if (!name) return { error: "Введите название турнира" };
+  if (!name) return { error: dict["error.required.tournament_name"] };
   if (!TYPES.includes(typeRaw as TournamentType))
-    return { error: "Неизвестный тип турнира" };
+    return { error: dict["error.invalid.tournament_type_unknown"] };
   if (!FORMATS.includes(formatRaw as TournamentFormat))
-    return { error: "Неизвестный формат" };
+    return { error: dict["error.invalid.format_unknown"] };
   if (!SCORING_SYSTEMS.includes(scoringRaw as ScoringSystem))
-    return { error: "Неизвестная система счёта" };
-  if (!date_start) return { error: "Выберите дату начала" };
+    return { error: dict["error.invalid.scoring_unknown"] };
+  if (!date_start) return { error: dict["error.required.date_start_short"] };
   if (date_end_raw && date_end_raw < date_start)
-    return { error: "Дата окончания раньше даты начала" };
+    return { error: dict["error.invalid.date_end_before_start_short"] };
   if (max_players != null && max_players < 4)
-    return { error: "Минимум 4 игрока" };
+    return { error: dict["error.invalid.min_players_4"] };
   if (max_players != null && max_players % 4 !== 0)
-    return { error: "Число игроков должно быть кратно 4" };
+    return { error: dict["error.invalid.player_count_multiple_of_4"] };
   if (duration_hours < 1 || duration_hours > 12)
-    return { error: "Длительность должна быть от 1 до 12 часов" };
+    return { error: dict["error.invalid.duration_hours_1_12"] };
 
   if (court_ids.length === 0)
-    return { error: "Выберите хотя бы один корт" };
+    return { error: dict["error.courts.at_least_one"] };
 
   const activeCourts = await listActiveCourts();
   const activeIds = new Set(activeCourts.map((c) => c.id));
   const validCourtIds = court_ids.filter((id) => activeIds.has(id));
   if (validCourtIds.length === 0)
-    return { error: "Выбранные корты больше не активны" };
+    return { error: dict["error.courts.no_longer_active"] };
 
   if (max_players != null) {
     const courtsNeeded = Math.ceil(max_players / 4);
     if (validCourtIds.length < courtsNeeded) {
+      const key = pluralize<TranslationKey>(
+        courtsNeeded,
+        {
+          one: "error.courts.needed_for_players_one",
+          few: "error.courts.needed_for_players_few",
+          many: "error.courts.needed_for_players_many",
+        },
+        lang,
+      );
       return {
-        error: `Для ${max_players} игроков необходимо минимум ${courtsNeeded} ${courtsNeeded === 1 ? "корт" : courtsNeeded < 5 ? "корта" : "кортов"}`,
+        error: translate(lang, key, {
+          players: max_players,
+          n: courtsNeeded,
+        }),
       };
     }
   }
 
+  const courtPrefix = dict["tournament.card.court_short_prefix"];
   if (start_time) {
     const conflicts = await checkCourtConflicts({
       courtIds: validCourtIds,
@@ -115,9 +133,14 @@ export async function createTournamentAction(
     });
     if (conflicts.length > 0) {
       const c = conflicts[0];
-      const courtLabel = c.courtNumbers.map((n) => `К${n}`).join(", ");
+      const courtLabel = c.courtNumbers
+        .map((n) => `${courtPrefix}${n}`)
+        .join(", ");
       return {
-        error: `Конфликт кортов: ${courtLabel} уже занят турниром «${c.tournamentName}» в это время`,
+        error: translate(lang, "error.courts.conflict_with_tournament", {
+          courts: courtLabel,
+          name: c.tournamentName,
+        }),
       };
     }
   }
@@ -142,8 +165,10 @@ export async function createTournamentAction(
       duration_hours,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Ошибка сохранения: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.save_with_reason"].replace("{reason}", reason),
+    };
   }
 
   revalidatePath("/");

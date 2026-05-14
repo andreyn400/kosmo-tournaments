@@ -4,13 +4,14 @@ import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import {
+  ORGANIZER_PAYMENT_DESC_KEY,
+  ORGANIZER_PAYMENT_TYPE_KEY,
+} from "@/lib/i18n/organizer-keys";
 import type { OrganizerPayment, OrganizerPaymentType } from "@/lib/types";
 import { todayIso } from "../../coaches/format";
-import {
-  PAYMENT_TYPE_DESCRIPTIONS,
-  PAYMENT_TYPE_LABELS,
-  type RawPaymentInput,
-} from "./payment-input";
+import { type RawPaymentInput } from "./payment-input";
 
 type Mode = "create" | "edit";
 
@@ -54,8 +55,7 @@ export function PaymentForm({
   pending,
   onDelete,
 }: PaymentFormProps) {
-  // State initialised once at mount; parent's conditional render (one
-  // expanded row at a time) gives us the re-init we need for free.
+  const { t } = useTranslation();
   const [state, setState] = useState<RawPaymentInput>(() =>
     makeInitial(payment),
   );
@@ -83,44 +83,44 @@ export function PaymentForm({
       className="grid gap-3 p-4 rounded-md bg-subtle border border-border"
     >
       <div>
-        <Label>Тип записи</Label>
+        <Label>{t("organizer.payment.form.type_label")}</Label>
         <div className="grid gap-2 sm:grid-cols-3 mt-1.5">
           <TypeRadio
             value="payment"
             current={state.type}
             onChange={(v) => set("type", v)}
-            label={PAYMENT_TYPE_LABELS.payment}
-            description={PAYMENT_TYPE_DESCRIPTIONS.payment}
+            label={t(ORGANIZER_PAYMENT_TYPE_KEY.payment)}
+            description={t(ORGANIZER_PAYMENT_DESC_KEY.payment)}
             tone="danger"
           />
           <TypeRadio
             value="deposit"
             current={state.type}
             onChange={(v) => set("type", v)}
-            label={PAYMENT_TYPE_LABELS.deposit}
-            description={PAYMENT_TYPE_DESCRIPTIONS.deposit}
+            label={t(ORGANIZER_PAYMENT_TYPE_KEY.deposit)}
+            description={t(ORGANIZER_PAYMENT_DESC_KEY.deposit)}
             tone="success"
           />
           <TypeRadio
             value="refund"
             current={state.type}
             onChange={(v) => set("type", v)}
-            label={PAYMENT_TYPE_LABELS.refund}
-            description={PAYMENT_TYPE_DESCRIPTIONS.refund}
+            label={t(ORGANIZER_PAYMENT_TYPE_KEY.refund)}
+            description={t(ORGANIZER_PAYMENT_DESC_KEY.refund)}
             tone="warning"
           />
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
-        <Field label="Дата">
+        <Field label={t("organizer.payment.form.field.date")}>
           <Input
             type="date"
             value={state.date}
             onChange={(e) => set("date", e.target.value)}
           />
         </Field>
-        <Field label="Сумма, ₽">
+        <Field label={t("organizer.payment.form.field.amount")}>
           <Input
             type="number"
             min={1}
@@ -135,7 +135,7 @@ export function PaymentForm({
 
       {isCharge && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Кортов">
+          <Field label={t("organizer.payment.form.field.courts")}>
             <Input
               type="number"
               min={0}
@@ -145,7 +145,7 @@ export function PaymentForm({
               placeholder="2"
             />
           </Field>
-          <Field label="Часов">
+          <Field label={t("organizer.payment.form.field.hours")}>
             <Input
               type="number"
               min={0}
@@ -159,15 +159,15 @@ export function PaymentForm({
         </div>
       )}
 
-      <Field label="Описание">
+      <Field label={t("organizer.payment.form.field.notes")}>
         <Textarea
           rows={2}
           value={state.notes}
           onChange={(e) => set("notes", e.target.value)}
           placeholder={
             isCharge
-              ? "Например: турнир 18 мая, 2 корта × 4 часа"
-              : "Например: предоплата на май, наличные"
+              ? t("organizer.payment.form.placeholder.notes_charge")
+              : t("organizer.payment.form.placeholder.notes_other")
           }
         />
       </Field>
@@ -184,7 +184,7 @@ export function PaymentForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -194,14 +194,14 @@ export function PaymentForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Записать"
-              : "Сохранить"}
+              ? t("organizer.payment.form.submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

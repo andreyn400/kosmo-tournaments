@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
 import {
-  DIVISION_CATEGORY_LABEL_RU,
-  FORMAT_LABEL_RU,
-  STATUS_LABEL_RU,
-} from "@/lib/constants";
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
 import { statusTone } from "@/lib/status-tone";
 import type { Court, Division, ScoringSystem, TournamentFormat } from "@/lib/types";
 import {
@@ -45,6 +46,7 @@ export function DivisionsPanel({
   divisions: Division[];
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>({ kind: "idle" });
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -107,7 +109,7 @@ export function DivisionsPanel({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-black">
-          Дивизионы · {divisions.length}
+          {t("divisions.title")} · {divisions.length}
         </h2>
         {mode.kind === "idle" ? (
           <Button
@@ -117,7 +119,7 @@ export function DivisionsPanel({
               setMode({ kind: "creating" });
             }}
           >
-            + Добавить дивизион
+            {t("divisions.add_cta")}
           </Button>
         ) : null}
       </div>
@@ -127,7 +129,7 @@ export function DivisionsPanel({
           initial={defaultInitial(tournamentDefaults)}
           tournamentId={tournamentId}
           tournamentCourts={tournamentCourts}
-          submitLabel="Создать"
+          submitLabel={t("divisions.submit.create")}
           pending={pending}
           error={error}
           onSubmit={submit}
@@ -141,7 +143,7 @@ export function DivisionsPanel({
           tournamentId={tournamentId}
           divisionId={mode.division.id}
           tournamentCourts={tournamentCourts}
-          submitLabel="Сохранить"
+          submitLabel={t("divisions.submit.save")}
           pending={pending}
           error={error}
           onSubmit={submit}
@@ -159,7 +161,7 @@ export function DivisionsPanel({
       ) : null}
 
       {divisions.length === 0 && mode.kind === "idle" ? (
-        <p className="text-sm text-muted">Дивизионов пока нет.</p>
+        <p className="text-sm text-muted">{t("divisions.empty")}</p>
       ) : null}
 
       <ul className="flex flex-col gap-3">
@@ -171,11 +173,12 @@ export function DivisionsPanel({
           const levelRange =
             d.level_min && d.level_max
               ? d.level_min === d.level_max
-                ? `Уровень ${d.level_min}`
-                : `${d.level_min} – ${d.level_max}`
-              : "Все уровни";
+                ? t("level.level_one", { level: d.level_min })
+                : t("level.level_range", { min: d.level_min, max: d.level_max })
+              : t("level.all_levels");
           const isConfirming = confirmingId === d.id;
           const isDeleting = deletingId === d.id;
+          const courtPrefix = t("court.prefix");
           return (
             <li
               key={d.id}
@@ -186,11 +189,13 @@ export function DivisionsPanel({
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-black">{d.name}</h3>
                     <Badge tone="neutral">
-                      {DIVISION_CATEGORY_LABEL_RU[d.category]}
+                      {t(DIVISION_CATEGORY_KEY[d.category])}
                     </Badge>
-                    <Badge tone="format">{FORMAT_LABEL_RU[d.format]}</Badge>
+                    <Badge tone="format">
+                      {t(TOURNAMENT_FORMAT_KEY[d.format])}
+                    </Badge>
                     <Badge tone={statusTone(d.status)}>
-                      {STATUS_LABEL_RU[d.status]}
+                      {t(TOURNAMENT_STATUS_KEY[d.status])}
                     </Badge>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
@@ -198,13 +203,15 @@ export function DivisionsPanel({
                     <span aria-hidden>·</span>
                     <span>
                       {courtNums.length > 0
-                        ? courtNums.map((n) => `К${n}`).join(" ")
-                        : "Корты не выбраны"}
+                        ? courtNums.map((n) => `${courtPrefix}${n}`).join(" ")
+                        : t("divisions.no_courts")}
                     </span>
                     {d.max_players ? (
                       <>
                         <span aria-hidden>·</span>
-                        <span>макс. {d.max_players} игроков</span>
+                        <span>
+                          {t("divisions.max_players", { n: d.max_players })}
+                        </span>
                       </>
                     ) : null}
                   </div>
@@ -214,7 +221,7 @@ export function DivisionsPanel({
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Link href={`/tournament/${tournamentId}/division/${d.id}`}>
                       <Button size="sm" variant="ghost">
-                        Открыть
+                        {t("divisions.row.open_cta")}
                       </Button>
                     </Link>
                     <Button
@@ -225,7 +232,7 @@ export function DivisionsPanel({
                         setMode({ kind: "editing", division: d });
                       }}
                     >
-                      Изменить
+                      {t("divisions.row.edit_cta")}
                     </Button>
                     <Button
                       size="sm"
@@ -235,7 +242,7 @@ export function DivisionsPanel({
                         setConfirmingId(d.id);
                       }}
                     >
-                      Удалить
+                      {t("divisions.row.delete_cta")}
                     </Button>
                   </div>
                 ) : null}
@@ -244,7 +251,7 @@ export function DivisionsPanel({
               {isConfirming ? (
                 <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
                   <span className="text-sm text-black">
-                    Удалить дивизион «{d.name}»?
+                    {t("divisions.delete_confirm", { name: d.name })}
                   </span>
                   <div className="flex items-center gap-2">
                     <Button
@@ -253,7 +260,7 @@ export function DivisionsPanel({
                       disabled={isDeleting}
                       onClick={() => confirmDelete(d.id)}
                     >
-                      {isDeleting ? "Удаление…" : "Да"}
+                      {isDeleting ? t("btn.deleting") : t("btn.yes")}
                     </Button>
                     <Button
                       size="sm"
@@ -264,7 +271,7 @@ export function DivisionsPanel({
                         setError(null);
                       }}
                     >
-                      Нет
+                      {t("btn.no")}
                     </Button>
                   </div>
                 </div>

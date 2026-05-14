@@ -1,7 +1,8 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatMonthStr, formatRub } from "@/lib/i18n/format";
 import type { CoachWithMonthlyStats } from "@/lib/queries/coaches";
-import { formatMonth, formatRub } from "./format";
 
 interface CoachesSummaryProps {
   coaches: CoachWithMonthlyStats[];
@@ -9,38 +10,43 @@ interface CoachesSummaryProps {
 }
 
 export function CoachesSummary({ coaches, month }: CoachesSummaryProps) {
+  const { t, tPlural, lang } = useTranslation();
   const total = coaches.length;
   const active = coaches.filter((c) => c.is_active).length;
-  const monthSessions = coaches.reduce(
-    (acc, c) => acc + c.monthSessions,
-    0,
-  );
+  const monthSessions = coaches.reduce((acc, c) => acc + c.monthSessions, 0);
   const monthRevenue = coaches.reduce((acc, c) => acc + c.monthRevenue, 0);
   const monthPayout = coaches.reduce((acc, c) => acc + c.monthEarnings, 0);
+  const coachWord = tPlural(total, {
+    one: "coaches.coaches.one",
+    few: "coaches.coaches.few",
+    many: "coaches.coaches.many",
+  });
 
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px]">
-      <Stat label="Всего" value={String(total)} suffix={pluralCoaches(total)} />
+      <Stat label={t("coaches.summary.total")} value={String(total)} suffix={coachWord} />
       <Sep />
       <Stat
-        label="Активных"
+        label={t("coaches.summary.active")}
         value={String(active)}
         tone={active > 0 ? "black" : "muted"}
       />
       <Sep />
       <Stat
-        label={`${formatMonth(month)}, сессий`}
+        label={t("coaches.summary.month_sessions", {
+          month: formatMonthStr(month, lang),
+        })}
         value={String(monthSessions)}
       />
       <Sep />
       <Stat
-        label="Выручка"
-        value={monthRevenue > 0 ? formatRub(monthRevenue) : "—"}
+        label={t("coaches.summary.revenue")}
+        value={monthRevenue > 0 ? formatRub(monthRevenue, lang) : "—"}
       />
       <Sep />
       <Stat
-        label="Выплачено тренерам"
-        value={monthPayout > 0 ? formatRub(monthPayout) : "—"}
+        label={t("coaches.summary.payout_to_coaches")}
+        value={monthPayout > 0 ? formatRub(monthPayout, lang) : "—"}
         tone="accent"
       />
     </div>
@@ -79,13 +85,4 @@ function Sep() {
       ·
     </span>
   );
-}
-
-function pluralCoaches(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "тренеров";
-  if (mod10 === 1) return "тренер";
-  if (mod10 >= 2 && mod10 <= 4) return "тренера";
-  return "тренеров";
 }

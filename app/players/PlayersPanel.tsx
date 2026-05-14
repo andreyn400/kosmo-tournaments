@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { PADEL_LEVELS } from "@/lib/constants";
 import type { Player } from "@/lib/types";
 import { createPlayerAction } from "./create-player-action";
@@ -19,6 +20,7 @@ import {
 
 export function PlayersPanel({ players }: { players: Player[] }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [values, setValues] = useState<PlayerFormValues>(emptyPlayerFormValues);
@@ -55,19 +57,21 @@ export function PlayersPanel({ players }: { players: Player[] }) {
     <div className="flex flex-col gap-6 max-w-3xl">
       <Card className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-black">Новый игрок</h2>
+          <h2 className="font-semibold text-black">
+            {t("players.new_player_card_title")}
+          </h2>
           <button
             type="button"
             onClick={() => setExpanded((e) => !e)}
             className="text-sm text-accent hover:underline"
           >
-            {expanded ? "Скрыть детали" : "Дополнительно"}
+            {expanded ? t("players.expand_hide") : t("players.expand_show")}
           </button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-[1fr_7rem_12rem_auto]">
           <Input
-            placeholder="Имя"
+            placeholder={t("players.placeholder_name")}
             value={values.name}
             onChange={(e) => setField("name", e.target.value)}
             disabled={pending}
@@ -84,13 +88,13 @@ export function PlayersPanel({ players }: { players: Player[] }) {
             ))}
           </Select>
           <Input
-            placeholder="Телефон (необязательно)"
+            placeholder={t("players.placeholder_phone_optional")}
             value={values.phone}
             onChange={(e) => setField("phone", e.target.value)}
             disabled={pending}
           />
           <Button disabled={pending || !values.name.trim()} onClick={submit}>
-            {pending ? "Сохранение…" : "Добавить"}
+            {pending ? t("btn.saving") : t("players.add_cta")}
           </Button>
         </div>
 
@@ -124,12 +128,10 @@ export function PlayersPanel({ players }: { players: Player[] }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <h2 className="text-xl font-semibold text-black">
-              Игроков пока нет
+              {t("players.empty_title")}
             </h2>
             <p className="text-muted text-sm max-w-sm">
-              Добавьте первого игрока в форме выше. Каждый игрок получает
-              стартовый ELO по своему уровню и появляется в списке
-              регистрации турниров.
+              {t("players.empty_copy")}
             </p>
           </div>
         </Card>
@@ -137,16 +139,16 @@ export function PlayersPanel({ players }: { players: Player[] }) {
         <Card className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-semibold text-black">
-              Все игроки · {players.length}
+              {t("players.all_players")} · {players.length}
             </h2>
           </div>
           <Input
-            placeholder="Поиск по имени или телефону…"
+            placeholder={t("players.search_placeholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted">Ничего не найдено.</p>
+            <p className="text-sm text-muted">{t("players.nothing_found")}</p>
           ) : (
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
               {filtered.map((p) => (

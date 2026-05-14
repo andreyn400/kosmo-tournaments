@@ -4,15 +4,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
+import { RENTAL_STATUS_KEY } from "@/lib/i18n/rental-keys";
 import type {
   Court,
   RentalContractStatus,
   RentalContractWithSummary,
 } from "@/lib/types";
-import { formatRub } from "../coaches/format";
 import { RentalsSummary } from "./RentalsSummary";
 import {
-  STATUS_LABELS,
   formatContractPeriod,
   formatCourtsList,
   formatScheduleSummary,
@@ -26,6 +27,7 @@ interface RentalsPanelProps {
 }
 
 export function RentalsPanel({ contracts, courts }: RentalsPanelProps) {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<Filter>("active");
   const [search, setSearch] = useState("");
 
@@ -72,38 +74,38 @@ export function RentalsPanel({ contracts, courts }: RentalsPanelProps) {
       <div className="flex flex-wrap items-center gap-3">
         <div
           role="tablist"
-          aria-label="Фильтр"
+          aria-label={t("rentals.aria.filter")}
           className="inline-flex p-0.5 rounded-md bg-subtle border border-border"
         >
           <FilterPill
             active={filter === "all"}
             onClick={() => setFilter("all")}
-            label="Все"
+            label={t("rentals.filter.all")}
             count={counts.all}
           />
           <FilterPill
             active={filter === "active"}
             onClick={() => setFilter("active")}
-            label="Активные"
+            label={t("rentals.filter.active")}
             count={counts.active}
           />
           <FilterPill
             active={filter === "overdue"}
             onClick={() => setFilter("overdue")}
-            label="Просрочены"
+            label={t("rentals.filter.overdue")}
             count={counts.overdue}
             tone="danger"
           />
           <FilterPill
             active={filter === "draft"}
             onClick={() => setFilter("draft")}
-            label="Черновики"
+            label={t("rentals.filter.draft")}
             count={counts.draft}
           />
           <FilterPill
             active={filter === "ended"}
             onClick={() => setFilter("ended")}
-            label="Завершены"
+            label={t("rentals.filter.ended")}
             count={counts.ended}
           />
         </div>
@@ -113,13 +115,13 @@ export function RentalsPanel({ contracts, courts }: RentalsPanelProps) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Клиент, ИНН, № контракта…"
+            placeholder={t("rentals.search_placeholder")}
             className="!h-9"
           />
         </div>
 
         <Link href="/ops/rentals/new" className="ml-auto">
-          <Button size="sm">+ Новый контракт</Button>
+          <Button size="sm">{t("rentals.new_contract_cta")}</Button>
         </Link>
       </div>
 
@@ -139,19 +141,26 @@ function ContractsTable({
   rows: RentalContractWithSummary[];
   courts: Court[];
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-border bg-surface overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-subtle/30 text-[10.5px] uppercase tracking-wider text-muted font-semibold">
-            <th className="pl-4 pr-2 py-2 text-left">Клиент</th>
-            <th className="px-2 py-2 text-left">Контракт</th>
-            <th className="px-2 py-2 text-left">Расписание</th>
-            <th className="px-2 py-2 text-left whitespace-nowrap">Корты</th>
-            <th className="px-2 py-2 text-right whitespace-nowrap">Стоимость</th>
-            <th className="px-2 py-2 text-right whitespace-nowrap">Баланс</th>
+            <th className="pl-4 pr-2 py-2 text-left">{t("rentals.col.client")}</th>
+            <th className="px-2 py-2 text-left">{t("rentals.col.contract")}</th>
+            <th className="px-2 py-2 text-left">{t("rentals.col.schedule")}</th>
+            <th className="px-2 py-2 text-left whitespace-nowrap">
+              {t("rentals.col.courts")}
+            </th>
+            <th className="px-2 py-2 text-right whitespace-nowrap">
+              {t("rentals.col.total_value")}
+            </th>
+            <th className="px-2 py-2 text-right whitespace-nowrap">
+              {t("rentals.col.balance")}
+            </th>
             <th className="pl-2 pr-4 py-2 text-left whitespace-nowrap">
-              Статус
+              {t("rentals.col.status")}
             </th>
           </tr>
         </thead>
@@ -179,6 +188,7 @@ function ContractRow({
   courts: Court[];
   zebra: boolean;
 }) {
+  const { t, lang } = useTranslation();
   const overdue = c.overdue_rub > 0;
   const ahead = c.ahead_rub > 0 && !overdue;
   const balanceCls = overdue
@@ -187,9 +197,9 @@ function ContractRow({
       ? "text-[var(--color-success)] font-bold"
       : "text-secondary";
   const balanceText = overdue
-    ? `−${formatRub(c.overdue_rub)}`
+    ? `−${formatRub(c.overdue_rub, lang)}`
     : ahead
-      ? `+${formatRub(c.ahead_rub)}`
+      ? `+${formatRub(c.ahead_rub, lang)}`
       : "0";
 
   const rowBg = zebra
@@ -231,24 +241,28 @@ function ContractRow({
       <td className="px-2 align-middle text-xs text-secondary min-w-0">
         <span
           className="truncate block max-w-[28ch]"
-          title={formatScheduleSummary(c.slots)}
+          title={formatScheduleSummary(c.slots, lang)}
         >
-          {formatScheduleSummary(c.slots)}
+          {formatScheduleSummary(c.slots, lang)}
         </span>
       </td>
       <td className="px-2 align-middle text-xs text-secondary whitespace-nowrap">
         {formatCourtsList(c.slots, courts)}
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-        {c.total_value_rub > 0 ? formatRub(c.total_value_rub) : "—"}
+        {c.total_value_rub > 0 ? formatRub(c.total_value_rub, lang) : "—"}
       </td>
       <td
         className={`px-2 align-middle text-sm tabular-nums text-right whitespace-nowrap ${balanceCls}`}
         title={
           overdue
-            ? `Просрочено: ${formatRub(c.overdue_rub)}`
+            ? t("rentals.balance.overdue_tooltip", {
+                amount: formatRub(c.overdue_rub, lang),
+              })
             : ahead
-              ? `Предоплата: ${formatRub(c.ahead_rub)}`
+              ? t("rentals.balance.ahead_tooltip", {
+                  amount: formatRub(c.ahead_rub, lang),
+                })
               : undefined
         }
       >
@@ -262,6 +276,7 @@ function ContractRow({
 }
 
 function StatusBadge({ status }: { status: RentalContractStatus }) {
+  const { t } = useTranslation();
   const map: Record<
     RentalContractStatus,
     { bg: string; text: string }
@@ -286,7 +301,7 @@ function StatusBadge({ status }: { status: RentalContractStatus }) {
     <span
       className={`inline-flex items-center px-2 h-6 rounded text-[10.5px] font-semibold uppercase tracking-wider ${cfg.bg} ${cfg.text}`}
     >
-      {STATUS_LABELS[status]}
+      {t(RENTAL_STATUS_KEY[status])}
     </span>
   );
 }
@@ -332,21 +347,22 @@ function FilterPill({
 }
 
 function EmptyState({ total }: { total: number }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center flex flex-col items-center gap-3">
       <h2 className="text-base font-semibold text-black">
         {total === 0
-          ? "Контрактов аренды пока нет"
-          : "По этим фильтрам ничего не найдено"}
+          ? t("rentals.empty.zero_title")
+          : t("rentals.empty.filter_title")}
       </h2>
       <p className="text-sm text-muted max-w-md">
         {total === 0
-          ? "Контракты долгосрочной аренды кортов — корпоративные клиенты, регулярные сессии. Создайте первый, чтобы начать."
-          : "Снимите фильтр или измените поиск."}
+          ? t("rentals.empty.zero_copy")
+          : t("rentals.empty.filter_copy")}
       </p>
       {total === 0 && (
         <Link href="/ops/rentals/new">
-          <Button size="sm">+ Новый контракт</Button>
+          <Button size="sm">{t("rentals.new_contract_cta")}</Button>
         </Link>
       )}
     </div>

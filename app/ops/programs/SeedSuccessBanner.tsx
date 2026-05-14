@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
 
 interface SeedSuccessBannerProps {
   count: number;
@@ -11,10 +12,18 @@ export function SeedSuccessBanner({
   count,
   onDismiss,
 }: SeedSuccessBannerProps) {
+  const { t, tPlural } = useTranslation();
+
   useEffect(() => {
-    const t = setTimeout(onDismiss, 6000);
-    return () => clearTimeout(t);
+    const tm = setTimeout(onDismiss, 6000);
+    return () => clearTimeout(tm);
   }, [onDismiss]);
+
+  const word = tPlural(count, {
+    one: "programs.progs.one",
+    few: "programs.progs.few",
+    many: "programs.progs.many",
+  });
 
   return (
     <div
@@ -28,26 +37,16 @@ export function SeedSuccessBanner({
         ✓
       </span>
       <p className="text-sm text-[var(--color-success)] font-medium flex-1">
-        {count}{" "}
-        {pluralProgs(count)} загружено из padel-ops.
+        {count} {word} {t("programs.seed.success_suffix")}
       </p>
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Закрыть"
+        aria-label={t("nav.close_menu")}
         className="text-[var(--color-success)]/80 hover:text-[var(--color-success)] text-xl leading-none px-1 -my-2 -mr-1"
       >
         ×
       </button>
     </div>
   );
-}
-
-function pluralProgs(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "программ";
-  if (mod10 === 1) return "программа";
-  if (mod10 >= 2 && mod10 <= 4) return "программы";
-  return "программ";
 }

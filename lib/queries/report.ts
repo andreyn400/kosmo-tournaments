@@ -31,7 +31,7 @@ export interface WeeklyReport {
   }>;
   topPrograms: Array<{
     program_id: string | null;
-    program_name: string;
+    program_name: string | null;
     program_type: string | null;
     sessions: number;
     revenue_rub: number;
@@ -271,7 +271,7 @@ export async function getWeeklyReport(
   // ── Top programs: group by program_id ───────────────────────────────────
   type ProgAgg = {
     program_id: string | null;
-    program_name: string;
+    program_name: string | null;
     program_type: string | null;
     sessions: number;
     revenue_rub: number;
@@ -282,7 +282,7 @@ export async function getWeeklyReport(
     const key = p?.id ?? "_unknown";
     const cur = progAgg.get(key) ?? {
       program_id: p?.id ?? null,
-      program_name: p?.name ?? "Без программы",
+      program_name: p?.name ?? null,
       program_type: p?.type ?? null,
       sessions: 0,
       revenue_rub: 0,

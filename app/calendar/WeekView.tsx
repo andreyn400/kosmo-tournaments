@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { Card } from "@/components/ui/Card";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { getWeekdayShortLabels } from "@/lib/i18n/format";
 import type { CalendarEvent } from "@/lib/queries/calendar";
 import {
   TOTAL_ROWS,
@@ -18,7 +20,6 @@ import {
 } from "@/lib/calendar-range";
 import { EventBlock } from "./EventBlock";
 
-const WEEKDAYS_SHORT_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const HOUR_LABELS = Array.from({ length: 17 }, (_, i) => 7 + i);
 
 export function WeekView({
@@ -32,6 +33,8 @@ export function WeekView({
   onSelectEvent?: (event: CalendarEvent) => void;
   onNavigateToDay?: (iso: string) => void;
 }) {
+  const { t, lang } = useTranslation();
+  const weekdaysShort = getWeekdayShortLabels(lang);
   const today = todayIso();
   const days = useMemo(() => {
     const { start, end } = weekRange(startOfWeekMon(date));
@@ -100,7 +103,7 @@ export function WeekView({
       {maxUntimedPerDay > 0 && (
         <Card padded={false} className="p-3">
           <div className="text-[11px] uppercase tracking-wide text-muted mb-2">
-            Без времени
+            {t("calendar.untimed")}
           </div>
           <div
             className="grid gap-1.5"
@@ -154,7 +157,7 @@ export function WeekView({
                   style={{ gridArea: `1 / ${i + 2} / 2 / ${i + 3}` }}
                 >
                   <span className="text-[10.5px] font-semibold uppercase tracking-[0.05em] text-muted">
-                    {WEEKDAYS_SHORT_RU[i]}
+                    {weekdaysShort[i]}
                   </span>
                   <span
                     className={`text-base font-semibold ${isToday ? "text-accent" : "text-black"}`}
@@ -187,7 +190,7 @@ export function WeekView({
                   key={`bg:${d}`}
                   type="button"
                   onClick={() => onNavigateToDay?.(d)}
-                  aria-label={`Открыть ${d} в режиме дня`}
+                  aria-label={t("calendar.aria.open_day_view", { date: d })}
                   className={`border-l border-border transition-colors ${
                     isToday
                       ? "bg-[color-mix(in_oklab,var(--color-accent-soft)_55%,white)] hover:bg-[color-mix(in_oklab,var(--color-accent-soft)_70%,white)]"

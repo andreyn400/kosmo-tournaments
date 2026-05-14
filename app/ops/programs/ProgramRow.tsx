@@ -2,9 +2,11 @@
 
 import { Fragment, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDuration, formatRub } from "@/lib/i18n/format";
 import type { Program } from "@/lib/types";
 import { groupForType } from "@/lib/program-groups";
-import { formatDuration, formatRub, perPlayer } from "./format";
+import { perPlayer } from "./format";
 import { ProgramForm } from "./ProgramForm";
 import { updateProgramAction } from "./update-program-action";
 import { deleteProgramAction } from "./delete-program-action";
@@ -24,6 +26,7 @@ export function ProgramRow({
   zebra,
 }: ProgramRowProps) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
   const [pending, startTransition] = useTransition();
   const group = groupForType(program.type);
 
@@ -43,7 +46,10 @@ export function ProgramRow({
   }
 
   function handleDelete() {
-    if (!confirm(`Удалить программу «${program.name}»?`)) return;
+    if (
+      !confirm(t("programs.row.delete_confirm", { name: program.name }))
+    )
+      return;
     startTransition(async () => {
       const res = await deleteProgramAction(program.id);
       if (res.error) {
@@ -54,8 +60,12 @@ export function ProgramRow({
     });
   }
 
-  const ppPeak = perPlayer(program.price_peak_rub, program.max_players);
-  const ppOff = perPlayer(program.price_offpeak_rub, program.max_players);
+  const ppPeak = perPlayer(program.price_peak_rub, program.max_players, lang);
+  const ppOff = perPlayer(
+    program.price_offpeak_rub,
+    program.max_players,
+    lang,
+  );
 
   const rowBg = expanded
     ? "bg-accent-soft/50"
@@ -94,13 +104,13 @@ export function ProgramRow({
             </span>
             {!program.is_active && (
               <span className="text-[10px] uppercase tracking-wider text-muted flex-shrink-0">
-                неактивна
+                {t("programs.inactive_lower")}
               </span>
             )}
           </div>
         </td>
         <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-          {formatDuration(program.duration_minutes)}
+          {formatDuration(program.duration_minutes, lang)}
         </td>
         <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right">
           {program.courts_needed}
@@ -109,10 +119,10 @@ export function ProgramRow({
           {program.max_players ?? "—"}
         </td>
         <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-          {formatRub(program.price_offpeak_rub)}
+          {formatRub(program.price_offpeak_rub, lang)}
         </td>
         <td className="px-2 align-middle text-xs text-black font-semibold tabular-nums text-right whitespace-nowrap">
-          {formatRub(program.price_peak_rub)}
+          {formatRub(program.price_peak_rub, lang)}
         </td>
         <td className="pl-2 pr-4 align-middle text-[11px] text-fade tabular-nums text-right whitespace-nowrap">
           {ppPeak && ppOff ? `${ppPeak} / ${ppOff}` : "—"}

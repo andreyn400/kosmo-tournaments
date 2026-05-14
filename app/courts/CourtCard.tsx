@@ -8,21 +8,22 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
-  COURT_STATUS_LABEL_RU,
-  COURT_SURFACE_LABEL_RU,
-} from "@/lib/constants";
+  COURT_STATUS_KEY,
+  COURT_STATUS_VALUES,
+  COURT_SURFACE_KEY,
+  COURT_SURFACE_VALUES,
+} from "@/lib/i18n/court-keys";
 import type { Court, CourtStatus, CourtSurface } from "@/lib/types";
 import { updateCourtAction } from "./update-court-action";
 import { deleteCourtAction } from "./delete-court-action";
-
-const SURFACES = Object.keys(COURT_SURFACE_LABEL_RU) as CourtSurface[];
-const STATUSES = Object.keys(COURT_STATUS_LABEL_RU) as CourtStatus[];
 
 type Mode = "view" | "edit" | "confirm-delete";
 
 export function CourtCard({ court }: { court: Court }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<Mode>("view");
   const [name, setName] = useState(court.name);
   const [number, setNumber] = useState(String(court.number));
@@ -90,9 +91,9 @@ export function CourtCard({ court }: { court: Court }) {
             value={surface}
             onChange={(e) => setSurface(e.target.value as CourtSurface)}
           >
-            {SURFACES.map((s) => (
+            {COURT_SURFACE_VALUES.map((s) => (
               <option key={s} value={s}>
-                {COURT_SURFACE_LABEL_RU[s]}
+                {t(COURT_SURFACE_KEY[s])}
               </option>
             ))}
           </Select>
@@ -100,15 +101,15 @@ export function CourtCard({ court }: { court: Court }) {
             value={status}
             onChange={(e) => setStatus(e.target.value as CourtStatus)}
           >
-            {STATUSES.map((s) => (
+            {COURT_STATUS_VALUES.map((s) => (
               <option key={s} value={s}>
-                {COURT_STATUS_LABEL_RU[s]}
+                {t(COURT_STATUS_KEY[s])}
               </option>
             ))}
           </Select>
         </div>
         <Textarea
-          placeholder="Заметки"
+          placeholder={t("courts.card.notes_placeholder")}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
@@ -122,7 +123,7 @@ export function CourtCard({ court }: { court: Court }) {
         ) : null}
         <div className="flex items-center gap-2">
           <Button size="sm" onClick={save} disabled={pending || !name.trim()}>
-            {pending ? "Сохранение…" : "Сохранить"}
+            {pending ? t("btn.saving") : t("btn.save")}
           </Button>
           <Button
             size="sm"
@@ -133,7 +134,7 @@ export function CourtCard({ court }: { court: Court }) {
             }}
             disabled={pending}
           >
-            Отмена
+            {t("btn.cancel")}
           </Button>
         </div>
       </Card>
@@ -153,7 +154,7 @@ export function CourtCard({ court }: { court: Court }) {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone="format">{COURT_SURFACE_LABEL_RU[court.surface]}</Badge>
+            <Badge tone="format">{t(COURT_SURFACE_KEY[court.surface])}</Badge>
             <Badge
               tone={
                 court.status === "active"
@@ -161,7 +162,7 @@ export function CourtCard({ court }: { court: Court }) {
                   : "status-progress"
               }
             >
-              {COURT_STATUS_LABEL_RU[court.status]}
+              {t(COURT_STATUS_KEY[court.status])}
             </Badge>
           </div>
         </div>
@@ -182,7 +183,9 @@ export function CourtCard({ court }: { court: Court }) {
 
       {mode === "confirm-delete" ? (
         <div className="flex flex-col gap-2 pt-2 border-t border-border">
-          <p className="text-sm text-black">Удалить корт «{court.name}»?</p>
+          <p className="text-sm text-black">
+            {t("courts.card.delete_confirm", { name: court.name })}
+          </p>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -190,7 +193,9 @@ export function CourtCard({ court }: { court: Court }) {
               onClick={remove}
               disabled={pending}
             >
-              {pending ? "Удаление…" : "Удалить"}
+              {pending
+                ? t("courts.card.delete_pending")
+                : t("courts.card.delete_cta")}
             </Button>
             <Button
               size="sm"
@@ -198,21 +203,21 @@ export function CourtCard({ court }: { court: Court }) {
               onClick={() => setMode("view")}
               disabled={pending}
             >
-              Отмена
+              {t("btn.cancel")}
             </Button>
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-2 pt-2 border-t border-border">
           <Button size="sm" variant="secondary" onClick={() => setMode("edit")}>
-            Изменить
+            {t("courts.card.edit_cta")}
           </Button>
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setMode("confirm-delete")}
           >
-            Удалить
+            {t("courts.card.delete_cta")}
           </Button>
         </div>
       )}

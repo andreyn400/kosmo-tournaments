@@ -3,18 +3,22 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageShell } from "@/components/site/PageShell";
 import { listActiveCourts } from "@/lib/queries/courts";
+import { getServerDict } from "@/lib/i18n/server";
 import { CreateLeagueForm } from "./CreateLeagueForm";
 
 export default async function NewLeaguePage() {
-  const courts = await listActiveCourts();
+  const [courts, dict] = await Promise.all([
+    listActiveCourts(),
+    getServerDict(),
+  ]);
 
   return (
     <PageShell
-      title="Новая лига"
+      title={dict["league.new.title"]}
       action={
         <Link href="/">
           <Button variant="secondary" size="md">
-            Отмена
+            {dict["btn.cancel"]}
           </Button>
         </Link>
       }
@@ -27,15 +31,14 @@ export default async function NewLeaguePage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <h2 className="text-xl font-semibold text-black">
-                Сначала добавьте корты
+                {dict["league.new.no_courts_title"]}
               </h2>
               <p className="text-muted text-sm max-w-sm">
-                Лига не может быть создана без активных кортов. Добавьте хотя
-                бы один корт на странице «Корты».
+                {dict["league.new.no_courts_copy"]}
               </p>
             </div>
             <Link href="/courts">
-              <Button>Перейти к кортам</Button>
+              <Button>{dict["league.new.go_to_courts"]}</Button>
             </Link>
           </Card>
         ) : (

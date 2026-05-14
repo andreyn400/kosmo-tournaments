@@ -2,7 +2,10 @@
 
 import { useRef } from "react";
 import { Button } from "@/components/ui/Button";
-import { formatDateRangeRu, formatDateRu } from "@/lib/format-date";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDate, formatDateRange, formatMonth, getWeekdayLongLabels } from "@/lib/i18n/format";
+import { CALENDAR_VIEW_LABEL_KEY } from "@/lib/i18n/calendar-keys";
+import type { Lang } from "@/lib/i18n/types";
 import {
   isSameDay,
   isValidIsoDate,
@@ -10,47 +13,26 @@ import {
   weekRange,
   weekdayMonIndex,
 } from "@/lib/calendar-range";
-import {
-  CALENDAR_VIEWS,
-  CALENDAR_VIEW_LABEL_RU,
-  type CalendarView,
-} from "./view";
+import { CALENDAR_VIEWS, type CalendarView } from "./view";
 
-const MONTHS_NOM_RU = [
-  "Январь",
-  "Февраль",
-  "Март",
-  "Апрель",
-  "Май",
-  "Июнь",
-  "Июль",
-  "Август",
-  "Сентябрь",
-  "Октябрь",
-  "Ноябрь",
-  "Декабрь",
-];
-
-const WEEKDAYS_FULL_RU = [
-  "понедельник",
-  "вторник",
-  "среда",
-  "четверг",
-  "пятница",
-  "суббота",
-  "воскресенье",
-];
-
-function headerLabel(view: CalendarView, date: string): string {
+function headerLabel(
+  view: CalendarView,
+  date: string,
+  lang: Lang,
+  weekPrefix: (range: string) => string,
+): string {
   if (view === "day") {
-    return `${formatDateRu(date)}, ${WEEKDAYS_FULL_RU[weekdayMonIndex(date)]}`;
+    const weekdayList = getWeekdayLongLabels(lang);
+    const weekdayLabel = weekdayList[weekdayMonIndex(date)];
+    const dayName = lang === "ru" ? weekdayLabel.toLowerCase() : weekdayLabel;
+    return `${formatDate(date, lang)}, ${dayName}`;
   }
   if (view === "week") {
     const { start, end } = weekRange(date);
-    return `Неделя ${formatDateRangeRu(start, end)}`;
+    return weekPrefix(formatDateRange(start, end, lang));
   }
   const [y, m] = date.split("-").map(Number);
-  return `${MONTHS_NOM_RU[m - 1]} ${y}`;
+  return formatMonth(y, m - 1, lang);
 }
 
 function todayDisabled(view: CalendarView, date: string): boolean {
@@ -82,6 +64,7 @@ export function CalendarHeader({
   onJumpDate: (iso: string) => void;
   onChangeView: (v: CalendarView) => void;
 }) {
+  const { t, lang } = useTranslation();
   const dateInputRef = useRef<HTMLInputElement>(null);
   const openPicker = () => {
     const el = dateInputRef.current;
@@ -90,6 +73,9 @@ export function CalendarHeader({
     else el.focus();
   };
 
+  const weekPrefix = (range: string) =>
+    t("calendar.week_label", { range });
+
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
       <div className="flex items-center gap-2 flex-wrap">
@@ -97,7 +83,7 @@ export function CalendarHeader({
           <button
             type="button"
             onClick={onPrev}
-            aria-label="Назад"
+            aria-label={t("calendar.aria.prev")}
             className="h-9 w-9 inline-flex items-center justify-center text-muted hover:text-black hover:bg-subtle"
           >
             <svg
@@ -117,7 +103,7 @@ export function CalendarHeader({
           <button
             type="button"
             onClick={onNext}
-            aria-label="Вперёд"
+            aria-label={t("calendar.aria.next")}
             className="h-9 w-9 inline-flex items-center justify-center text-muted hover:text-black hover:bg-subtle border-l border-border"
           >
             <svg
@@ -141,15 +127,15 @@ export function CalendarHeader({
           onClick={onToday}
           disabled={todayDisabled(view, date)}
         >
-          Сегодня
+          {t("calendar.today_cta")}
         </Button>
         <button
           type="button"
           onClick={openPicker}
           className="text-sm md:text-base font-semibold text-black px-2.5 py-1.5 rounded-[var(--radius-button)] hover:bg-subtle"
-          aria-label="Открыть выбор даты"
+          aria-label={t("calendar.aria.open_date_picker")}
         >
-          {headerLabel(view, date)}
+          {headerLabel(view, date, lang, weekPrefix)}
         </button>
         <input
           ref={dateInputRef}
@@ -167,7 +153,7 @@ export function CalendarHeader({
 
       <div
         role="tablist"
-        aria-label="Вид календаря"
+        aria-label={t("calendar.aria.view_picker")}
         className="inline-flex rounded-[var(--radius-button)] border border-border bg-subtle p-0.5 self-start"
       >
         {CALENDAR_VIEWS.map((v) => {
@@ -185,7 +171,7 @@ export function CalendarHeader({
                   : "text-muted hover:text-black"
               }`}
             >
-              {CALENDAR_VIEW_LABEL_RU[v]}
+              {t(CALENDAR_VIEW_LABEL_KEY[v])}
             </button>
           );
         })}

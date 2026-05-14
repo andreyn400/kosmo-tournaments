@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Organizer, OrganizerPayment } from "@/lib/types";
 import { LedgerRow } from "./LedgerRow";
 import { PaymentForm } from "./PaymentForm";
@@ -16,6 +17,7 @@ interface LedgerPanelProps {
 
 export function LedgerPanel({ organizer, payments }: LedgerPanelProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -38,9 +40,13 @@ export function LedgerPanel({ organizer, payments }: LedgerPanelProps) {
   return (
     <section className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold text-black">Лента операций</h2>
+        <h2 className="text-sm font-semibold text-black">
+          {t("organizer.ledger.title")}
+        </h2>
         <span className="text-xs text-muted">
-          {payments.length === 0 ? "Записей нет" : `Всего записей: ${payments.length}`}
+          {payments.length === 0
+            ? t("organizer.ledger.count_empty")
+            : t("organizer.ledger.count_total", { count: payments.length })}
         </span>
         <Button
           size="sm"
@@ -48,7 +54,7 @@ export function LedgerPanel({ organizer, payments }: LedgerPanelProps) {
           disabled={creating}
           className="ml-auto"
         >
-          + Добавить запись
+          {t("organizer.ledger.add_cta")}
         </Button>
       </header>
 
@@ -65,10 +71,7 @@ export function LedgerPanel({ organizer, payments }: LedgerPanelProps) {
 
       {payments.length === 0 && !creating ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center">
-          <p className="text-sm text-muted">
-            Записей пока нет. Добавьте первое начисление, депозит или возврат —
-            баланс пересчитается сразу.
-          </p>
+          <p className="text-sm text-muted">{t("organizer.ledger.empty")}</p>
         </div>
       ) : payments.length > 0 ? (
         <div className="rounded-card border border-border bg-surface overflow-x-auto">
@@ -76,16 +79,22 @@ export function LedgerPanel({ organizer, payments }: LedgerPanelProps) {
             <thead>
               <tr className="border-b border-border bg-subtle/30 text-[10.5px] uppercase tracking-wider text-muted font-semibold">
                 <th className="pl-4 pr-2 py-2 text-left whitespace-nowrap">
-                  Дата
+                  {t("organizer.ledger.col.date")}
                 </th>
-                <th className="px-2 py-2 text-left">Тип</th>
-                <th className="px-2 py-2 text-left">Описание</th>
+                <th className="px-2 py-2 text-left">
+                  {t("organizer.ledger.col.type")}
+                </th>
+                <th className="px-2 py-2 text-left">
+                  {t("organizer.ledger.col.description")}
+                </th>
                 <th className="px-2 py-2 text-right whitespace-nowrap">
-                  Корты
+                  {t("organizer.ledger.col.courts")}
                 </th>
-                <th className="px-2 py-2 text-right whitespace-nowrap">Часы</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">
+                  {t("organizer.ledger.col.hours")}
+                </th>
                 <th className="pl-2 pr-4 py-2 text-right whitespace-nowrap">
-                  Сумма
+                  {t("organizer.ledger.col.amount")}
                 </th>
               </tr>
             </thead>
@@ -111,24 +120,25 @@ export function LedgerPanel({ organizer, payments }: LedgerPanelProps) {
 }
 
 function LegendBar() {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-wrap items-center gap-3 text-[11px] text-secondary">
       <LegendItem
         color="var(--color-danger)"
-        label="Начисление"
-        hint="увеличивает долг"
+        label={t("organizer.payment.type.payment")}
+        hint={t("organizer.legend.payment_hint")}
         sign="+"
       />
       <LegendItem
         color="var(--color-success)"
-        label="Депозит"
-        hint="уменьшает долг"
+        label={t("organizer.payment.type.deposit")}
+        hint={t("organizer.legend.deposit_hint")}
         sign="−"
       />
       <LegendItem
         color="var(--color-warning)"
-        label="Возврат"
-        hint="уменьшает долг"
+        label={t("organizer.payment.type.refund")}
+        hint={t("organizer.legend.refund_hint")}
         sign="−"
       />
     </div>

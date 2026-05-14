@@ -3,13 +3,18 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PageShell } from "@/components/site/PageShell";
 import { TournamentCard } from "@/components/tournament/TournamentCard";
+import { getServerDict } from "@/lib/i18n/server";
 import { listTournaments } from "@/lib/queries/tournaments";
 import { listCourts } from "@/lib/queries/courts";
 import { listRegisteredPlayersByTournaments } from "@/lib/queries/registrations";
 import { listDivisionsByTournaments } from "@/lib/queries/divisions";
 
 export default async function HomePage() {
-  const [all, courts] = await Promise.all([listTournaments(), listCourts()]);
+  const [all, courts, dict] = await Promise.all([
+    listTournaments(),
+    listCourts(),
+    getServerDict(),
+  ]);
   const tournamentIds = all.map((t) => t.id);
   const [playersByTournament, divisionsByTournament] = await Promise.all([
     listRegisteredPlayersByTournaments(tournamentIds),
@@ -20,19 +25,25 @@ export default async function HomePage() {
 
   return (
     <PageShell
-      title="Главная"
+      title={dict["home.title"]}
       action={
         <div className="flex items-center gap-2">
           <Link href="/league/new">
             <Button variant="secondary" size="md">
-              <span className="hidden sm:inline">+ Новая лига</span>
-              <span className="sm:hidden">+ Лига</span>
+              <span className="hidden sm:inline">
+                {dict["home.new_league_long"]}
+              </span>
+              <span className="sm:hidden">{dict["home.new_league_short"]}</span>
             </Button>
           </Link>
           <Link href="/tournament/new">
             <Button size="md">
-              <span className="hidden sm:inline">+ Новый турнир</span>
-              <span className="sm:hidden">+ Турнир</span>
+              <span className="hidden sm:inline">
+                {dict["home.new_tournament_long"]}
+              </span>
+              <span className="sm:hidden">
+                {dict["home.new_tournament_short"]}
+              </span>
             </Button>
           </Link>
         </div>
@@ -44,19 +55,20 @@ export default async function HomePage() {
             <span className="h-3 w-3 rounded-sm bg-accent" />
           </div>
           <div className="flex flex-col gap-1.5">
-            <h2 className="text-xl font-semibold text-black">Пока пусто</h2>
+            <h2 className="text-xl font-semibold text-black">
+              {dict["home.empty_title"]}
+            </h2>
             <p className="text-muted text-sm max-w-sm">
-              Создайте первый турнир или лигу, чтобы начать регистрацию
-              игроков и расписание матчей.
+              {dict["home.empty_copy"]}
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
             <Link href="/tournament/new">
-              <Button size="lg">+ Новый турнир</Button>
+              <Button size="lg">{dict["home.new_tournament_long"]}</Button>
             </Link>
             <Link href="/league/new">
               <Button size="lg" variant="secondary">
-                + Новая лига
+                {dict["home.new_league_long"]}
               </Button>
             </Link>
           </div>
@@ -64,11 +76,11 @@ export default async function HomePage() {
       ) : (
         <div className="flex flex-col gap-10">
           <Section
-            title="Лиги"
+            title={dict["home.section.leagues"]}
             count={leagues.length}
             emptyHref="/league/new"
-            emptyCta="+ Новая лига"
-            emptyCopy="Сезонные лиги с несколькими сессиями и кумулятивной таблицей."
+            emptyCta={dict["home.new_league_long"]}
+            emptyCopy={dict["home.leagues_empty_copy"]}
           >
             {leagues.map((t) => (
               <TournamentCard
@@ -81,11 +93,11 @@ export default async function HomePage() {
             ))}
           </Section>
           <Section
-            title="Турниры одного дня"
+            title={dict["home.section.one_day"]}
             count={oneDays.length}
             emptyHref="/tournament/new"
-            emptyCta="+ Новый турнир"
-            emptyCopy="Однодневные турниры: Американо, Мексикано, Круговой, Команды."
+            emptyCta={dict["home.new_tournament_long"]}
+            emptyCopy={dict["home.one_day_empty_copy"]}
           >
             {oneDays.map((t) => (
               <TournamentCard

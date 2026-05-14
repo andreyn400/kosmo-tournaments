@@ -13,12 +13,14 @@ import { listRoundsBySession } from "@/lib/queries/rounds";
 import { listMatchesByRound } from "@/lib/queries/matches";
 import { listDivisions } from "@/lib/queries/divisions";
 import { listActiveCourts, listCourtsByIds } from "@/lib/queries/courts";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
 import {
-  FORMAT_LABEL_RU,
-  STATUS_LABEL_RU,
-  TYPE_LABEL_RU,
-} from "@/lib/constants";
-import { formatDateRangeRu, formatDateRu, formatTimeRu } from "@/lib/format-date";
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
+import { TOURNAMENT_TYPE_KEY } from "@/lib/i18n/calendar-keys";
+import { formatDate, formatDateRange, formatTime } from "@/lib/i18n/format";
 import { statusTone } from "@/lib/status-tone";
 import { computeSeasonLeaderboard } from "@/lib/season-leaderboard";
 import type { Match } from "@/lib/types";
@@ -42,6 +44,10 @@ export default async function TournamentDetailPage({
   const t = await getTournament(id);
   if (!t) notFound();
 
+  const lang = await getServerLang();
+  const tr = (key: Parameters<typeof translate>[1], vars?: Parameters<typeof translate>[2]) =>
+    translate(lang, key, vars);
+
   const [registrations, allPlayers] = await Promise.all([
     listRegistrations(id),
     listPlayers(),
@@ -55,12 +61,12 @@ export default async function TournamentDetailPage({
   const levelRange =
     t.level_min && t.level_max
       ? t.level_min === t.level_max
-        ? `Уровень ${t.level_min}`
-        : `Уровни ${t.level_min} – ${t.level_max}`
-      : "Все уровни";
+        ? tr("level.level_one", { level: t.level_min })
+        : tr("level.level_range", { min: t.level_min, max: t.level_max })
+      : tr("level.all_levels");
 
-  const dateRange = formatDateRangeRu(t.date_start, t.date_end);
-  const startTimeStr = formatTimeRu(t.start_time);
+  const dateRange = formatDateRange(t.date_start, t.date_end, lang);
+  const startTimeStr = formatTime(t.start_time);
   const dateValue = startTimeStr ? `${dateRange} · ${startTimeStr}` : dateRange;
 
   const canAdd = isLeague
@@ -70,7 +76,7 @@ export default async function TournamentDetailPage({
   const headerAction = (
     <Link href="/">
       <Button variant="secondary" size="md">
-        Назад
+        {tr("btn.back")}
       </Button>
     </Link>
   );
@@ -78,26 +84,40 @@ export default async function TournamentDetailPage({
   const infoCardContent = (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Badge tone="format">{FORMAT_LABEL_RU[t.format]}</Badge>
-        <Badge tone={statusTone(t.status)}>{STATUS_LABEL_RU[t.status]}</Badge>
-        <Badge tone="neutral">{TYPE_LABEL_RU[t.type]}</Badge>
+        <Badge tone="format">{tr(TOURNAMENT_FORMAT_KEY[t.format])}</Badge>
+        <Badge tone={statusTone(t.status)}>{tr(TOURNAMENT_STATUS_KEY[t.status])}</Badge>
+        <Badge tone="neutral">{tr(TOURNAMENT_TYPE_KEY[t.type])}</Badge>
       </div>
 
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-        <Row label="Даты" value={dateValue} />
-        <Row label="Уровни" value={levelRange} />
+        <Row label={tr("tournament.detail.field.dates")} value={dateValue} />
+        <Row label={tr("tournament.detail.field.levels")} value={levelRange} />
         <Row
-          label="Макс. игроков"
+          label={tr("tournament.detail.field.max_players")}
           value={t.max_players ? String(t.max_players) : "—"}
         />
         <Row
-          label="Взнос"
-          value={t.entry_fee > 0 ? `${t.entry_fee} ₽` : "Бесплатно"}
+          label={tr("tournament.detail.field.entry_fee")}
+          value={
+            t.entry_fee > 0
+              ? `${t.entry_fee} ₽`
+              : tr("tournament.detail.field.entry_fee_free")
+          }
         />
         {t.prize_description ? (
-          <Row label="Приз" value={t.prize_description} wide />
+          <Row
+            label={tr("tournament.detail.field.prize")}
+            value={t.prize_description}
+            wide
+          />
         ) : null}
-        {t.notes ? <Row label="Заметки" value={t.notes} wide /> : null}
+        {t.notes ? (
+          <Row
+            label={tr("tournament.detail.field.notes")}
+            value={t.notes}
+            wide
+          />
+        ) : null}
       </dl>
     </>
   );
@@ -152,33 +172,47 @@ export default async function TournamentDetailPage({
     const finalsCard =
       finalsStatus === "in_progress" ? (
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Финальная сетка</h2>
-          <p className="text-sm text-muted">Финалы идут.</p>
+          <h2 className="font-semibold text-black">
+            {tr("tournament.league.finals_in_progress_title")}
+          </h2>
+          <p className="text-sm text-muted">
+            {tr("tournament.league.finals_in_progress_copy")}
+          </p>
           <div>
             <Link href={`/tournament/${t.id}/finals`}>
-              <Button size="lg">К сетке финала</Button>
+              <Button size="lg">
+                {tr("tournament.league.finals_in_progress_cta")}
+              </Button>
             </Link>
           </div>
         </Card>
       ) : finalsStatus === "completed" ? (
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Финалы завершены</h2>
+          <h2 className="font-semibold text-black">
+            {tr("tournament.league.finals_completed_title")}
+          </h2>
           <div>
             <Link href={`/tournament/${t.id}/finals/results`}>
-              <Button size="lg">Итоги финала</Button>
+              <Button size="lg">
+                {tr("tournament.league.finals_results_cta")}
+              </Button>
             </Link>
           </div>
         </Card>
       ) : allSessionsCompleted && qualifiedCount >= requiredSpots ? (
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Сезон завершён</h2>
+          <h2 className="font-semibold text-black">
+            {tr("tournament.league.season_completed_title")}
+          </h2>
           <p className="text-sm text-muted">
-            Все сессии сыграны. Квалифицировано игроков: {qualifiedCount} из{" "}
-            {requiredSpots}.
+            {tr("tournament.league.season_completed_copy", {
+              q: qualifiedCount,
+              total: requiredSpots,
+            })}
           </p>
           <div>
             <Link href={`/tournament/${t.id}/finals/setup`}>
-              <Button size="lg">Создать финальную сетку</Button>
+              <Button size="lg">{tr("tournament.league.create_finals_cta")}</Button>
             </Link>
           </div>
         </Card>
@@ -209,11 +243,13 @@ export default async function TournamentDetailPage({
           <Card className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-black">
-                Сессии · {sessions.length}
+                {tr("tournament.league.sessions_title")} · {sessions.length}
               </h2>
               {league?.finals_date ? (
                 <span className="text-xs text-muted">
-                  Финал: {formatDateRu(league.finals_date)}
+                  {tr("tournament.league.finals_date", {
+                    date: formatDate(league.finals_date, lang),
+                  })}
                 </span>
               ) : null}
             </div>
@@ -223,13 +259,13 @@ export default async function TournamentDetailPage({
           <Card className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-black">
-                Турнирная таблица лиги
+                {tr("tournament.league.standings_title")}
               </h2>
               <Link
                 href={`/tournament/${t.id}/season`}
                 className="text-sm text-accent underline-offset-2 hover:underline"
               >
-                Подробнее →
+                {tr("tournament.league.standings_more")}
               </Link>
             </div>
             {topRows.length === 0 ? (
@@ -238,11 +274,12 @@ export default async function TournamentDetailPage({
                   <span className="h-2 w-2 rounded-sm bg-muted" />
                 </div>
                 <p className="text-sm text-black font-medium">
-                  Сезон только начинается
+                  {tr("tournament.league.season_started_title")}
                 </p>
                 <p className="text-xs text-muted max-w-xs">
-                  Очки будут начислены после первой завершённой сессии.
-                  Квалификационных мест в финал: {league?.qualification_spots ?? 0}.
+                  {tr("tournament.league.season_started_copy", {
+                    n: league?.qualification_spots ?? 0,
+                  })}
                 </p>
               </div>
             ) : (
@@ -260,7 +297,9 @@ export default async function TournamentDetailPage({
                         {row.playerName}
                       </span>
                       {row.qualified ? (
-                        <Badge tone="qualified">В финал</Badge>
+                        <Badge tone="qualified">
+                          {tr("tournament.league.qualified_badge")}
+                        </Badge>
                       ) : null}
                     </div>
                     <span className="text-black font-semibold tabular-nums">
@@ -271,20 +310,24 @@ export default async function TournamentDetailPage({
               </ul>
             )}
             <p className="text-xs text-muted">
-              Квалификационных мест: {league?.qualification_spots ?? 0}
+              {tr("tournament.league.qualification_spots", {
+                n: league?.qualification_spots ?? 0,
+              })}
             </p>
           </Card>
 
           <Card className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-black">
-                Участники лиги · {registrations.length}
+                {tr("tournament.league.participants_title")} · {registrations.length}
                 {t.max_players ? ` / ${t.max_players}` : ""}
               </h2>
             </div>
 
             {registrations.length === 0 ? (
-              <p className="text-sm text-muted">Игроков пока нет.</p>
+              <p className="text-sm text-muted">
+                {tr("tournament.detail.no_players")}
+              </p>
             ) : (
               <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
                 {registrations.map((r, idx) => (
@@ -338,9 +381,11 @@ export default async function TournamentDetailPage({
 
         {t.status === "draft" ? (
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Следующий шаг</h2>
+            <h2 className="font-semibold text-black">
+              {tr("tournament.detail.next_step_title")}
+            </h2>
             <p className="text-sm text-muted">
-              Откройте регистрацию, чтобы начать добавлять игроков.
+              {tr("tournament.detail.next_step_copy")}
             </p>
             <div>
               <OpenRegistrationButton tournamentId={t.id} />
@@ -365,13 +410,15 @@ export default async function TournamentDetailPage({
 
         {t.status === "in_progress" && divisions.length === 0 ? (
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Турнир идёт</h2>
+            <h2 className="font-semibold text-black">
+              {tr("tournament.detail.in_progress_title")}
+            </h2>
             <p className="text-sm text-muted">
-              Перейдите на экран живой игры, чтобы вводить счёт.
+              {tr("tournament.detail.in_progress_copy")}
             </p>
             <div>
               <Link href={`/tournament/${t.id}/play`}>
-                <Button size="lg">Экран живой игры</Button>
+                <Button size="lg">{tr("tournament.detail.live_screen_cta")}</Button>
               </Link>
             </div>
           </Card>
@@ -379,10 +426,12 @@ export default async function TournamentDetailPage({
 
         {t.status === "completed" ? (
           <Card className="flex flex-col gap-3">
-            <h2 className="font-semibold text-black">Турнир завершён</h2>
+            <h2 className="font-semibold text-black">
+              {tr("tournament.detail.completed_title")}
+            </h2>
             <div>
               <Link href={`/tournament/${t.id}/results`}>
-                <Button size="lg">Итоги турнира</Button>
+                <Button size="lg">{tr("tournament.detail.results_cta")}</Button>
               </Link>
             </div>
           </Card>
@@ -392,7 +441,7 @@ export default async function TournamentDetailPage({
           <Card className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-black">
-                Игроки · {registrations.length}
+                {tr("tournament.detail.players_title")} · {registrations.length}
                 {t.max_players ? ` / ${t.max_players}` : ""}
               </h2>
               {t.status === "registration_open" ? (
@@ -404,7 +453,9 @@ export default async function TournamentDetailPage({
             </div>
 
             {registrations.length === 0 ? (
-              <p className="text-sm text-muted">Игроков пока нет.</p>
+              <p className="text-sm text-muted">
+                {tr("tournament.detail.no_players")}
+              </p>
             ) : (
               <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
                 {registrations.map((r, idx) => (

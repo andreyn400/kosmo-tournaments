@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Program } from "@/lib/types";
 import {
   PROGRAM_GROUPS,
@@ -21,6 +22,7 @@ const COLLAPSED_KEY = "kosmo_ops_programs_collapsed";
 type CollapsedMap = Partial<Record<ProgramGroupKey, boolean>>;
 
 export function ProgramsPanel({ programs }: { programs: Program[] }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [showInactive, setShowInactive] = useState(true);
@@ -110,7 +112,7 @@ export function ProgramsPanel({ programs }: { programs: Program[] }) {
       {filtered.length === 0 ? (
         <div className="rounded-card border border-border bg-surface p-8 text-center">
           <p className="text-sm text-muted">
-            Ничего не найдено. Снимите фильтры или измените запрос.
+            {t("programs.toolbar.empty_filter")}
           </p>
         </div>
       ) : (
@@ -144,7 +146,6 @@ export function ProgramsPanel({ programs }: { programs: Program[] }) {
                 onStartCreate={() => {
                   setCreatingGroup(group.key);
                   setExpandedId(null);
-                  // Make sure the group is visible when creating in it.
                   setCollapsed((prev) => ({ ...prev, [group.key]: false }));
                 }}
                 onCancelCreate={() => setCreatingGroup(null)}

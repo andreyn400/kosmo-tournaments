@@ -1,4 +1,5 @@
 import { minutesFromTime } from "./program-groups";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 /**
  * Pure collision detection for scheduler placement. Used both client-side
@@ -13,8 +14,8 @@ import { minutesFromTime } from "./program-groups";
  * don't block placements. (If an operator wants to "uncancel" a session into a
  * conflict, the activation path is responsible for re-checking.)
  *
- * Returns a Russian-language error message naming the conflicting session, or
- * `null` if the candidate is clear.
+ * Returns a typed FieldError describing the conflict, or `null` if the
+ * candidate is clear. The caller resolves the error via the i18n dictionary.
  */
 export interface CollisionCandidate {
   /** Defined for edit mode so the candidate doesn't collide with itself. */
@@ -38,14 +39,14 @@ export interface CollisionExisting {
 export function detectCollision(
   existing: CollisionExisting[],
   candidate: CollisionCandidate,
-): string | null {
+): FieldError | null {
   const cStart = minutesFromTime(candidate.start_time);
   const cEnd = minutesFromTime(candidate.end_time);
   if (cEnd <= cStart) {
-    return "Время окончания должно быть позже начала.";
+    return fieldErr("error.invalid.end_time_after_start_alt");
   }
   if (candidate.court_ids.length === 0) {
-    return "Нужно выбрать хотя бы один корт.";
+    return fieldErr("error.schedule.at_least_one_court_required");
   }
   const cCourts = new Set(candidate.court_ids);
 
@@ -62,10 +63,16 @@ export function detectCollision(
     const sharedCourt = e.court_ids.some((id) => cCourts.has(id));
     if (!sharedCourt) continue;
 
-    const label = e.program_name
-      ? `«${e.program_name}» (${e.start_time.slice(0, 5)}–${e.end_time.slice(0, 5)})`
-      : `сессия ${e.start_time.slice(0, 5)}–${e.end_time.slice(0, 5)}`;
-    return `Пересекается с ${label}.`;
+    const start = e.start_time.slice(0, 5);
+    const end = e.end_time.slice(0, 5);
+    if (e.program_name) {
+      return fieldErr("error.schedule.overlaps_named", {
+        name: e.program_name,
+        start,
+        end,
+      });
+    }
+    return fieldErr("error.schedule.overlaps_anon", { start, end });
   }
 
   return null;

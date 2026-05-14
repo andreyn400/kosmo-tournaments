@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { ScheduleSessionForGrid, SessionCoachChip } from "@/lib/types";
 import { programTypeColor } from "@/lib/program-colors";
 import { minutesFromTime, OPS_OPEN_HOUR } from "@/lib/ops-constants";
@@ -19,9 +20,9 @@ interface SessionBlockProps {
   colSpan: number;
   /** Live column width (fluid in wide viewports, fixed in scroll mode). */
   colWidth: number;
-  /** Day view = "courts" (shows "К1–К3" or "К1, К3"); week view = "none". */
+  /** Day view = "courts" (shows "C1–C3" or "C1, C3"); week view = "none". */
   spanLabelMode: "courts" | "none";
-  /** Day view only: non-contiguous court indices, rendered as "К1, К3". */
+  /** Day view only: non-contiguous court indices, rendered as "C1, C3". */
   nonContiguousCourtIndices?: number[];
   onClick: (session: ScheduleSessionForGrid, anchor: DOMRect) => void;
 }
@@ -41,8 +42,7 @@ export function SessionBlock({
   nonContiguousCourtIndices,
   onClick,
 }: SessionBlockProps) {
-  // Slot math: time → minutes since open → slot fraction. Sub-slot durations
-  // (e.g. 45 min) are honoured pixel-exactly by using fractional slot heights.
+  const { t } = useTranslation();
   const startMin = minutesFromTime(session.start_time);
   const endMin = minutesFromTime(session.end_time);
   const startSlotFrac = (startMin - OPS_OPEN_HOUR * 60) / 30;
@@ -72,7 +72,11 @@ export function SessionBlock({
       onClick={(e) =>
         onClick(session, e.currentTarget.getBoundingClientRect())
       }
-      aria-label={`${session.program_name ?? "Сессия"} ${session.start_time.slice(0, 5)}–${session.end_time.slice(0, 5)}`}
+      aria-label={t("schedule.session.aria", {
+        name: session.program_name ?? t("schedule.session.fallback_name"),
+        start: session.start_time.slice(0, 5),
+        end: session.end_time.slice(0, 5),
+      })}
       className="absolute group text-left cursor-pointer transition-transform hover:scale-[1.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-accent"
       style={{
         top,
@@ -98,7 +102,7 @@ export function SessionBlock({
         )}
         <div className="min-w-0 flex-1">
           <div className="text-[12px] font-semibold leading-tight truncate">
-            {session.program_name ?? "Без программы"}
+            {session.program_name ?? t("schedule.session.no_program")}
           </div>
           <div className="text-[10.5px] leading-tight opacity-90 truncate tabular-nums">
             {session.start_time.slice(0, 5)}–{session.end_time.slice(0, 5)}
@@ -111,7 +115,7 @@ export function SessionBlock({
             )}
             {session.attendee_count > 0 && (
               <span className="ml-1.5 opacity-90">
-                · {session.attendee_count} игр.
+                · {session.attendee_count} {t("schedule.session.players_short")}
               </span>
             )}
           </div>
@@ -120,7 +124,7 @@ export function SessionBlock({
           <span
             aria-hidden
             className="text-[10px] leading-none mt-[2px] opacity-90"
-            title="Проведена"
+            title={t("schedule.session.completed_tooltip")}
           >
             ✓
           </span>
@@ -145,17 +149,21 @@ function CourtSpanLabel({
   colSpan: number;
   nonContiguousCourtIndices?: number[];
 }) {
+  const { t } = useTranslation();
+  const prefix = t("tournament.card.court_short_prefix");
   if (nonContiguousCourtIndices && nonContiguousCourtIndices.length > 0) {
     return (
       <span className="ml-1.5 opacity-90">
-        · {nonContiguousCourtIndices.map((i) => `К${i + 1}`).join(", ")}
+        · {nonContiguousCourtIndices.map((i) => `${prefix}${i + 1}`).join(", ")}
       </span>
     );
   }
   if (colSpan > 1) {
     return (
       <span className="ml-1.5 opacity-90">
-        · К{colIndex + 1}–К{colIndex + colSpan}
+        · {prefix}
+        {colIndex + 1}–{prefix}
+        {colIndex + colSpan}
       </span>
     );
   }

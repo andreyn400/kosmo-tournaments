@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { TournamentType } from "@/lib/types";
 import { deleteTournamentAction } from "./delete-tournament-action";
 
@@ -14,11 +15,19 @@ export function DangerZone({
   tournamentName: string;
   tournamentType: TournamentType;
 }) {
+  const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const label = tournamentType === "league_season" ? "лигу" : "турнир";
+  const label =
+    tournamentType === "league_season"
+      ? t("danger.label.season")
+      : t("danger.label.tournament");
+  const scope =
+    tournamentType === "league_season"
+      ? t("danger.scope.season")
+      : t("danger.scope.tournament");
 
   const doDelete = () => {
     setError(null);
@@ -38,13 +47,9 @@ export function DangerZone({
     >
       <div className="flex flex-col gap-1">
         <h2 className="font-semibold text-[var(--color-danger)]">
-          Опасная зона
+          {t("danger.title")}
         </h2>
-        <p className="text-sm text-secondary">
-          Удаление необратимо: будут удалены сессии, раунды, матчи, регистрации и
-          история рейтингов, связанные с этим{" "}
-          {tournamentType === "league_season" ? "сезоном" : "турниром"}.
-        </p>
+        <p className="text-sm text-secondary">{t("danger.copy", { scope })}</p>
       </div>
 
       {!confirming ? (
@@ -54,19 +59,26 @@ export function DangerZone({
             onClick={() => setConfirming(true)}
             className="inline-flex items-center justify-center h-11 px-4 text-sm font-medium rounded-[var(--radius-button)] bg-white border border-[var(--color-danger)]/50 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] hover:border-[var(--color-danger)] transition-colors"
           >
-            Удалить {label}
+            {t("danger.delete_button", { label })}
           </button>
         </div>
       ) : (
         <div className="flex flex-col gap-3 rounded-[var(--radius-button)] border border-[var(--color-danger)]/30 bg-white p-4">
           <p className="text-sm text-black">
-            Удалить {label}{" "}
-            <span className="font-semibold">{tournamentName}</span>? Все данные
-            будут удалены без возможности восстановления.
+            {t("danger.confirm_prompt", { label, name: "{name}" })
+              .split("{name}")
+              .map((chunk, i, arr) => (
+                <span key={i}>
+                  {chunk}
+                  {i < arr.length - 1 ? (
+                    <span className="font-semibold">{tournamentName}</span>
+                  ) : null}
+                </span>
+              ))}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="danger" disabled={pending} onClick={doDelete}>
-              {pending ? "Удаление…" : "Удалить"}
+              {pending ? t("btn.deleting") : t("btn.delete")}
             </Button>
             <Button
               variant="secondary"
@@ -76,7 +88,7 @@ export function DangerZone({
                 setError(null);
               }}
             >
-              Отмена
+              {t("btn.cancel")}
             </Button>
           </div>
           {error ? (

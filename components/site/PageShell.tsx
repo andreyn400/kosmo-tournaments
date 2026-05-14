@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { LanguageToggle } from "./LanguageToggle";
 import { Logo } from "./Logo";
 import { SidebarNav } from "./SidebarNav";
 import { SidebarMiniCalendar } from "./SidebarMiniCalendar";
@@ -19,6 +20,9 @@ export function PageShell({ title, action, children }: PageShellProps) {
       >
         <div className="h-16 flex items-center px-5 border-b border-border flex-shrink-0">
           <Logo />
+        </div>
+        <div className="px-3 pt-3 pb-1 flex-shrink-0">
+          <LanguageToggle />
         </div>
         <SidebarNav />
         <SidebarMiniCalendar />

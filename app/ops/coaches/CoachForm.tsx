@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Coach } from "@/lib/types";
 import type { RawCoachInput } from "./coach-input";
 
@@ -60,10 +61,7 @@ export function CoachForm({
   pending,
   onDelete,
 }: CoachFormProps) {
-  // State is initialised once at mount. Parents must remount via
-  // `key={coach.id}` (or a conditional render that unmounts the form) to
-  // re-init for a different coach — avoiding the prop-sync useEffect that
-  // silently clobbered user input in earlier iterations.
+  const { t } = useTranslation();
   const [state, setState] = useState<FormState>(() => makeInitial(coach));
   const [error, setError] = useState<string | null>(null);
 
@@ -99,87 +97,87 @@ export function CoachForm({
       className="grid gap-3 p-4 rounded-md bg-subtle border border-border"
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_minmax(0,12rem)_4.5rem]">
-        <Field label="Имя">
+        <Field label={t("coaches.field.name")}>
           <Input
             value={state.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="Например, Максим Петров"
+            placeholder={t("coaches.placeholder.name")}
             autoFocus={mode === "create"}
           />
         </Field>
-        <Field label="Телефон">
+        <Field label={t("coaches.field.phone")}>
           <Input
             value={state.phone}
             onChange={(e) => set("phone", e.target.value)}
             placeholder="+7 …"
           />
         </Field>
-        <Field label="Цвет">
+        <Field label={t("coaches.field.color")}>
           <input
             type="color"
             value={state.color}
             onChange={(e) => set("color", e.target.value)}
             className="w-full h-11 rounded-[var(--radius-button)] border border-border bg-subtle cursor-pointer"
-            aria-label="Цвет тренера"
+            aria-label={t("coaches.aria.color_picker")}
           />
         </Field>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Специализация">
+        <Field label={t("coaches.field.specialization")}>
           <Input
             value={state.specialization}
             onChange={(e) => set("specialization", e.target.value)}
-            placeholder="Например, дети, юниоры, профи"
+            placeholder={t("coaches.placeholder.specialization")}
           />
         </Field>
-        <Field label="Уровень">
+        <Field label={t("coaches.field.level")}>
           <Input
             value={state.level}
             onChange={(e) => set("level", e.target.value)}
-            placeholder="старший, стажёр…"
+            placeholder={t("coaches.placeholder.level")}
           />
         </Field>
       </div>
 
-      <Field label="URL фото">
+      <Field label={t("coaches.field.photo_url")}>
         <Input
           value={state.photoUrl}
           onChange={(e) => set("photoUrl", e.target.value)}
-          placeholder="https://…"
+          placeholder={t("coaches.placeholder.photo_url")}
         />
       </Field>
 
-      <Field label="О тренере">
+      <Field label={t("coaches.field.bio")}>
         <Textarea
           rows={2}
           value={state.bio}
           onChange={(e) => set("bio", e.target.value)}
-          placeholder="Короткая биография"
+          placeholder={t("coaches.placeholder.bio")}
         />
       </Field>
 
       <fieldset className="grid gap-3 p-3 rounded-md bg-surface border border-border">
         <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Модель оплаты
+          {t("coaches.field.pay_model")}
         </legend>
         <div className="flex gap-3">
           <RateRadio
             checked={state.rateType === "flat"}
-            label="Фиксированная"
-            hint="Ставка за сессию"
+            label={t("coaches.rate.flat_long")}
+            hint={t("coaches.rate.flat_hint")}
             onClick={() => set("rateType", "flat")}
           />
           <RateRadio
             checked={state.rateType === "percent"}
-            label="Процент"
-            hint="% с корта + % с тренировки"
+            label={t("coaches.rate.percent_long")}
+            hint={t("coaches.rate.percent_hint")}
             onClick={() => set("rateType", "percent")}
           />
         </div>
 
         {state.rateType === "flat" ? (
-          <Field label="Ставка за сессию, ₽">
+          <Field label={t("coaches.field.flat_rate")}>
             <Input
               type="number"
               min={0}
@@ -189,7 +187,7 @@ export function CoachForm({
           </Field>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="% с аренды корта">
+            <Field label={t("coaches.field.court_percent")}>
               <Input
                 type="number"
                 min={0}
@@ -199,7 +197,7 @@ export function CoachForm({
                 onChange={(e) => set("courtPct", e.target.value)}
               />
             </Field>
-            <Field label="% с тренерского сбора">
+            <Field label={t("coaches.field.coaching_percent")}>
               <Input
                 type="number"
                 min={0}
@@ -213,12 +211,12 @@ export function CoachForm({
         )}
       </fieldset>
 
-      <Field label="Заметки">
+      <Field label={t("coaches.field.notes")}>
         <Textarea
           rows={2}
           value={state.notes}
           onChange={(e) => set("notes", e.target.value)}
-          placeholder="Внутренние заметки"
+          placeholder={t("coaches.placeholder.notes")}
         />
       </Field>
 
@@ -229,7 +227,7 @@ export function CoachForm({
           onChange={(e) => set("isActive", e.target.checked)}
           className="h-4 w-4 accent-[var(--color-accent)]"
         />
-        Активный тренер
+        {t("coaches.field.is_active")}
       </label>
 
       {error && <p className="text-sm text-[var(--color-danger)]">{error}</p>}
@@ -244,7 +242,7 @@ export function CoachForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -254,14 +252,14 @@ export function CoachForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Добавить"
-              : "Сохранить"}
+              ? t("coaches.add_submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

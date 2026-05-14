@@ -2,6 +2,7 @@ import type {
   OrganizerPaymentInput,
   OrganizerPaymentType,
 } from "@/lib/types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 export interface RawPaymentInput {
   date: string;
@@ -14,30 +15,30 @@ export interface RawPaymentInput {
 
 export type ValidatedPayment =
   | { ok: true; value: Omit<OrganizerPaymentInput, "organizer_id"> }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validatePaymentInput(raw: RawPaymentInput): ValidatedPayment {
   if (!raw.date || !/^\d{4}-\d{2}-\d{2}$/.test(raw.date)) {
-    return { ok: false, error: "Укажите дату" };
+    return { ok: false, error: fieldErr("error.required.date") };
   }
 
   const amount = Number.parseInt(raw.amount_rub, 10);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return { ok: false, error: "Сумма должна быть больше нуля" };
+    return { ok: false, error: fieldErr("error.invalid.amount_positive") };
   }
   if (amount > 100_000_000) {
-    return { ok: false, error: "Сумма выглядит слишком большой" };
+    return { ok: false, error: fieldErr("error.invalid.amount_too_large") };
   }
 
   if (!["payment", "deposit", "refund"].includes(raw.type)) {
-    return { ok: false, error: "Неверный тип записи" };
+    return { ok: false, error: fieldErr("error.invalid.entry_type") };
   }
 
   let courts: number | null = null;
   if (raw.courts_booked.trim()) {
     const c = Number.parseInt(raw.courts_booked, 10);
     if (!Number.isFinite(c) || c < 0 || c > 99) {
-      return { ok: false, error: "Кортов: 0–99" };
+      return { ok: false, error: fieldErr("error.invalid.courts_range_0_99") };
     }
     courts = c;
   }
@@ -46,7 +47,7 @@ export function validatePaymentInput(raw: RawPaymentInput): ValidatedPayment {
   if (raw.hours_booked.trim()) {
     const h = Number.parseFloat(raw.hours_booked);
     if (!Number.isFinite(h) || h < 0 || h > 999) {
-      return { ok: false, error: "Часов: 0–999" };
+      return { ok: false, error: fieldErr("error.invalid.hours_range_0_999") };
     }
     hours = Math.round(h * 10) / 10;
   }
@@ -64,14 +65,6 @@ export function validatePaymentInput(raw: RawPaymentInput): ValidatedPayment {
   };
 }
 
-export const PAYMENT_TYPE_LABELS: Record<OrganizerPaymentType, string> = {
-  payment: "Начисление",
-  deposit: "Депозит",
-  refund: "Возврат",
-};
-
-export const PAYMENT_TYPE_DESCRIPTIONS: Record<OrganizerPaymentType, string> = {
-  payment: "Счёт за аренду / турнир — увеличивает долг",
-  deposit: "Получено от организатора — уменьшает долг",
-  refund: "Возвращено организатору — уменьшает долг",
-};
+// PAYMENT_TYPE_LABELS / PAYMENT_TYPE_DESCRIPTIONS removed: UI callers translate
+// via `lib/i18n/organizer-keys.ts` (ORGANIZER_PAYMENT_TYPE_KEY /
+// ORGANIZER_PAYMENT_DESC_KEY).

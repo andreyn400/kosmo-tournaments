@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   isSetsDetail,
   scoringGroup,
@@ -25,6 +26,7 @@ export function BracketMatchCard({
   courtLabelById: Record<string, string>;
   readOnly?: boolean;
 }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
 
   const team1 = formatTeam(
@@ -51,12 +53,12 @@ export function BracketMatchCard({
   const courtLabel = match.court_id ? courtLabelById[match.court_id] : null;
 
   const statusText = isBye
-    ? "Бай"
+    ? t("finals.match.bye")
     : isCompleted
-      ? "Сыгран"
+      ? t("finals.match.played")
       : bothKnown
-        ? "Ожидает"
-        : "Ждёт соперников";
+        ? t("finals.match.awaiting")
+        : t("finals.match.waiting_opponents");
 
   return (
     <div
@@ -65,7 +67,9 @@ export function BracketMatchCard({
     >
       <div className="flex items-center justify-between px-3 pt-2 pb-1 text-[10px] uppercase tracking-[0.08em] text-muted">
         <span>
-          {courtLabel ? `Корт ${courtLabel}` : `M${match.position + 1}`}
+          {courtLabel
+            ? t("finals.match.court_label", { label: courtLabel })
+            : `M${match.position + 1}`}
         </span>
         <span
           className={
@@ -129,7 +133,7 @@ export function BracketMatchCard({
           onClick={() => setEditing(true)}
           className="block w-full px-3 py-2 border-t border-border text-xs font-semibold text-accent hover:bg-accent-soft text-center"
         >
-          {isCompleted ? "Изменить счёт" : "Ввести счёт"}
+          {isCompleted ? t("match.edit_score") : t("match.enter_score")}
         </button>
       ) : null}
     </div>
@@ -160,6 +164,7 @@ function TeamRow({
   score: number | null;
   showScore: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       className={`flex items-center gap-2 pr-3 py-2 border-l-4 ${
@@ -174,7 +179,11 @@ function TeamRow({
         className={`flex-1 truncate ${isWinner ? "font-bold text-black" : "text-black"}`}
         title={team ?? undefined}
       >
-        {team ?? <span className="text-muted italic">Ожидание</span>}
+        {team ?? (
+          <span className="text-muted italic">
+            {t("finals.match.awaiting_team")}
+          </span>
+        )}
       </span>
       {showScore && score != null ? (
         <span
@@ -196,6 +205,7 @@ function ByeBody({
   team: string | null;
   seed: number | null;
 }) {
+  const { t } = useTranslation();
   return (
     <>
       <div
@@ -206,11 +216,13 @@ function ByeBody({
           {seed != null ? seed : ""}
         </span>
         <span className="flex-1 truncate font-bold text-black" title={team ?? undefined}>
-          {team ?? <span className="text-muted italic">—</span>}
+          {team ?? (
+            <span className="text-muted italic">{t("finals.match.no_team")}</span>
+          )}
         </span>
       </div>
       <div className="px-3 py-1.5 text-[11px] text-muted italic border-t border-border bg-subtle/60">
-        Бай — авто-выход
+        {t("finals.bye_auto")}
       </div>
     </>
   );

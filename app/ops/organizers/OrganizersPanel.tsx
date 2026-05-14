@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub, formatShortDateWithWeekday } from "@/lib/i18n/format";
 import type { OrganizerWithBalance } from "@/lib/types";
-import { formatDateRu, formatRub } from "../coaches/format";
 import { OrganizersSummary } from "./OrganizersSummary";
 import { OrganizerForm } from "./OrganizerForm";
 import { createOrganizerAction } from "./create-organizer-action";
@@ -20,6 +21,7 @@ interface OrganizersPanelProps {
 
 export function OrganizersPanel({ organizers }: OrganizersPanelProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -72,33 +74,33 @@ export function OrganizersPanel({ organizers }: OrganizersPanelProps) {
       <div className="flex flex-wrap items-center gap-3">
         <div
           role="tablist"
-          aria-label="Фильтр"
+          aria-label={t("organizers.aria.filter")}
           className="inline-flex p-0.5 rounded-md bg-subtle border border-border"
         >
           <FilterPill
             active={filter === "all"}
             onClick={() => setFilter("all")}
-            label="Все"
+            label={t("organizers.filter.all")}
             count={counts.all}
           />
           <FilterPill
             active={filter === "owing"}
             onClick={() => setFilter("owing")}
-            label="Должны"
+            label={t("organizers.filter.owing")}
             count={counts.owing}
             tone="danger"
           />
           <FilterPill
             active={filter === "credit"}
             onClick={() => setFilter("credit")}
-            label="Предоплата"
+            label={t("organizers.filter.credit")}
             count={counts.credit}
             tone="success"
           />
           <FilterPill
             active={filter === "settled"}
             onClick={() => setFilter("settled")}
-            label="0"
+            label={t("organizers.filter.settled")}
             count={counts.settled}
           />
         </div>
@@ -108,7 +110,7 @@ export function OrganizersPanel({ organizers }: OrganizersPanelProps) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию, контакту…"
+            placeholder={t("organizers.search_placeholder")}
             className="!h-9"
           />
         </div>
@@ -119,7 +121,7 @@ export function OrganizersPanel({ organizers }: OrganizersPanelProps) {
           disabled={creating}
           className="ml-auto"
         >
-          + Добавить организатора
+          {t("organizers.add_cta")}
         </Button>
       </div>
 
@@ -145,23 +147,30 @@ export function OrganizersPanel({ organizers }: OrganizersPanelProps) {
 }
 
 function OrganizersTable({ rows }: { rows: OrganizerWithBalance[] }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-border bg-surface overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border bg-subtle/30 text-[10.5px] uppercase tracking-wider text-muted font-semibold">
-            <th className="pl-4 pr-2 py-2 text-left">Организатор</th>
-            <th className="px-2 py-2 text-left">Контакт</th>
-            <th className="px-2 py-2 text-right whitespace-nowrap">
-              Начислено
+            <th className="pl-4 pr-2 py-2 text-left">
+              {t("organizers.col.organizer")}
             </th>
-            <th className="px-2 py-2 text-right whitespace-nowrap">Получено</th>
+            <th className="px-2 py-2 text-left">{t("organizers.col.contact")}</th>
             <th className="px-2 py-2 text-right whitespace-nowrap">
-              Записей
+              {t("organizers.col.charges")}
             </th>
-            <th className="px-2 py-2 text-left whitespace-nowrap">Активность</th>
+            <th className="px-2 py-2 text-right whitespace-nowrap">
+              {t("organizers.col.deposits")}
+            </th>
+            <th className="px-2 py-2 text-right whitespace-nowrap">
+              {t("organizers.col.entries")}
+            </th>
+            <th className="px-2 py-2 text-left whitespace-nowrap">
+              {t("organizers.col.activity")}
+            </th>
             <th className="pl-2 pr-4 py-2 text-right whitespace-nowrap">
-              Баланс
+              {t("organizers.col.balance")}
             </th>
           </tr>
         </thead>
@@ -182,6 +191,7 @@ function OrganizerRow({
   organizer: OrganizerWithBalance;
   zebra: boolean;
 }) {
+  const { lang } = useTranslation();
   const owes = o.balance_rub > 0;
   const credit = o.balance_rub < 0;
   const balanceCls = owes
@@ -190,9 +200,9 @@ function OrganizerRow({
       ? "text-[var(--color-success)] font-bold"
       : "text-muted";
   const balanceText = owes
-    ? formatRub(o.balance_rub)
+    ? formatRub(o.balance_rub, lang)
     : credit
-      ? `−${formatRub(-o.balance_rub)}`
+      ? `−${formatRub(-o.balance_rub, lang)}`
       : "0";
 
   return (
@@ -221,16 +231,16 @@ function OrganizerRow({
         </div>
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-        {o.charges_total > 0 ? formatRub(o.charges_total) : "—"}
+        {o.charges_total > 0 ? formatRub(o.charges_total, lang) : "—"}
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-        {o.deposits_total > 0 ? formatRub(o.deposits_total) : "—"}
+        {o.deposits_total > 0 ? formatRub(o.deposits_total, lang) : "—"}
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right">
         {o.entries_count || "—"}
       </td>
       <td className="px-2 align-middle text-xs text-muted tabular-nums whitespace-nowrap">
-        {o.last_activity ? formatDateRu(o.last_activity) : "—"}
+        {o.last_activity ? formatShortDateWithWeekday(o.last_activity, lang) : "—"}
       </td>
       <td
         className={`pl-2 pr-4 align-middle text-sm tabular-nums text-right whitespace-nowrap ${balanceCls}`}
@@ -290,20 +300,21 @@ function EmptyState({
   total: number;
   onAdd: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center flex flex-col items-center gap-3">
       <h2 className="text-base font-semibold text-black">
         {total === 0
-          ? "Организаторов пока нет"
-          : "По этим фильтрам никого нет"}
+          ? t("organizers.empty.zero_title")
+          : t("organizers.empty.filter_title")}
       </h2>
       <p className="text-sm text-muted max-w-md">
         {total === 0
-          ? "Добавьте первого организатора турниров — потом будете вести его учёт: начисления за корты, депозиты, возвраты."
-          : "Снимите фильтр или измените поиск."}
+          ? t("organizers.empty.zero_copy")
+          : t("organizers.empty.filter_copy")}
       </p>
       <Button size="sm" onClick={onAdd}>
-        + Добавить организатора
+        {t("organizers.add_cta")}
       </Button>
     </div>
   );

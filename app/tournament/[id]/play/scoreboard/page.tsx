@@ -7,6 +7,7 @@ import { listPlayers } from "@/lib/queries/players";
 import { listRegistrations } from "@/lib/queries/registrations";
 import { totalRoundsFor } from "@/lib/total-rounds";
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
+import { getServerDict } from "@/lib/i18n/server";
 import type { Match } from "@/lib/types";
 import { Scoreboard } from "./Scoreboard";
 
@@ -27,12 +28,13 @@ export default async function ScoreboardPage({
       : null);
 
   if (!activeSession) {
+    const dict = await getServerDict();
     return (
       <div className="min-h-dvh bg-black text-white flex items-center justify-center p-10 text-center">
         <div className="flex flex-col gap-3">
           <div className="text-3xl font-semibold">{tournament.name}</div>
           <div className="text-lg text-white/60">
-            Сессия ещё не запущена
+            {dict["scoreboard.session_not_started"]}
           </div>
         </div>
       </div>

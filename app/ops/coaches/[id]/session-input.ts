@@ -8,6 +8,7 @@ import {
   minutesFromTime,
   timeFromMinutes,
 } from "@/lib/program-groups";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 export interface RawSessionInput {
   program_id: string | null;
@@ -32,25 +33,29 @@ const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 export function validateSessionInput(
   raw: RawSessionInput,
   program: Program | null,
-): { ok: true; value: SessionInput } | { ok: false; error: string } {
-  if (!DATE_RE.test(raw.date)) return { ok: false, error: "Неверная дата." };
+): { ok: true; value: SessionInput } | { ok: false; error: FieldError } {
+  if (!DATE_RE.test(raw.date))
+    return { ok: false, error: fieldErr("error.invalid.date") };
   if (!TIME_RE.test(raw.start_time)) {
-    return { ok: false, error: "Время начала: формат ЧЧ:ММ." };
+    return { ok: false, error: fieldErr("error.invalid.start_time_format") };
   }
   if (!TIME_RE.test(raw.end_time)) {
-    return { ok: false, error: "Время окончания: формат ЧЧ:ММ." };
+    return { ok: false, error: fieldErr("error.invalid.end_time_format") };
   }
   const startMin = minutesFromTime(raw.start_time);
   const endMin = minutesFromTime(raw.end_time);
   if (endMin <= startMin) {
-    return { ok: false, error: "Время окончания должно быть после начала." };
+    return {
+      ok: false,
+      error: fieldErr("error.invalid.end_time_after_start_alt"),
+    };
   }
   if (
     !Number.isInteger(raw.attendee_count) ||
     raw.attendee_count < 0 ||
     raw.attendee_count > 64
   ) {
-    return { ok: false, error: "Игроков — целое от 0 до 64." };
+    return { ok: false, error: fieldErr("error.invalid.players_range_0_64") };
   }
 
   let revenue = 0;
@@ -62,7 +67,7 @@ export function validateSessionInput(
     if (!program) {
       return {
         ok: false,
-        error: "Для авто-расчёта выручки выберите программу.",
+        error: fieldErr("error.invalid.choose_program_for_revenue"),
       };
     }
     const pricePerPlayer = isPeak
@@ -72,14 +77,35 @@ export function validateSessionInput(
     courtRev = pricePerPlayer * program.courts_needed;
     coachingFee = Math.max(0, revenue - courtRev);
   } else {
-    for (const [v, label] of [
-      [raw.revenue_rub, "Выручка"],
-      [raw.court_revenue_rub, "Корт"],
-      [raw.coaching_fee_rub, "Тренировка"],
-    ] as const) {
-      if (!Number.isInteger(v) || v < 0 || v > 10_000_000) {
-        return { ok: false, error: `${label}: целое число ≥ 0.` };
-      }
+    if (
+      !Number.isInteger(raw.revenue_rub) ||
+      raw.revenue_rub < 0 ||
+      raw.revenue_rub > 10_000_000
+    ) {
+      return {
+        ok: false,
+        error: fieldErr("error.invalid.revenue_non_negative_int"),
+      };
+    }
+    if (
+      !Number.isInteger(raw.court_revenue_rub) ||
+      raw.court_revenue_rub < 0 ||
+      raw.court_revenue_rub > 10_000_000
+    ) {
+      return {
+        ok: false,
+        error: fieldErr("error.invalid.court_rev_non_negative_int"),
+      };
+    }
+    if (
+      !Number.isInteger(raw.coaching_fee_rub) ||
+      raw.coaching_fee_rub < 0 ||
+      raw.coaching_fee_rub > 10_000_000
+    ) {
+      return {
+        ok: false,
+        error: fieldErr("error.invalid.coaching_fee_non_negative_int"),
+      };
     }
     revenue = raw.revenue_rub;
     courtRev = raw.court_revenue_rub;

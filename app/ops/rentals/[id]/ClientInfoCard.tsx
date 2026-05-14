@@ -1,29 +1,47 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { RentalContract } from "@/lib/types";
 
 export function ClientInfoCard({ contract }: { contract: RentalContract }) {
+  const { t } = useTranslation();
   const isLegal = contract.client_type === "legal_entity";
   return (
     <section className="rounded-card border border-border bg-surface p-5 flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-black">Клиент</h2>
+        <h2 className="text-sm font-semibold text-black">
+          {t("contract.client.title")}
+        </h2>
         <span className="inline-flex items-center px-1.5 h-5 rounded text-[10px] font-semibold uppercase tracking-wider bg-subtle text-secondary">
-          {isLegal ? "Юр. лицо" : "Физ. лицо"}
+          {isLegal
+            ? t("contract.client.type.legal_short")
+            : t("contract.client.type.individual_short")}
         </span>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Контактное лицо" value={contract.contact_person} />
-        <Field label="Телефон" value={contract.contact_phone} />
-        <Field label="Email" value={contract.contact_email} />
+        <Field
+          label={t("contract.client.field.contact_person")}
+          value={contract.contact_person}
+        />
+        <Field
+          label={t("contract.client.field.phone")}
+          value={contract.contact_phone}
+        />
+        <Field
+          label={t("contract.client.field.email")}
+          value={contract.contact_email}
+        />
         {isLegal && (
           <>
             <Field
-              label="Юр. наименование"
+              label={t("contract.client.field.legal_name")}
               value={contract.legal_entity_name}
             />
-            <Field label="ИНН" value={contract.inn} />
+            <Field
+              label={t("contract.client.field.inn")}
+              value={contract.inn}
+            />
           </>
         )}
       </div>

@@ -6,7 +6,9 @@ import { PageShell } from "@/components/site/PageShell";
 import { getTournament } from "@/lib/queries/tournaments";
 import { getSession } from "@/lib/queries/sessions";
 import { listRegistrations } from "@/lib/queries/registrations";
-import { formatDateRu } from "@/lib/format-date";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
+import { formatDate } from "@/lib/i18n/format";
 import { SelectPlayersForm } from "./SelectPlayersForm";
 
 export default async function SelectPlayersPage({
@@ -25,18 +27,29 @@ export default async function SelectPlayersPage({
     redirect(`/tournament/${id}`);
   }
 
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
+
   const registrations = await listRegistrations(id);
   const candidates = registrations
     .map((r) => r.player)
-    .sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    .sort((a, b) => a.name.localeCompare(b.name, lang));
+
+  const title = tr("session_select.page_title", {
+    n: session.session_number,
+    date: formatDate(session.session_date, lang),
+  });
 
   return (
     <PageShell
-      title={`Сессия ${session.session_number} · ${formatDateRu(session.session_date)}`}
+      title={title}
       action={
         <Link href={`/tournament/${id}`}>
           <Button variant="secondary" size="md">
-            К лиге
+            {tr("session_select.back_to_league")}
           </Button>
         </Link>
       }
@@ -47,7 +60,7 @@ export default async function SelectPlayersPage({
             <span className="font-semibold">{tournament.name}</span>
             {" · "}
             <span className="text-muted">
-              Выберите участников этой сессии из списка лиги.
+              {tr("session_select.session_card_copy")}
             </span>
           </p>
         </Card>

@@ -2,6 +2,8 @@
 
 import { Fragment, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub, formatShortDateWithWeekday } from "@/lib/i18n/format";
 import type {
   Coach,
   Court,
@@ -9,7 +11,6 @@ import type {
   ScheduleSessionWithMeta,
 } from "@/lib/types";
 import { computeEarnings } from "@/lib/coach-earnings";
-import { formatDateRu, formatRub } from "../format";
 import { LogSessionForm } from "./LogSessionForm";
 import { updateSessionAction } from "./update-session-action";
 import { deleteSessionAction } from "./delete-session-action";
@@ -37,6 +38,7 @@ export function SessionRow({
   zebra,
 }: SessionRowProps) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
   const [pending, startTransition] = useTransition();
   const payout = computeEarnings(coach, session);
 
@@ -56,7 +58,7 @@ export function SessionRow({
   }
 
   function handleDelete() {
-    if (!confirm("Удалить эту сессию из лога?")) return;
+    if (!confirm(t("coach.row.delete_confirm"))) return;
     startTransition(async () => {
       const res = await deleteSessionAction(coach.id, session.id);
       if (res.error) {
@@ -88,19 +90,24 @@ export function SessionRow({
         style={{ height: "44px" }}
       >
         <td className={`pl-4 pr-2 align-middle text-xs tabular-nums whitespace-nowrap ${textCls}`}>
-          {formatDateRu(session.date)}
+          {formatShortDateWithWeekday(session.date, lang)}
         </td>
         <td className={`px-2 align-middle text-xs tabular-nums whitespace-nowrap ${textCls}`}>
           {session.start_time.slice(0, 5)}–{session.end_time.slice(0, 5)}
         </td>
         <td className="px-2 align-middle text-xs min-w-0">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className={`truncate ${textCls}`} title={session.program_name ?? "Без программы"}>
-              {session.program_name ?? <span className="text-fade italic">Без программы</span>}
+            <span
+              className={`truncate ${textCls}`}
+              title={session.program_name ?? t("coach.row.no_program")}
+            >
+              {session.program_name ?? (
+                <span className="text-fade italic">{t("coach.row.no_program")}</span>
+              )}
             </span>
             {session.is_peak && (
               <span className="inline-flex items-center px-1 h-4 rounded text-[9px] font-bold tracking-wider uppercase bg-[var(--color-warning-soft)] text-[var(--color-warning)] flex-shrink-0">
-                Пик
+                {t("coach.row.peak")}
               </span>
             )}
           </div>
@@ -112,16 +119,20 @@ export function SessionRow({
           {session.attendee_count || "—"}
         </td>
         <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-          {session.revenue_rub > 0 ? formatRub(session.revenue_rub) : "—"}
+          {session.revenue_rub > 0 ? formatRub(session.revenue_rub, lang) : "—"}
         </td>
         <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-          {session.court_revenue_rub > 0 ? formatRub(session.court_revenue_rub) : "—"}
+          {session.court_revenue_rub > 0
+            ? formatRub(session.court_revenue_rub, lang)
+            : "—"}
         </td>
         <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-          {session.coaching_fee_rub > 0 ? formatRub(session.coaching_fee_rub) : "—"}
+          {session.coaching_fee_rub > 0
+            ? formatRub(session.coaching_fee_rub, lang)
+            : "—"}
         </td>
         <td className="pl-2 pr-4 align-middle text-xs text-accent font-semibold tabular-nums text-right whitespace-nowrap">
-          {payout > 0 ? formatRub(payout) : "—"}
+          {payout > 0 ? formatRub(payout, lang) : "—"}
         </td>
       </tr>
       {expanded && (

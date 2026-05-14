@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Program } from "@/lib/types";
 import type { ProgramGroup as Group } from "@/lib/program-groups";
 import { ProgramCard } from "./ProgramCard";
@@ -38,6 +39,7 @@ export function ProgramGroupSection({
   onCancelCreate,
 }: ProgramGroupProps) {
   const router = useRouter();
+  const { t, tPlural } = useTranslation();
   const [pending, startTransition] = useTransition();
 
   function handleCreate(
@@ -74,9 +76,16 @@ export function ProgramGroupSection({
             {group.icon}
           </span>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-black">{group.label}</h2>
+            <h2 className="text-sm font-semibold text-black">
+              {t(group.labelKey)}
+            </h2>
             <p className="text-[11px] text-muted">
-              {programs.length} {pluralProgs(programs.length)}
+              {programs.length}{" "}
+              {tPlural(programs.length, {
+                one: "programs.progs.one",
+                few: "programs.progs.few",
+                many: "programs.progs.many",
+              })}
             </p>
           </div>
         </button>
@@ -86,7 +95,7 @@ export function ProgramGroupSection({
           onClick={onStartCreate}
           disabled={isCreating}
         >
-          + Новая
+          {t("programs.new_cta")}
         </Button>
       </header>
 
@@ -104,7 +113,7 @@ export function ProgramGroupSection({
 
           {programs.length === 0 && !isCreating ? (
             <div className="rounded-card border border-dashed border-border p-6 text-center">
-              <p className="text-sm text-muted">В этой группе нет программ.</p>
+              <p className="text-sm text-muted">{t("programs.group.empty")}</p>
             </div>
           ) : programs.length > 0 ? (
             view === "table" ? (
@@ -154,13 +163,4 @@ function Chevron({ expanded }: { expanded: boolean }) {
       <polyline points="9 6 15 12 9 18" />
     </svg>
   );
-}
-
-function pluralProgs(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "программ";
-  if (mod10 === 1) return "программа";
-  if (mod10 >= 2 && mod10 <= 4) return "программы";
-  return "программ";
 }

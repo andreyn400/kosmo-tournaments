@@ -8,6 +8,8 @@ import {
   deleteSlot,
   updateSlot,
 } from "@/lib/queries/rentals";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import {
   validateExceptionInput,
   validateSlotInput,
@@ -26,15 +28,16 @@ export async function createSlotAction(
   contractId: string,
   raw: RawSlotInput,
 ): Promise<{ id?: string; error?: string }> {
+  const dict = await getServerDict();
   const v = validateSlotInput(raw);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
   try {
     const slot = await createSlot({ ...v.value, contract_id: contractId });
     revalidate(contractId);
     return { id: slot.id };
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось создать слот.",
+      error: e instanceof Error ? e.message : dict["error.failed.create.slot"],
     };
   }
 }
@@ -44,15 +47,16 @@ export async function updateSlotAction(
   slotId: string,
   raw: RawSlotInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const v = validateSlotInput(raw);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
   try {
     await updateSlot(slotId, { ...v.value, contract_id: contractId });
     revalidate(contractId);
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось обновить слот.",
+      error: e instanceof Error ? e.message : dict["error.failed.update.slot"],
     };
   }
 }
@@ -61,13 +65,14 @@ export async function deleteSlotAction(
   contractId: string,
   slotId: string,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   try {
     await deleteSlot(slotId);
     revalidate(contractId);
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось удалить слот.",
+      error: e instanceof Error ? e.message : dict["error.failed.delete.slot"],
     };
   }
 }
@@ -77,15 +82,17 @@ export async function createExceptionAction(
   slotId: string,
   raw: RawExceptionInput,
 ): Promise<{ id?: string; error?: string }> {
+  const dict = await getServerDict();
   const v = validateExceptionInput(raw);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
   try {
     const ex = await createException({ ...v.value, slot_id: slotId });
     revalidate(contractId);
     return { id: ex.id };
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось добавить исключение.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.create.exception"],
     };
   }
 }
@@ -94,13 +101,15 @@ export async function deleteExceptionAction(
   contractId: string,
   exceptionId: string,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   try {
     await deleteException(exceptionId);
     revalidate(contractId);
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось удалить исключение.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.delete.exception"],
     };
   }
 }

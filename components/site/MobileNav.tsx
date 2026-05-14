@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { LanguageToggle } from "./LanguageToggle";
 import { Logo } from "./Logo";
 import { SidebarNav } from "./SidebarNav";
 
 export function MobileNav() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -24,7 +27,7 @@ export function MobileNav() {
     <>
       <button
         type="button"
-        aria-label="Открыть меню"
+        aria-label={t("nav.open_menu")}
         aria-expanded={open}
         onClick={() => setOpen(true)}
         className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border text-black hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
@@ -48,7 +51,7 @@ export function MobileNav() {
         <div className="fixed inset-0 z-50">
           <button
             type="button"
-            aria-label="Закрыть меню"
+            aria-label={t("nav.close_menu")}
             className="absolute inset-0 bg-black/30"
             onClick={() => setOpen(false)}
           />
@@ -57,7 +60,7 @@ export function MobileNav() {
               <Logo onNavigate={() => setOpen(false)} />
               <button
                 type="button"
-                aria-label="Закрыть меню"
+                aria-label={t("nav.close_menu")}
                 onClick={() => setOpen(false)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted hover:text-black hover:bg-subtle"
               >
@@ -75,6 +78,9 @@ export function MobileNav() {
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
+            </div>
+            <div className="px-3 pt-3 pb-1 flex-shrink-0">
+              <LanguageToggle />
             </div>
             <SidebarNav onNavigate={() => setOpen(false)} />
           </aside>

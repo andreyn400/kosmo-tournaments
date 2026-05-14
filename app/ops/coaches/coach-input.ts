@@ -1,4 +1,5 @@
 import type { CoachInput, CoachRateType } from "@/lib/types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 export interface RawCoachInput {
   name: string;
@@ -20,12 +21,12 @@ const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 export function validateCoachInput(
   raw: RawCoachInput,
-): { ok: true; value: CoachInput } | { ok: false; error: string } {
+): { ok: true; value: CoachInput } | { ok: false; error: FieldError } {
   const name = raw.name.trim();
-  if (!name) return { ok: false, error: "Введите имя тренера." };
+  if (!name) return { ok: false, error: fieldErr("error.required.coach_name") };
 
   if (raw.rate_type !== "flat" && raw.rate_type !== "percent") {
-    return { ok: false, error: "Тип ставки указан неверно." };
+    return { ok: false, error: fieldErr("error.invalid.rate_type") };
   }
   const rate_type = raw.rate_type as CoachRateType;
 
@@ -34,20 +35,25 @@ export function validateCoachInput(
     raw.flat_rate_rub < 0 ||
     raw.flat_rate_rub > 1_000_000
   ) {
-    return {
-      ok: false,
-      error: "Фиксированная ставка — целое число от 0 до 1 000 000 ₽.",
-    };
+    return { ok: false, error: fieldErr("error.invalid.flat_rate_range") };
   }
 
-  for (const [field, label] of [
-    ["rate_court_percent", "Процент с корта"],
-    ["rate_coaching_percent", "Процент с тренировки"],
-  ] as const) {
-    const v = raw[field];
-    if (!Number.isFinite(v) || v < 0 || v > 100) {
-      return { ok: false, error: `${label} — число от 0 до 100.` };
-    }
+  if (
+    !Number.isFinite(raw.rate_court_percent) ||
+    raw.rate_court_percent < 0 ||
+    raw.rate_court_percent > 100
+  ) {
+    return { ok: false, error: fieldErr("error.invalid.court_percent_range") };
+  }
+  if (
+    !Number.isFinite(raw.rate_coaching_percent) ||
+    raw.rate_coaching_percent < 0 ||
+    raw.rate_coaching_percent > 100
+  ) {
+    return {
+      ok: false,
+      error: fieldErr("error.invalid.coaching_percent_range"),
+    };
   }
 
   const color = COLOR_RE.test(raw.color) ? raw.color : "#4fc3f7";

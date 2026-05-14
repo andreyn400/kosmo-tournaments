@@ -1,13 +1,17 @@
+"use client";
+
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { formatDateTimeRu } from "@/lib/format-date";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDateTime } from "@/lib/i18n/format";
+import type { TranslationKey } from "@/lib/i18n";
 import type { SessionStatus, TournamentSession } from "@/lib/types";
 
-const SESSION_STATUS_LABEL: Record<SessionStatus, string> = {
-  scheduled: "Запланирована",
-  in_progress: "Идёт",
-  completed: "Завершена",
+const SESSION_STATUS_KEY: Record<SessionStatus, TranslationKey> = {
+  scheduled: "session.status.scheduled",
+  in_progress: "session.status.in_progress",
+  completed: "session.status.completed",
 };
 
 const SESSION_STATUS_TONE: Record<
@@ -26,8 +30,10 @@ export function SessionsList({
   tournamentId: string;
   sessions: TournamentSession[];
 }) {
+  const { t, lang } = useTranslation();
+
   if (sessions.length === 0) {
-    return <p className="text-sm text-muted">Сессии не созданы.</p>;
+    return <p className="text-sm text-muted">{t("session.no_sessions")}</p>;
   }
 
   return (
@@ -40,14 +46,14 @@ export function SessionsList({
           <div className="flex flex-col gap-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-black font-medium">
-                Сессия {s.session_number}
+                {t("session.label_n", { n: s.session_number })}
               </span>
               <Badge tone={SESSION_STATUS_TONE[s.status]}>
-                {SESSION_STATUS_LABEL[s.status]}
+                {t(SESSION_STATUS_KEY[s.status])}
               </Badge>
             </div>
             <span className="text-xs text-muted tabular-nums">
-              {formatDateTimeRu(s.session_date, s.start_time)}
+              {formatDateTime(s.session_date, s.start_time, lang)}
             </span>
           </div>
           <SessionActionButton tournamentId={tournamentId} session={s} />
@@ -64,25 +70,24 @@ function SessionActionButton({
   tournamentId: string;
   session: TournamentSession;
 }) {
+  const { t } = useTranslation();
   if (session.status === "scheduled") {
     return (
-      <Link
-        href={`/tournament/${tournamentId}/session/${session.id}/select`}
-      >
-        <Button size="sm">Запустить</Button>
+      <Link href={`/tournament/${tournamentId}/session/${session.id}/select`}>
+        <Button size="sm">{t("session.action.start")}</Button>
       </Link>
     );
   }
   if (session.status === "in_progress") {
     return (
       <Link href={`/tournament/${tournamentId}/play`}>
-        <Button size="sm">Играть</Button>
+        <Button size="sm">{t("session.action.play")}</Button>
       </Link>
     );
   }
   return (
     <span className="text-xs text-muted uppercase tracking-wider">
-      Завершена
+      {t("session.action.completed")}
     </span>
   );
 }

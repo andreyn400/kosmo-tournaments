@@ -17,11 +17,13 @@ import {
   sortStrategyForFormat,
 } from "@/lib/leaderboard";
 import { aggregateEloChanges } from "@/lib/aggregate-elo-changes";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
 import {
-  DIVISION_CATEGORY_LABEL_RU,
-  FORMAT_LABEL_RU,
-  STATUS_LABEL_RU,
-} from "@/lib/constants";
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
+import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
 import { statusTone } from "@/lib/status-tone";
 import { ShareButton } from "../../../results/ShareButton";
 
@@ -72,6 +74,28 @@ export default async function DivisionResultsPage({
   const backHref = `/tournament/${id}/division/${divisionId}`;
   const title = `${tournament.name} · ${division.name}`;
 
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
+
+  const rowMeta = (
+    wins: number,
+    matches: number,
+    plusMinus: number,
+  ): string =>
+    strategy === "wins"
+      ? tr("results.row_meta_wins", {
+          wins,
+          matches,
+          pm: formatSigned(plusMinus),
+        })
+      : tr("results.row_meta_matches", {
+          matches,
+          pm: formatSigned(plusMinus),
+        });
+
   return (
     <PageShell
       title={title}
@@ -80,7 +104,7 @@ export default async function DivisionResultsPage({
           <ShareButton />
           <Link href={backHref}>
             <Button variant="secondary" size="md">
-              К дивизиону
+              {tr("results.back_to_division")}
             </Button>
           </Link>
         </div>
@@ -90,24 +114,31 @@ export default async function DivisionResultsPage({
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="neutral">
-              {DIVISION_CATEGORY_LABEL_RU[division.category]}
+              {tr(DIVISION_CATEGORY_KEY[division.category])}
             </Badge>
-            <Badge tone="format">{FORMAT_LABEL_RU[division.format]}</Badge>
+            <Badge tone="format">
+              {tr(TOURNAMENT_FORMAT_KEY[division.format])}
+            </Badge>
             <Badge tone={statusTone(division.status)}>
-              {STATUS_LABEL_RU[division.status]}
+              {tr(TOURNAMENT_STATUS_KEY[division.status])}
             </Badge>
           </div>
           <p className="text-sm text-muted">
-            {playerCount} игроков · {completedMatches.length} матчей
+            {tr("results.summary", {
+              players: playerCount,
+              matches: completedMatches.length,
+            })}
           </p>
         </Card>
 
         <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-black">Итоговая таблица</h2>
+          <h2 className="font-semibold text-black">
+            {tr("results.leaderboard_title")}
+          </h2>
 
           {isTeamFormat ? (
             pairLeaderboard.length === 0 ? (
-              <p className="text-sm text-muted">Нет завершённых матчей.</p>
+              <p className="text-sm text-muted">{tr("results.no_matches")}</p>
             ) : (
               <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
                 {pairLeaderboard.map((row, idx) => {
@@ -139,9 +170,7 @@ export default async function DivisionResultsPage({
                           {row.playerNames[0]} / {row.playerNames[1]}
                         </span>
                         <span className="text-xs text-muted">
-                          {strategy === "wins"
-                            ? `${row.wins} побед · ${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`
-                            : `${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`}
+                          {rowMeta(row.wins, row.matchesPlayed, row.plusMinus)}
                         </span>
                         {elo1 || elo2 ? (
                           <span className="text-xs text-muted hidden sm:block">
@@ -164,7 +193,7 @@ export default async function DivisionResultsPage({
               </ul>
             )
           ) : leaderboard.length === 0 ? (
-            <p className="text-sm text-muted">Нет завершённых матчей.</p>
+            <p className="text-sm text-muted">{tr("results.no_matches")}</p>
           ) : (
             <ul className="flex flex-col divide-y divide-border border border-border rounded-[var(--radius-button)] overflow-hidden">
               {leaderboard.map((row, idx) => {
@@ -190,9 +219,7 @@ export default async function DivisionResultsPage({
                         {player?.name ?? row.playerName}
                       </span>
                       <span className="text-xs text-muted">
-                        {strategy === "wins"
-                          ? `${row.wins} побед · ${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`
-                          : `${row.matchesPlayed} матч · +/− ${formatSigned(row.plusMinus)}`}
+                        {rowMeta(row.wins, row.matchesPlayed, row.plusMinus)}
                       </span>
                     </div>
                     {elo ? (

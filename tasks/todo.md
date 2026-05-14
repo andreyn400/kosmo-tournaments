@@ -2066,3 +2066,321 @@ Workflow: write plan → confirm with user → SQL handoff → wait for "ran cle
 - `app/ops/report/update-target-action.ts` — **new**
 
 Total surface: ~12 files (10 new + 1 rewrite + 3 small edits), 0 deletions, expected ~1100 lines net change.
+
+---
+
+# Phase 13 — English language support (RU/EN)
+
+Goal: every piece of UI chrome — labels, buttons, headings, status badges, empty states, validation messages, public TV display — can render in English. Operators flip a toggle in the sidebar; the choice persists across sessions and across server/client renders. URLs do not change. Database content (player names, program names, tournament names, notes, etc.) is never translated.
+
+Workflow: write plan (this section) → confirm with user → build section-by-section (each section runs `npm run build` + `npm run lint` clean before the next) → final browser sweep across RU and EN → single commit.
+
+## 13.0 Open decisions (resolve with user before code)
+
+- [ ] 13.0.1 **Toggle placement.** Sidebar, between Logo and the first nav section. Two equal-width pills (40 px wide each) joined as a segmented control: `RU` on the left, `EN` on the right. Active pill = `bg-subtle text-black font-semibold` + 3 px left bar in accent; inactive = `text-muted hover:text-black`. Same control appears in `MobileNav` header.
+- [ ] 13.0.2 **Two locales only, no regional variants.** `lang = 'ru' | 'en'`. No `en-US`/`en-GB` split; no `ru-RU` namespacing. Default = `'ru'`.
+- [ ] 13.0.3 **Cookie name + lifetime.** `kosmo_lang`, `maxAge = 60 * 60 * 24 * 365` (1 year), `path = "/"`, `sameSite = "lax"`, not `httpOnly` (client must read it for hydration parity), not `secure` (dev runs over http).
+- [ ] 13.0.4 **No URL prefix.** App router stays flat — no `app/[lang]/…` restructure. The language is read from the cookie on every request. (User explicitly stated URLs stay the same.)
+- [ ] 13.0.5 **Display page (`/display`) follows the cookie**, same as every other page. (Stadium TVs will set the cookie once via a one-off visit; no separate switch on the display itself.)
+- [ ] 13.0.6 **`<html lang>` follows the active language** — set in the root layout from the cookie.
+- [ ] 13.0.7 **Server actions still return Russian error strings for now** — server actions don't run inside the React tree, so they can't read the context. They CAN read the cookie. Sub-phase 13.18 covers wiring `getServerLang()` into every action that throws/returns user-facing copy; until then translated chrome co-exists with RU-only validation errors. Acceptable for the section-by-section rollout; the final sweep closes this gap.
+- [ ] 13.0.8 **No machine translation in source** — every EN string is hand-written. Quality bar: short, idiomatic, padel/tennis-club-appropriate (e.g. «АМЕРИКАНО» → `AMERICANO`, «АРЕНДА» → `RENTAL`, «Сессии» → `Sessions`, «Игроки» → `Players`).
+
+## 13.1 Sub-phase: i18n foundation
+
+Pure infrastructure — no UI calls yet. After this section, `t('btn.save')` returns the right string in both locales but no component uses it.
+
+- [ ] 13.1.1 Create `lib/i18n/types.ts`:
+  ```ts
+  export type Lang = 'ru' | 'en';
+  export const LANGS: readonly Lang[] = ['ru', 'en'] as const;
+  export const DEFAULT_LANG: Lang = 'ru';
+  export const LANG_COOKIE = 'kosmo_lang';
+  export function isLang(v: string | undefined | null): v is Lang {
+    return v === 'ru' || v === 'en';
+  }
+  ```
+- [ ] 13.1.2 Create `lib/i18n/ru.ts` — empty object skeleton `export const ru = { } as const;`. We populate it section by section in 13.3–13.17.
+- [ ] 13.1.3 Create `lib/i18n/en.ts` — `import type { Dictionary } from './ru'; export const en: Dictionary = { } as const;`. Empty for now.
+- [ ] 13.1.4 Create `lib/i18n/index.ts`:
+  - `export type TranslationKey = keyof typeof ru;`
+  - `export type Dictionary = Record<TranslationKey, string>;`
+  - `export const DICTS: Record<Lang, Dictionary> = { ru, en };`
+  - `export function translate(lang: Lang, key: TranslationKey, vars?: Record<string, string | number>): string` — looks up the dict, falls back to `ru[key]` if missing in `en`, then to the literal key if both miss. Substitutes `{name}`-style placeholders from `vars`.
+  - `export function tPlural(lang: Lang, count: number, keys: { one: TranslationKey; few?: TranslationKey; many: TranslationKey }): string` — RU rule (mod-10/mod-100) for `lang === 'ru'`; English `count === 1 ? one : many` for `lang === 'en'`.
+- [ ] 13.1.5 Create `lib/i18n/server.ts`:
+  - `import 'server-only';`
+  - `export async function getServerLang(): Promise<Lang>` — reads `kosmo_lang` cookie via `cookies()` from `next/headers`, returns the parsed value or `DEFAULT_LANG`.
+  - `export async function getServerDict(): Promise<Dictionary>` — `DICTS[await getServerLang()]`.
+  - `export async function st(key: TranslationKey, vars?: …): Promise<string>` — convenience for one-off server lookups.
+- [ ] 13.1.6 Create `lib/i18n/format.ts` — pure functions, no React. All RU output preserves current behavior (matches `lib/format-date.ts` + thin-space ₽). EN output uses comma grouping and `MMM D, YYYY` style.
+  - `formatDate(iso: string, lang: Lang): string` — `'12 мая 2026'` vs `'May 12, 2026'`.
+  - `formatDateShort(iso: string, lang: Lang): string` — `'12.05'` vs `'May 12'`.
+  - `formatTime(hhmm: string, lang: Lang): string` — both `'14:30'`; reserved for future am/pm if requested.
+  - `formatWeekday(iso: string, lang: Lang, opts?: { short?: boolean }): string` — Понедельник / Monday; Пн / Mon.
+  - `formatMonth(year: number, monthIdx: number, lang: Lang): string` — «Май 2026» / «May 2026».
+  - `formatRub(rub: number, lang: Lang, opts?: { signed?: boolean }): string` — `'₽1 200 000'` (RU, U+202F narrow no-break space) vs `'₽1,200,000'` (EN). Sign rules preserved.
+  - `formatNumber(n: number, lang: Lang): string` — thin-space vs comma grouping.
+  - Each function accepts `Lang` explicitly; no global state.
+- [ ] 13.1.7 Create `components/i18n/LanguageProvider.tsx` (client):
+  - Context value `{ lang: Lang; setLang: (l: Lang) => void; t: (k: TranslationKey, vars?) => string; tPlural: (count, keys) => string; }`.
+  - Props: `initialLang: Lang` (provided by root layout from the cookie).
+  - On `setLang(l)`: optimistically update state, write cookie via `document.cookie = …` (1-year expiry, path=/, samesite=lax), call the `setLangAction(l)` server action to keep the cookie source-of-truth aligned for the next server render, then `router.refresh()` to re-render server components in the new language without a full reload.
+- [ ] 13.1.8 Create `components/i18n/useTranslation.ts` (client) — thin hook re-exporting context fields: `const { t, tPlural, lang, setLang } = useContext(LanguageContext)`.
+- [ ] 13.1.9 Create `app/(actions)/set-lang-action.ts` (or `lib/actions/set-lang.ts` — match existing convention): `'use server'`, accepts `lang: Lang`, validates with `isLang`, writes the cookie with the options from 13.0.3, calls `revalidatePath('/', 'layout')` to refresh every server-rendered tree.
+- [ ] 13.1.10 Wire `app/layout.tsx`: read `lang` server-side, set `<html lang={lang}>`, wrap children in `<LanguageProvider initialLang={lang}>`. This is the only place the provider is mounted.
+- [ ] 13.1.11 Section gate: `npm run build` + `npm run lint` clean. No visible UI change yet.
+
+## 13.2 Sub-phase: language toggle in sidebar and mobile nav
+
+After this section, the user can flip RU↔EN. Nothing else changes — the entire UI is still hardcoded Russian — but the toggle is reachable and persists.
+
+- [ ] 13.2.1 Create `components/site/LanguageToggle.tsx` (client): segmented pill control. Uses `useTranslation()` for `lang` + `setLang`. Renders `RU` / `EN` as two buttons; active = `bg-subtle text-black font-semibold` with a 2 px accent left bar (visible only on the active pill). `aria-pressed` on each button.
+- [ ] 13.2.2 Insert `<LanguageToggle />` in `components/site/PageShell.tsx` between `<Logo />` and `<SidebarNav />` with `px-3 pt-1 pb-2` so it sits under the logo with comfortable air.
+- [ ] 13.2.3 Insert `<LanguageToggle />` in `components/site/MobileNav.tsx` inside the drawer header, right after the logo.
+- [ ] 13.2.4 Manual verification: open `/`, click `EN`, page refreshes — `<html lang>` is now `en`, cookie is set, navigation labels still read in Russian (expected — translations land in 13.3+). Click `RU` again, returns to `ru`. Hard reload preserves selection.
+- [ ] 13.2.5 Section gate: `npm run build` + `npm run lint` clean.
+
+## 13.3 Sub-phase: navigation and shell
+
+The first user-visible translation: sidebar section headers + nav link labels + mobile menu chrome + page-shell-level strings (e.g. «Меню», «Закрыть»). Locale files start filling up here.
+
+- [ ] 13.3.1 Add keys to `lib/i18n/ru.ts` (and matching English to `lib/i18n/en.ts`). All keys are flat, dot-namespaced strings; pluralize via `tPlural`:
+  - `nav.section.courts` КОРТЫ / COURTS
+  - `nav.section.tournaments` ТУРНИРЫ / TOURNAMENTS
+  - `nav.section.staff` ПЕРСОНАЛ / STAFF
+  - `nav.section.programs` ПРОГРАММЫ / PROGRAMS
+  - `nav.section.system` СИСТЕМА / SYSTEM
+  - `nav.schedule` Расписание / Schedule
+  - `nav.rentals` Аренда / Rental
+  - `nav.calendar` Календарь / Calendar
+  - `nav.courts` Корты / Courts
+  - `nav.report` Отчёт / Report
+  - `nav.tournaments_and_leagues` Турниры и лиги / Tournaments & leagues
+  - `nav.players` Игроки / Players
+  - `nav.analytics` Аналитика / Analytics
+  - `nav.coaches` Тренеры / Coaches
+  - `nav.organizers` Организаторы / Organizers
+  - `nav.programs` Программы / Programs
+  - `nav.display` Дисплей / Display
+  - `nav.open_menu` Меню / Menu
+  - `nav.close_menu` Закрыть / Close
+- [ ] 13.3.2 Refactor `components/site/navLinks.ts`: change `label: string` to `labelKey: TranslationKey`. Update `NAV_SECTIONS` to use the keys above.
+- [ ] 13.3.3 Refactor `components/site/SidebarNav.tsx`: read translations via `useTranslation()`, render `t(section.titleKey)` and `t(link.labelKey)`.
+- [ ] 13.3.4 Refactor `components/site/MobileNav.tsx`: same — section headers, link labels, drawer chrome.
+- [ ] 13.3.5 `components/site/Logo.tsx` — if it carries any Cyrillic text, route through `t()`. (Likely just the brand mark; brand names stay as-is per 13.0.8.)
+- [ ] 13.3.6 Verify in browser: switch to EN, every nav label updates without a hard reload (server components re-render after `router.refresh()`).
+- [ ] 13.3.7 Section gate: build + lint clean.
+
+## 13.4 Sub-phase: home + tournament browse
+
+Covers `/` and the tournament list/card chrome.
+
+- [ ] 13.4.1 Inventory Russian text in `app/page.tsx`, `components/tournament/TournamentCard.tsx`, `app/delete-tournament-list-action.ts`. Expected keys (~25):
+  - `home.title`, `home.empty`, `home.new_tournament_cta`
+  - `tournament.status.draft` / `.registration_open` / `.in_progress` / `.completed` / `.cancelled`
+  - `tournament.format.americano` / `.team_americano` / `.mexicano` / `.team_mexicano` / `.round_robin` / `.escalera` / `.king_of_court`
+  - `tournament.format.soon_suffix` (the «скоро» annotation)
+  - `tournament.type.one_day`, `tournament.type.league`
+  - `tournament.players_count` with vars `{count}/{max}`
+  - `tournament.fee` («Взнос» label) — used in card
+  - `tournament.date_short` (used in card; routed through `formatDateShort`)
+  - `tournament.no_date` («Без даты»)
+- [ ] 13.4.2 Replace all hardcoded RU strings in these files with `t(…)` calls. For status/format badges, look up the key via a deterministic helper (`statusLabelKey(s)`, `formatLabelKey(f)`).
+- [ ] 13.4.3 Browser sweep: `/` in RU, then EN — every card chip, header, button, empty state translates.
+- [ ] 13.4.4 Section gate: build + lint clean.
+
+## 13.5 Sub-phase: players page
+
+`/players` + supporting forms / actions surface.
+
+- [ ] 13.5.1 Inventory `app/players/page.tsx`, `app/players/PlayersPanel.tsx`, `app/players/PlayerFields.tsx`, `app/players/parse-player-form.ts`, `app/players/create-player-action.ts`. Plus level-display helpers if they live under `lib/`. Expected keys (~40):
+  - `players.title`, `players.empty`, `players.search_placeholder`, `players.add_cta`, `players.count` (plural)
+  - `players.field.name`, `.phone`, `.level`, `.elo`, `.notes`
+  - `players.validation.name_required`, `.phone_invalid`, `.duplicate`
+  - `level.label.<code>` for every padel level (extract from `lib/constants.ts`)
+  - column headers for the players table
+- [ ] 13.5.2 Replace hardcoded strings. Server actions: temporarily still return RU error strings (see 13.0.7) — track for 13.18.
+- [ ] 13.5.3 Browser: switch languages on `/players`; add a player; verify level select / table / form all translate.
+- [ ] 13.5.4 Section gate: build + lint clean.
+
+## 13.6 Sub-phase: calendar
+
+`/calendar` views + popovers + mini calendar.
+
+- [ ] 13.6.1 Inventory `app/calendar/page.tsx`, `CalendarHeader.tsx`, `DayView.tsx`, `WeekView.tsx`, `MonthView.tsx`, `EventBlock.tsx`, `EventPopover.tsx`, `view.ts`, `lib/calendar-events.ts`, `components/site/MiniCalendar.tsx`, `components/site/SidebarMiniCalendar.tsx`. Expected keys (~30):
+  - `calendar.title`, `calendar.view.day`, `.week`, `.month`, `.today_cta`, `.empty_week`
+  - `event.kind.tournament`, `.league_session`, `.rental`, `.schedule_session`
+  - `event.action.open_contract`, `.open_in_schedule`, `.open_tournament`, `.open_session`
+  - `event.no_court`, `.no_program`, `.no_time`, `.no_coach`
+  - Weekday short labels (Пн/Mon …) — routed through `formatWeekday(date, lang, { short: true })`.
+- [ ] 13.6.2 Replace strings. Use `formatDate`, `formatWeekday`, `formatMonth` from `lib/i18n/format.ts` everywhere a date is rendered.
+- [ ] 13.6.3 Browser: switch languages on `/calendar` (day/week/month). Popovers, KIND_LABEL chips, the «Сегодня» button, weekday headers all translate.
+- [ ] 13.6.4 Section gate: build + lint clean.
+
+## 13.7 Sub-phase: ops/coaches
+
+- [ ] 13.7.1 Inventory `app/ops/coaches/page.tsx`, `CoachesPanel.tsx`, `CoachesSummary.tsx`, `CoachCard.tsx`, `CoachForm.tsx`, `coach-input.ts`, all action files, `app/ops/coaches/[id]/*`. Expected keys (~35):
+  - `coaches.title`, `coaches.empty`, `coaches.add_cta`, `coaches.summary.total`, `.active`
+  - `coaches.field.name`, `.color`, `.commission`, `.notes`, `.active`
+  - `coaches.validation.name_required`, `.commission_invalid`
+  - `coaches.stats.sessions`, `.revenue`, `.payout`, `.last_session`
+- [ ] 13.7.2 Replace strings. Browser-verify list, detail page, create + edit forms.
+- [ ] 13.7.3 Section gate: build + lint clean.
+
+## 13.8 Sub-phase: ops/programs
+
+- [ ] 13.8.1 Inventory `app/ops/programs/page.tsx`, all program*.tsx files, `seed-programs-action.ts`. Expected keys (~50):
+  - `programs.title`, `programs.toolbar.search_placeholder`, `programs.group.<type>`
+  - `programs.field.name`, `.price`, `.duration`, `.capacity`, `.coach_count`, `.type`
+  - `programs.type.<value>` for every program type
+  - `programs.seed.title`, `programs.seed.cta`, `programs.seed.success_count` (plural), `programs.seed.skipped` (plural)
+  - `programs.empty.library`, `programs.empty.group`
+- [ ] 13.8.2 Replace strings; route the table's program-type chip through the type key map.
+- [ ] 13.8.3 Section gate: build + lint clean.
+
+## 13.9 Sub-phase: ops/schedule
+
+The largest single surface. Plan for ~80 keys.
+
+- [ ] 13.9.1 Inventory every file under `app/ops/schedule/`. Common patterns:
+  - Day/week toggles, view switchers, date nav
+  - Session block content (program name + coach + time + court)
+  - Session popover (everything: edit, attendees, coach assignment, payment status)
+  - Program picker inline panel
+  - Rental block + rental info popover
+  - Validation strings in `schedule-input.ts`
+- [ ] 13.9.2 Add keys + replace strings.
+- [ ] 13.9.3 Section gate: build + lint clean.
+
+## 13.10 Sub-phase: ops/rentals
+
+- [ ] 13.10.1 Inventory `app/ops/rentals/page.tsx`, `RentalsPanel.tsx`, `RentalsSummary.tsx`, `app/ops/rentals/new/*`, `app/ops/rentals/[id]/*`. Expected keys (~50):
+  - Contract list/empty/filter chrome
+  - Status badges (active, draft, ended, cancelled)
+  - New-contract wizard (client/court/dates/recurrence/price)
+  - Validation strings from inputs
+  - Payment history, refunds, instance overrides
+- [ ] 13.10.2 Replace strings.
+- [ ] 13.10.3 Section gate: build + lint clean.
+
+## 13.11 Sub-phase: ops/organizers
+
+- [ ] 13.11.1 Inventory `app/ops/organizers/*`. Smaller surface (~20 keys).
+- [ ] 13.11.2 Replace strings.
+- [ ] 13.11.3 Section gate: build + lint clean.
+
+## 13.12 Sub-phase: ops/report
+
+Already-rich Phase 12B page. Expected keys (~40).
+
+- [ ] 13.12.1 Inventory `app/ops/report/page.tsx`, `ReportWeekHeader.tsx`, `RevenueSummaryCard.tsx`, `CourtUtilizationCard.tsx`, `CoachPayoutsTable.tsx`, `TopProgramsCard.tsx`, `SessionsBreakdownByDay.tsx`, `format.ts`.
+- [ ] 13.12.2 Keys:
+  - `report.this_week_cta`
+  - `report.revenue.title`, `.rentals`, `.sessions`, `.tournaments_estimated`, `.tournaments_estimated_tooltip`
+  - `report.utilization.title`, `.unit_hours`
+  - `report.payouts.title`, `.empty`, columns
+  - `report.top_programs.title`, `.empty`
+  - `report.sessions.title`, `.empty`
+  - `report.sessions.col.time`, `.program`, `.coaches`, `.courts`, `.attendees`, `.revenue`
+  - Plural «N сессий / N sessions» via `tPlural`.
+- [ ] 13.12.3 Replace `formatDateRu` calls with `formatDate(iso, lang)`; the existing `formatRub` helper in `app/ops/report/format.ts` gains a `lang` parameter and forwards to `lib/i18n/format.ts`.
+- [ ] 13.12.4 Weekday labels in `SessionsBreakdownByDay` use `formatWeekday(iso, lang)`.
+- [ ] 13.12.5 Section gate: build + lint clean.
+
+## 13.13 Sub-phase: courts and analytics
+
+- [ ] 13.13.1 Inventory `app/courts/*` and `app/analytics/*`. Translate chrome, headings, axis labels, empty states.
+- [ ] 13.13.2 Replace strings.
+- [ ] 13.13.3 Section gate: build + lint clean.
+
+## 13.14 Sub-phase: tournament detail and sub-routes
+
+`app/tournament/[id]/*` — the heaviest user-facing surface aside from schedule. Plan for ~120 keys.
+
+- [ ] 13.14.1 Inventory tournament detail (`page.tsx`, `AddPlayerPanel`, `AddPairPanel`, `DivisionsPanel`, `EditTournamentPanel`, `LeagueSettingsPanel`, `RegistrationRow`, `SessionsList`, `OpenRegistrationButton`, `StartTournamentButton`, `DangerZone`, `DivisionForm`) + sub-routes (`play`, `finals`, `division`, `results`, `season`, `session`).
+- [ ] 13.14.2 Keys cover: action button labels, state-machine transitions, validation messages, scoring chrome («В сетке не может быть ничьей», «Введите счёт», bye/forfeit labels), leaderboard headers, finals bracket labels («В финал», «Полуфинал», «Финал»), division/court conflict warnings.
+- [ ] 13.14.3 Replace strings.
+- [ ] 13.14.4 Section gate: build + lint clean.
+
+## 13.15 Sub-phase: league pages
+
+- [ ] 13.15.1 Inventory `app/league/*`. Smaller surface (~25 keys).
+- [ ] 13.15.2 Replace strings.
+- [ ] 13.15.3 Section gate: build + lint clean.
+
+## 13.16 Sub-phase: display (`/display`)
+
+Public TV view. Expected keys (~25).
+
+- [ ] 13.16.1 Inventory `app/display/*`. Headlines, status chips, rotation hints, fallback / empty states.
+- [ ] 13.16.2 Replace strings.
+- [ ] 13.16.3 Verify in a browser on a wide viewport, switch languages via the sidebar, return to `/display` — the display reads the cookie and renders accordingly.
+- [ ] 13.16.4 Section gate: build + lint clean.
+
+## 13.17 Sub-phase: shared UI primitives + leftover edge cases
+
+Anything not yet swept: ui components in `components/ui/*`, modal-free inline forms, breadcrumb chips, last-edit timestamps, etc.
+
+- [ ] 13.17.1 Grep the repo for unswept Cyrillic: `find app components -name "*.tsx" -o -name "*.ts" | xargs grep -l -E '[А-ЯЁа-яё]'`. Expected: only `lib/i18n/ru.ts` and `lib/constants.ts` (level codes — those are stored as data; the labels go through `level.label.*` keys).
+- [ ] 13.17.2 Address each surviving file.
+- [ ] 13.17.3 Section gate: build + lint clean.
+
+## 13.18 Sub-phase: server-action error messages
+
+Closes the gap from 13.0.7. Server actions can read the cookie via `getServerLang()`.
+
+- [ ] 13.18.1 Audit every `*-action.ts` file that returns or throws a user-visible string. Common error keys to add: `error.validation.required`, `.too_long`, `.invalid_format`, `.duplicate`, `.not_found`, `.conflict`, `.internal`, `error.generic`.
+- [ ] 13.18.2 In each action, replace literal `"…"` strings with `(await getServerDict())['error.…']`. Keep technical/internal log strings as-is (English console.error messages don't need to change).
+- [ ] 13.18.3 Validation libraries (e.g. zod refinements in `*-input.ts`): if a refinement returns a message string, change it to a key + resolve at call site. Alternative: refinements return a key and the calling action translates — pick whichever is cleaner per file.
+- [ ] 13.18.4 Browser-verify by triggering at least 3 representative validation errors in EN.
+- [ ] 13.18.5 Section gate: build + lint clean.
+
+## 13.19 Sub-phase: final sweep, polish, commit
+
+- [ ] 13.19.1 `npm run build` clean (Turbopack), no missing-key console warnings.
+- [ ] 13.19.2 `npm run lint` exits 0.
+- [ ] 13.19.3 Final grep: zero Cyrillic in any file under `app/` or `components/` except `lib/i18n/ru.ts` (the canonical RU dict). One residual `lib/format-date.ts` is acceptable only if it has been fully deprecated and re-exported from `lib/i18n/format.ts` — otherwise delete it.
+- [ ] 13.19.4 Verify locale parity: a small script (one-liner in `package.json` or inline in CI later, not committed) — `node -e "const ru=require('./lib/i18n/ru');const en=require('./lib/i18n/en');const m=Object.keys(ru).filter(k=>!(k in en));if(m.length){console.error('MISSING EN:',m);process.exit(1)}"` — must exit 0. Run manually before committing.
+- [ ] 13.19.5 Browser sweep — RU first, then EN — across every route from Phase 11.5.3 plus `/display`. For each: confirm zero Cyrillic remains visible in EN; numbers, dates, weekdays match locale; status badges and validation errors translate.
+- [ ] 13.19.6 No file exceeds 600 lines. `lib/i18n/ru.ts` and `lib/i18n/en.ts` are checked specifically — if either approaches 600 lines, split by namespace (`lib/i18n/ru/nav.ts`, `lib/i18n/ru/tournament.ts`, etc.) and re-export from a barrel.
+- [ ] 13.19.7 Single commit: `Phase 13: English language support (RU/EN)` with HEREDOC body listing the toggle, the i18n infra, the section-by-section migration, server-action error coverage. Push to `origin/main`.
+
+---
+
+## Out of scope for Phase 13
+
+- No URL prefixes (`/en/...`) — language is cookie-only.
+- No new languages beyond RU/EN; no infrastructure for adding a third locale (e.g. JSON-based dicts, ICU MessageFormat, plural-category tables for other languages). The current `tPlural` understands RU and EN rules only — that's acceptable for v1.
+- No translation of user-entered content (player/program/tournament names, notes, free-text fields). These are always rendered as stored.
+- No `Accept-Language` sniffing — the user must explicitly choose. (Default = `'ru'` matches the operator-language assumption.)
+- No editor/CMS UI for the dictionaries; they are checked-in TypeScript constants.
+- No analytics, no telemetry, no rollout flag — Phase 13 ships in one piece.
+- No DB column for per-user language preference. (User mentioned «future»; deferred.)
+- No translation of toast/snackbar libraries' fallback strings; we don't use a toast library that ships English-only chrome (verify during 13.19.3).
+
+## Files touched (expected)
+
+New:
+- `lib/i18n/types.ts`
+- `lib/i18n/ru.ts`
+- `lib/i18n/en.ts`
+- `lib/i18n/index.ts`
+- `lib/i18n/server.ts`
+- `lib/i18n/format.ts`
+- `components/i18n/LanguageProvider.tsx`
+- `components/i18n/useTranslation.ts`
+- `components/site/LanguageToggle.tsx`
+- `app/(actions)/set-lang-action.ts` (or `lib/actions/set-lang.ts`)
+
+Modified (every file with chrome text — ~200 files across `app/**` and `components/**`):
+- Root: `app/layout.tsx`
+- Site shell: `components/site/PageShell.tsx`, `MobileNav.tsx`, `SidebarNav.tsx`, `navLinks.ts`, `Logo.tsx`, `MiniCalendar.tsx`, `SidebarMiniCalendar.tsx`
+- Routes: every `app/**/*.tsx` and `app/**/*-action.ts` containing Cyrillic
+- Library helpers: `lib/format-date.ts` (deprecate → re-export from `lib/i18n/format.ts`), validation modules
+
+Deletions: ideally `lib/format-date.ts` (folded into `lib/i18n/format.ts`); confirm during 13.19.3.
+
+Total surface: ~210 files modified + 10 new, ~600–800 translation keys, expected ~2000–3000 lines net change. Largest single phase to date; the section-by-section gate is the safety mechanism.
+
+---

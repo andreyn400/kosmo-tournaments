@@ -9,15 +9,18 @@ import {
   detectCollision,
   type CollisionExisting,
 } from "@/lib/schedule-collisions";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import { validateScheduleInput, type RawScheduleInput } from "./schedule-input";
 
 export async function createScheduleAction(
   raw: RawScheduleInput,
 ): Promise<{ id?: string; error?: string }> {
+  const dict = await getServerDict();
   const program = raw.program_id ? await getProgram(raw.program_id) : null;
 
   const v = validateScheduleInput(raw, program);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
 
   // Server-side collision re-check against BOTH sessions and rental blocks.
   // Rentals are read-only from the scheduler but they still block placement
@@ -26,6 +29,8 @@ export async function createScheduleAction(
     listSessionsForRange(v.value.date, v.value.date),
     listRentalBlocksForRange(v.value.date, v.value.date),
   ]);
+  const rentalLabel = (client: string) =>
+    dict["error.schedule.rental_label"].replace("{client}", client);
   const existing: CollisionExisting[] = [
     ...existingSessions.map((s) => ({
       id: s.id,
@@ -43,7 +48,7 @@ export async function createScheduleAction(
       end_time: b.end_time,
       court_ids: b.court_ids,
       status: "scheduled" as const,
-      program_name: `Аренда: ${b.client_name}`,
+      program_name: rentalLabel(b.client_name),
     })),
   ];
   const conflict = detectCollision(existing, {
@@ -52,7 +57,7 @@ export async function createScheduleAction(
     end_time: v.value.end_time,
     court_ids: v.value.court_ids,
   });
-  if (conflict) return { error: conflict };
+  if (conflict) return { error: resolveErrorWithDict(conflict, dict) };
 
   try {
     const id = await createScheduleSession(v.value, v.coachIds);
@@ -61,7 +66,8 @@ export async function createScheduleAction(
     return { id };
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось создать сессию.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.create.session"],
     };
   }
 }

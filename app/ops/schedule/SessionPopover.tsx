@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type {
   Coach,
   Court,
@@ -25,7 +27,6 @@ import {
   minutesFromTime,
   timeFromMinutes,
 } from "@/lib/ops-constants";
-import { formatRub } from "../coaches/format";
 import { ProgramPicker } from "./ProgramPicker";
 import { ChipRow, PreviewCell, Section, ToggleChip } from "./PopoverAtoms";
 import type { RawScheduleInput } from "./schedule-input";
@@ -37,11 +38,9 @@ const VIEWPORT_MARGIN = 12;
 interface SessionPopoverProps {
   mode: "create" | "edit";
   anchor: DOMRect;
-  /** create-mode prefill */
   prefillDate?: string;
   prefillTime?: string;
   prefillCourtId?: string;
-  /** edit-mode source */
   session?: ScheduleSessionForGrid;
   programs: Program[];
   courts: Court[];
@@ -67,7 +66,6 @@ interface FormState {
   notes: string;
 }
 
-/** Add duration minutes to HH:MM, clamping into the closing minutes range. */
 function addMinutes(start: string, minutes: number): string {
   return timeFromMinutes(minutesFromTime(start) + minutes);
 }
@@ -91,9 +89,6 @@ function makeInitial(
       coachIds: session.coach_chips.map((c) => c.id),
       attendeeCount: String(session.attendee_count),
       status: session.status,
-      // Same convention as the coach-page form: edit mode opens in auto-calc
-      // so changing players/time updates revenue live. Flipping the override
-      // checkbox reveals the saved snapshot in the manual inputs.
       manualRevenue: false,
       revenue: String(session.revenue_rub),
       courtRevenue: String(session.court_revenue_rub),
@@ -106,8 +101,6 @@ function makeInitial(
   const firstProgram = programs[0] ?? null;
   const duration = firstProgram?.duration_minutes ?? 60;
 
-  // Default courts: program needs N → take prefillCourt + the next N-1
-  // contiguous ones if they exist; else just prefillCourt.
   let courtIds: string[] = [];
   if (prefillCourtId) {
     const startIdx = courts.findIndex((c) => c.id === prefillCourtId);
@@ -151,6 +144,7 @@ export function SessionPopover(props: SessionPopoverProps) {
     prefillCourtId,
   } = props;
 
+  const { t, lang } = useTranslation();
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(
     null,
@@ -175,7 +169,6 @@ export function SessionPopover(props: SessionPopoverProps) {
     [programs, state.programId],
   );
 
-  // Position the popover next to the anchor, viewport-clamped.
   useLayoutEffect(() => {
     const popover = popoverRef.current;
     const vpW = window.innerWidth;
@@ -197,7 +190,6 @@ export function SessionPopover(props: SessionPopoverProps) {
     setPosition({ top, left });
   }, [anchor]);
 
-  // Close on outside click / Esc.
   useEffect(() => {
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
@@ -211,14 +203,12 @@ export function SessionPopover(props: SessionPopoverProps) {
         onClose();
       }
     }
-    // Defer pointer listener by one tick so the click that opened the popover
-    // doesn't immediately close it.
-    const t = setTimeout(() => {
+    const tm = setTimeout(() => {
       document.addEventListener("pointerdown", onPointerDown);
     }, 0);
     document.addEventListener("keydown", onKey);
     return () => {
-      clearTimeout(t);
+      clearTimeout(tm);
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKey);
     };
@@ -232,8 +222,6 @@ export function SessionPopover(props: SessionPopoverProps) {
     setState((s) => {
       const duration = p?.duration_minutes ?? minutesFromTime(s.endTime) - minutesFromTime(s.startTime);
       const newAttendees = p?.max_players != null ? String(p.max_players) : s.attendeeCount;
-      // Re-fit courts to the new program's courts_needed when shrinking; never
-      // expand silently (user must add courts explicitly).
       let newCourtIds = s.courtIds;
       if (p && newCourtIds.length > p.courts_needed) {
         newCourtIds = newCourtIds.slice(0, p.courts_needed);
@@ -248,13 +236,13 @@ export function SessionPopover(props: SessionPopoverProps) {
     });
   }
 
-  function onStartChange(t: string) {
+  function onStartChange(time: string) {
     setState((s) => {
       const dur = minutesFromTime(s.endTime) - minutesFromTime(s.startTime);
       return {
         ...s,
-        startTime: t,
-        endTime: dur > 0 ? addMinutes(t, dur) : s.endTime,
+        startTime: time,
+        endTime: dur > 0 ? addMinutes(time, dur) : s.endTime,
       };
     });
   }
@@ -277,7 +265,6 @@ export function SessionPopover(props: SessionPopoverProps) {
     }));
   }
 
-  // Live revenue preview — same formula as 10.3.
   const attendeeCount = Number.parseInt(state.attendeeCount, 10) || 0;
   const preview = useMemo(() => {
     if (!program) return null;
@@ -327,7 +314,7 @@ export function SessionPopover(props: SessionPopoverProps) {
 
   const handleDelete = useCallback(async () => {
     if (!onDelete) return;
-    if (!confirm("Удалить сессию? Это действие нельзя отменить.")) return;
+    if (!confirm(t("schedule.popover.delete_confirm"))) return;
     setError(null);
     setPending(true);
     try {
@@ -337,13 +324,17 @@ export function SessionPopover(props: SessionPopoverProps) {
     } finally {
       setPending(false);
     }
-  }, [onDelete, onClose]);
+  }, [onDelete, onClose, t]);
 
   return (
     <div
       ref={popoverRef}
       role="dialog"
-      aria-label={mode === "create" ? "Создать сессию" : "Редактировать сессию"}
+      aria-label={
+        mode === "create"
+          ? t("schedule.popover.aria_create")
+          : t("schedule.popover.aria_edit")
+      }
       className="fixed z-50 bg-surface rounded-card border border-border shadow-xl flex flex-col"
       style={{
         top: position?.top ?? -9999,
@@ -356,12 +347,14 @@ export function SessionPopover(props: SessionPopoverProps) {
     >
       <header className="flex items-center justify-between px-4 h-11 border-b border-border flex-shrink-0">
         <h2 className="text-sm font-semibold text-black">
-          {mode === "create" ? "Создать сессию" : "Сессия"}
+          {mode === "create"
+            ? t("schedule.popover.title_create")
+            : t("schedule.popover.title_edit")}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Закрыть"
+          aria-label={t("event.popover.close")}
           className="w-7 h-7 inline-flex items-center justify-center rounded text-muted hover:bg-subtle hover:text-black transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
@@ -374,7 +367,7 @@ export function SessionPopover(props: SessionPopoverProps) {
         onSubmit={handleSubmit}
         className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3"
       >
-        <Section label="Программа">
+        <Section label={t("schedule.popover.section.program")}>
           <ProgramPicker
             programs={programs}
             selectedId={state.programId}
@@ -383,7 +376,7 @@ export function SessionPopover(props: SessionPopoverProps) {
         </Section>
 
         <div className="grid grid-cols-[1fr_5.5rem_5.5rem] gap-2">
-          <Section label="Дата">
+          <Section label={t("schedule.popover.section.date")}>
             <Input
               type="date"
               value={state.date}
@@ -391,7 +384,7 @@ export function SessionPopover(props: SessionPopoverProps) {
               className="!h-9"
             />
           </Section>
-          <Section label="Начало">
+          <Section label={t("schedule.popover.section.start")}>
             <Input
               type="time"
               value={state.startTime}
@@ -399,7 +392,7 @@ export function SessionPopover(props: SessionPopoverProps) {
               className="!h-9"
             />
           </Section>
-          <Section label="Конец">
+          <Section label={t("schedule.popover.section.end")}>
             <Input
               type="time"
               value={state.endTime}
@@ -409,10 +402,12 @@ export function SessionPopover(props: SessionPopoverProps) {
           </Section>
         </div>
 
-        <Section label="Корты">
+        <Section label={t("schedule.popover.section.courts")}>
           <ChipRow>
             {courts.length === 0 ? (
-              <span className="text-[11px] text-fade">Нет активных кортов.</span>
+              <span className="text-[11px] text-fade">
+                {t("schedule.popover.no_active_courts")}
+              </span>
             ) : (
               courts.map((c) => (
                 <ToggleChip
@@ -427,11 +422,13 @@ export function SessionPopover(props: SessionPopoverProps) {
         </Section>
 
         <Section
-          label={`Тренеры${state.coachIds.length > 0 ? ` · ${state.coachIds.length}` : " · необязательно"}`}
+          label={`${t("schedule.popover.section.coaches")}${state.coachIds.length > 0 ? ` · ${state.coachIds.length}` : ` · ${t("schedule.popover.coaches_optional")}`}`}
         >
           <ChipRow>
             {coaches.length === 0 ? (
-              <span className="text-[11px] text-fade">Нет активных тренеров.</span>
+              <span className="text-[11px] text-fade">
+                {t("schedule.popover.no_active_coaches")}
+              </span>
             ) : (
               coaches.map((c) => (
                 <ToggleChip
@@ -447,7 +444,7 @@ export function SessionPopover(props: SessionPopoverProps) {
         </Section>
 
         <div className="grid grid-cols-[6rem_1fr] gap-2">
-          <Section label="Игроков">
+          <Section label={t("schedule.popover.section.players")}>
             <Input
               type="number"
               min={0}
@@ -457,15 +454,15 @@ export function SessionPopover(props: SessionPopoverProps) {
               className="!h-9"
             />
           </Section>
-          <Section label="Статус">
+          <Section label={t("schedule.popover.section.status")}>
             <Select
               value={state.status}
               onChange={(e) => set("status", e.target.value as ScheduleSessionStatus)}
               className="!h-9"
             >
-              <option value="scheduled">Запланирована</option>
-              <option value="completed">Проведена</option>
-              <option value="cancelled">Отменена</option>
+              <option value="scheduled">{t("schedule.popover.status.scheduled")}</option>
+              <option value="completed">{t("schedule.popover.status.completed")}</option>
+              <option value="cancelled">{t("schedule.popover.status.cancelled")}</option>
             </Select>
           </Section>
         </div>
@@ -473,13 +470,26 @@ export function SessionPopover(props: SessionPopoverProps) {
         {preview && !state.manualRevenue && (
           <div className="rounded-md bg-subtle border border-border p-2.5 grid grid-cols-4 gap-2 text-[10.5px]">
             <PreviewCell
-              label={preview.peak ? "Пик" : "Off-peak"}
-              value={`${formatRub(preview.price)} / игр.`}
+              label={
+                preview.peak
+                  ? t("schedule.popover.preview.peak")
+                  : t("schedule.popover.preview.off_peak")
+              }
+              value={`${formatRub(preview.price, lang)} ${t("schedule.popover.preview.per_player_short")}`}
               tone={preview.peak ? "warn" : "muted"}
             />
-            <PreviewCell label="Выручка" value={formatRub(preview.revenue)} />
-            <PreviewCell label="Корт" value={formatRub(preview.courtRev)} />
-            <PreviewCell label="Тренировка" value={formatRub(preview.coachingFee)} />
+            <PreviewCell
+              label={t("schedule.popover.preview.revenue")}
+              value={formatRub(preview.revenue, lang)}
+            />
+            <PreviewCell
+              label={t("schedule.popover.preview.court")}
+              value={formatRub(preview.courtRev, lang)}
+            />
+            <PreviewCell
+              label={t("schedule.popover.preview.coaching")}
+              value={formatRub(preview.coachingFee, lang)}
+            />
           </div>
         )}
 
@@ -490,12 +500,12 @@ export function SessionPopover(props: SessionPopoverProps) {
             onChange={(e) => set("manualRevenue", e.target.checked)}
             className="h-3.5 w-3.5 accent-[var(--color-accent)]"
           />
-          Указать суммы вручную
+          {t("schedule.popover.manual_revenue")}
         </label>
 
         {state.manualRevenue && (
           <div className="grid grid-cols-3 gap-2">
-            <Section label="Выручка, ₽">
+            <Section label={t("schedule.popover.revenue_rub")}>
               <Input
                 type="number"
                 min={0}
@@ -504,7 +514,7 @@ export function SessionPopover(props: SessionPopoverProps) {
                 className="!h-9"
               />
             </Section>
-            <Section label="Корт, ₽">
+            <Section label={t("schedule.popover.court_revenue_rub")}>
               <Input
                 type="number"
                 min={0}
@@ -513,7 +523,7 @@ export function SessionPopover(props: SessionPopoverProps) {
                 className="!h-9"
               />
             </Section>
-            <Section label="Тренировка, ₽">
+            <Section label={t("schedule.popover.coaching_fee_rub")}>
               <Input
                 type="number"
                 min={0}
@@ -525,12 +535,12 @@ export function SessionPopover(props: SessionPopoverProps) {
           </div>
         )}
 
-        <Section label="Заметки">
+        <Section label={t("schedule.popover.notes")}>
           <Textarea
             rows={2}
             value={state.notes}
             onChange={(e) => set("notes", e.target.value)}
-            placeholder="Необязательная заметка"
+            placeholder={t("schedule.popover.notes_placeholder")}
           />
         </Section>
 
@@ -551,7 +561,7 @@ export function SessionPopover(props: SessionPopoverProps) {
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -562,7 +572,7 @@ export function SessionPopover(props: SessionPopoverProps) {
           disabled={pending}
           className={mode === "edit" ? "" : "ml-auto"}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button
           type="button"
@@ -571,13 +581,12 @@ export function SessionPopover(props: SessionPopoverProps) {
           disabled={pending}
         >
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Создать"
-              : "Сохранить"}
+              ? t("schedule.popover.submit_create")
+              : t("btn.save")}
         </Button>
       </footer>
     </div>
   );
 }
-

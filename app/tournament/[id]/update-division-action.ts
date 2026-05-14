@@ -5,6 +5,7 @@ import { listDivisions, updateDivision } from "@/lib/queries/divisions";
 import { listCourtsByIds } from "@/lib/queries/courts";
 import { PADEL_LEVELS } from "@/lib/constants";
 import { SCORING_SYSTEMS } from "@/lib/scoring-systems";
+import { getServerDict } from "@/lib/i18n/server";
 import type {
   DivisionCategory,
   PadelLevel,
@@ -39,20 +40,21 @@ export interface UpdateDivisionInput {
 export async function updateDivisionAction(
   input: UpdateDivisionInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const name = input.name.trim();
-  if (!name) return { error: "Введите название дивизиона" };
+  if (!name) return { error: dict["error.required.division_name"] };
   if (!CATEGORIES.includes(input.category as DivisionCategory))
-    return { error: "Неизвестная категория" };
+    return { error: dict["error.invalid.category_unknown"] };
   if (!FORMATS.includes(input.format as TournamentFormat))
-    return { error: "Неизвестный формат" };
+    return { error: dict["error.invalid.format_unknown"] };
   if (!SCORING_SYSTEMS.includes(input.scoring_system as ScoringSystem))
-    return { error: "Неизвестная система счёта" };
+    return { error: dict["error.invalid.scoring_unknown"] };
   if (input.max_players != null && input.max_players < 4)
-    return { error: "Минимум 4 игрока" };
+    return { error: dict["error.invalid.min_players_4"] };
   if (input.max_players != null && input.max_players % 4 !== 0)
-    return { error: "Число игроков должно быть кратно 4" };
+    return { error: dict["error.invalid.player_count_multiple_of_4"] };
   if (input.court_ids.length === 0)
-    return { error: "Выберите хотя бы один корт" };
+    return { error: dict["error.courts.at_least_one"] };
 
   const level_min =
     input.level_min && (PADEL_LEVELS as string[]).includes(input.level_min)
@@ -74,12 +76,18 @@ export async function updateDivisionAction(
   if (conflicting) {
     const sharedIds = conflicting.court_ids.filter((cid) => courtIdSet.has(cid));
     const courts = await listCourtsByIds(sharedIds);
+    const courtPrefix = dict["tournament.card.court_short_prefix"];
     const courtLabel =
       courts.length > 0
-        ? `К${courts.map((c) => c.number).sort((a, b) => a - b).join(", К")}`
-        : "один из кортов";
+        ? `${courtPrefix}${courts
+            .map((c) => c.number)
+            .sort((a, b) => a - b)
+            .join(`, ${courtPrefix}`)}`
+        : dict["error.division.one_of_courts"];
     return {
-      error: `Конфликт кортов: ${courtLabel} уже используется дивизионом «${conflicting.name}» (идёт). Выберите другие корты.`,
+      error: dict["error.division.court_conflict"]
+        .replace("{courts}", courtLabel)
+        .replace("{name}", conflicting.name),
     };
   }
 
@@ -98,7 +106,12 @@ export async function updateDivisionAction(
     revalidatePath("/display");
     return {};
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Ошибка сохранения: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.save_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
 }

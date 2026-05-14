@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getProgram } from "@/lib/queries/programs";
 import { createSessionWithCoach } from "@/lib/queries/schedule-sessions";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import {
   validateSessionInput,
   type RawSessionInput,
@@ -12,11 +14,12 @@ export async function logSessionAction(
   coachId: string,
   raw: RawSessionInput,
 ): Promise<{ id?: string; error?: string }> {
-  if (!coachId) return { error: "Тренер не найден." };
+  const dict = await getServerDict();
+  if (!coachId) return { error: dict["error.not_found.coach"] };
 
   const program = raw.program_id ? await getProgram(raw.program_id) : null;
   const v = validateSessionInput(raw, program);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
 
   try {
     const id = await createSessionWithCoach(v.value, coachId);
@@ -25,7 +28,8 @@ export async function logSessionAction(
     return { id };
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось записать сессию.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.log_session"],
     };
   }
 }

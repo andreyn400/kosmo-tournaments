@@ -29,6 +29,8 @@ import {
 } from "@/lib/finals-seeding";
 import { SCORING_SYSTEMS } from "@/lib/scoring-systems";
 import { normalizeTime } from "@/lib/time-slots";
+import { getServerDict } from "@/lib/i18n/server";
+import type { Dictionary } from "@/lib/i18n/ru";
 import type { Match, ScoringSystem } from "@/lib/types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,13 +59,19 @@ export interface CreateFinalsInput {
 export async function createFinalsAction(
   input: CreateFinalsInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   let result: { error?: string };
   try {
-    result = await createFinalsActionInner(input);
+    result = await createFinalsActionInner(input, dict);
   } catch (e) {
     console.error("[createFinalsAction] unhandled error", e);
-    const msg = e instanceof Error ? e.message : String(e);
-    return { error: `Внутренняя ошибка: ${msg}` };
+    const reason = e instanceof Error ? e.message : String(e);
+    return {
+      error: dict["error.finals.unhandled_internal"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
   if (result.error) return result;
   redirect(`/tournament/${input.tournamentId}/finals`);
@@ -71,31 +79,32 @@ export async function createFinalsAction(
 
 async function createFinalsActionInner(
   input: CreateFinalsInput,
+  dict: Dictionary,
 ): Promise<{ error?: string }> {
   if (!isBracketSize(input.bracketSize)) {
-    return { error: "Неверный размер сетки" };
+    return { error: dict["error.finals.bracket_size_invalid"] };
   }
   if (!SCORING_SYSTEMS.includes(input.scoringSystem as ScoringSystem)) {
-    return { error: "Неверная система счёта" };
+    return { error: dict["error.invalid.scoring_unknown"] };
   }
   const bracketSize = input.bracketSize as BracketSize;
   const scoringSystem = input.scoringSystem as ScoringSystem;
 
   const tournament = await getTournament(input.tournamentId);
-  if (!tournament) return { error: "Турнир не найден" };
+  if (!tournament) return { error: dict["error.not_found.tournament"] };
   if (tournament.type !== "league_season") {
-    return { error: "Финалы доступны только для сезонных лиг" };
+    return { error: dict["error.finals.league_only"] };
   }
 
   const league = await getLeagueSeason(input.tournamentId);
-  if (!league) return { error: "Сезон лиги не найден" };
+  if (!league) return { error: dict["error.not_found.league_season"] };
   if (league.finals_status !== "not_created") {
-    return { error: "Финальная сетка уже создана" };
+    return { error: dict["error.finals.already_created"] };
   }
 
   const sessions = await listSessionsByTournament(input.tournamentId);
   if (sessions.length === 0 || sessions.some((s) => s.status !== "completed")) {
-    return { error: "Сначала завершите все сессии лиги" };
+    return { error: dict["error.finals.complete_sessions_first"] };
   }
 
   const [registrations, players] = await Promise.all([
@@ -142,7 +151,9 @@ async function createFinalsActionInner(
   if (qualification.kind === "team") {
     if (qualification.pairs.length < bracketSize / 2) {
       return {
-        error: `Нужно минимум ${bracketSize / 2} пар, квалифицировано ${qualification.pairs.length}`,
+        error: dict["error.finals.need_n_pairs"]
+          .replace("{needed}", String(bracketSize / 2))
+          .replace("{actual}", String(qualification.pairs.length)),
       };
     }
     qualifiedPairs = qualification.pairs.slice(0, bracketSize);
@@ -150,20 +161,27 @@ async function createFinalsActionInner(
     const needed = bracketSize * 2;
     if (qualification.individuals.length < needed) {
       return {
-        error: `Нужно минимум ${needed} квалифицированных игроков, найдено ${qualification.individuals.length}`,
+        error: dict["error.finals.need_n_qualified"]
+          .replace("{needed}", String(needed))
+          .replace("{actual}", String(qualification.individuals.length)),
       };
     }
     const clientPairs = input.individualPairs ?? [];
     if (clientPairs.length !== bracketSize) {
-      return { error: `Нужно сформировать ${bracketSize} пар для финалов` };
+      return {
+        error: dict["error.finals.need_n_pairs_to_form"].replace(
+          "{n}",
+          String(bracketSize),
+        ),
+      };
     }
     const seenIds = new Set<string>();
     for (const cp of clientPairs) {
       if (!cp.player1_id || !cp.player2_id || cp.player1_id === cp.player2_id) {
-        return { error: "Неверная пара (совпадают игроки)" };
+        return { error: dict["error.finals.invalid_pair_same_player"] };
       }
       if (seenIds.has(cp.player1_id) || seenIds.has(cp.player2_id)) {
-        return { error: "Игрок использован дважды в составах пар" };
+        return { error: dict["error.finals.player_used_twice"] };
       }
       seenIds.add(cp.player1_id);
       seenIds.add(cp.player2_id);
@@ -173,7 +191,7 @@ async function createFinalsActionInner(
     );
     for (const cp of clientPairs) {
       if (!qualifiedIds.has(cp.player1_id) || !qualifiedIds.has(cp.player2_id)) {
-        return { error: "Пара содержит неквалифицированного игрока" };
+        return { error: dict["error.finals.pair_unqualified_player"] };
       }
     }
     const pairSeedFor = (a: string, b: string) => {
@@ -201,7 +219,8 @@ async function createFinalsActionInner(
   try {
     plan = generateBracketPlan({ bracketSize, qualifiedPairs });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Ошибка генерации сетки";
+    const msg =
+      e instanceof Error ? e.message : dict["error.finals.bracket_gen_error"];
     return { error: msg };
   }
 
@@ -226,7 +245,10 @@ async function createFinalsActionInner(
   try {
     inserted = await createBracketMatches(rowsToInsert);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Ошибка создания матчей";
+    const msg =
+      e instanceof Error
+        ? e.message
+        : dict["error.finals.match_creation_error"];
     return { error: msg };
   }
 
@@ -266,7 +288,8 @@ async function createFinalsActionInner(
       finals_date: input.scheduledDate ?? league.finals_date,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Ошибка сохранения конфига финала";
+    const msg =
+      e instanceof Error ? e.message : dict["error.finals.config_save_error"];
     return { error: msg };
   }
 

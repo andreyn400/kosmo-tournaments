@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type {
   Court,
   Match,
@@ -43,6 +44,7 @@ export function LivePlayBoard({
   divisionFormat?: Tournament["format"];
   divisionScoringSystem?: Tournament["scoring_system"];
 }) {
+  const { t } = useTranslation();
   const format = divisionFormat ?? tournament.format;
   const scoringSystem = divisionScoringSystem ?? tournament.scoring_system;
   const [rounds, setRounds] = useState<Round[]>(initialRounds);
@@ -149,8 +151,11 @@ export function LivePlayBoard({
         <div className="flex flex-col gap-1">
           <span className="text-xs text-muted uppercase tracking-wider">
             {effectiveTotal > 0
-              ? `Раунд ${currentRound?.round_number ?? sortedRounds.length} из ${effectiveTotal}`
-              : "Нет раундов"}
+              ? t("play.round_label", {
+                  n: currentRound?.round_number ?? sortedRounds.length,
+                  total: effectiveTotal,
+                })
+              : t("play.no_rounds")}
           </span>
           <div className="flex items-center gap-1.5">
             {Array.from({ length: effectiveTotal }, (_, i) => {
@@ -166,7 +171,7 @@ export function LivePlayBoard({
                         ? "bg-accent/40 ring-2 ring-accent/20"
                         : "bg-border"
                   }`}
-                  title={`Раунд ${i + 1} · ${status}`}
+                  title={t("play.round_status_title", { n: i + 1, status })}
                 />
               );
             })}

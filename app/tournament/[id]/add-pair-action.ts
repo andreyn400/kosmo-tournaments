@@ -6,6 +6,7 @@ import {
   listRegistrationsByDivision,
 } from "@/lib/queries/registrations";
 import { getDivision } from "@/lib/queries/divisions";
+import { getServerDict } from "@/lib/i18n/server";
 
 export async function addPairAction(input: {
   tournamentId: string;
@@ -13,21 +14,25 @@ export async function addPairAction(input: {
   playerBId: string;
   divisionId?: string | null;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   if (!input.playerAId || !input.playerBId) {
-    return { error: "Выберите обоих игроков" };
+    return { error: dict["error.player.both_required"] };
   }
   if (input.playerAId === input.playerBId) {
-    return { error: "Игрок не может быть в паре сам с собой" };
+    return { error: dict["error.player.self_pair"] };
   }
   try {
     if (input.divisionId) {
       const div = await getDivision(input.divisionId);
-      if (!div) return { error: "Дивизион не найден" };
+      if (!div) return { error: dict["error.not_found.division"] };
       if (div.max_players) {
         const existing = await listRegistrationsByDivision(input.divisionId);
         if (existing.length + 2 > div.max_players) {
           return {
-            error: `Нельзя добавить пару: лимит ${div.max_players} игроков`,
+            error: dict["error.division.pair_exceeds_limit"].replace(
+              "{limit}",
+              String(div.max_players),
+            ),
           };
         }
       }
@@ -39,8 +44,13 @@ export async function addPairAction(input: {
       division_id: input.divisionId ?? null,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось добавить пару: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.add_pair_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
   revalidatePath(`/tournament/${input.tournamentId}`);
   if (input.divisionId) {

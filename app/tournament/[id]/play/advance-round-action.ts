@@ -12,6 +12,8 @@ import {
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
 import { listCourtsByIds } from "@/lib/queries/courts";
 import { totalRoundsFor } from "@/lib/total-rounds";
+import { getServerDict } from "@/lib/i18n/server";
+import type { Dictionary } from "@/lib/i18n/ru";
 import type { Court, Division, Match, Player, Tournament } from "@/lib/types";
 
 export async function advanceRoundAction(input: {
@@ -20,6 +22,7 @@ export async function advanceRoundAction(input: {
   currentRoundId: string;
   divisionId?: string | null;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const supabase = await createClient();
 
   const { data: matches, error: matchesErr } = await supabase
@@ -28,7 +31,7 @@ export async function advanceRoundAction(input: {
     .eq("round_id", input.currentRoundId);
   if (matchesErr) return { error: matchesErr.message };
   if (!matches || matches.some((m) => m.status !== "completed"))
-    return { error: "Ещё не все матчи раунда завершены" };
+    return { error: dict["error.state.matches_not_complete"] };
 
   const { data: currentRound, error: currentErr } = await supabase
     .from("rounds")
@@ -107,6 +110,7 @@ export async function advanceRoundAction(input: {
       nextRoundNumber,
       divisionId: input.divisionId ?? null,
       courtIds,
+      dict,
     });
     if (generated.error) return { error: generated.error };
     if (generated.generated) {
@@ -123,6 +127,7 @@ export async function advanceRoundAction(input: {
       nextRoundNumber,
       divisionId: input.divisionId ?? null,
       courtIds,
+      dict,
     });
     if (generated.error) return { error: generated.error };
     if (generated.generated) {
@@ -279,6 +284,7 @@ async function generateNextIndividualMexicanoRound({
   nextRoundNumber,
   divisionId,
   courtIds,
+  dict,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   tournament: Tournament;
@@ -286,6 +292,7 @@ async function generateNextIndividualMexicanoRound({
   nextRoundNumber: number;
   divisionId: string | null;
   courtIds: string[];
+  dict: Dictionary;
 }): Promise<{ generated: boolean; error?: string }> {
   const loaded = await loadRoundAndMatchData({
     supabase,
@@ -298,10 +305,7 @@ async function generateNextIndividualMexicanoRound({
   const playerCount = loaded.regs.length;
   const maxRounds = totalRoundsFor("mexicano", playerCount);
   if (maxRounds === 0) {
-    return {
-      generated: false,
-      error: "Не удалось определить общее число раундов",
-    };
+    return { generated: false, error: dict["error.failed.total_rounds"] };
   }
   if (nextRoundNumber > maxRounds) return { generated: false };
 
@@ -319,7 +323,9 @@ async function generateNextIndividualMexicanoRound({
   if (orderedPlayerIds.length !== playerCount) {
     return {
       generated: false,
-      error: `Ожидалось ${playerCount} игроков в таблице, получено ${orderedPlayerIds.length}`,
+      error: dict["error.failed.expected_players_in_table"]
+        .replace("{expected}", String(playerCount))
+        .replace("{actual}", String(orderedPlayerIds.length)),
     };
   }
 
@@ -343,6 +349,7 @@ async function generateNextTeamMexicanoRound({
   nextRoundNumber,
   divisionId,
   courtIds,
+  dict,
 }: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   tournament: Tournament;
@@ -350,6 +357,7 @@ async function generateNextTeamMexicanoRound({
   nextRoundNumber: number;
   divisionId: string | null;
   courtIds: string[];
+  dict: Dictionary;
 }): Promise<{ generated: boolean; error?: string }> {
   const loaded = await loadRoundAndMatchData({
     supabase,
@@ -362,19 +370,13 @@ async function generateNextTeamMexicanoRound({
   const playerCount = loaded.regs.length;
   const maxRounds = totalRoundsFor("team_mexicano", playerCount);
   if (maxRounds === 0) {
-    return {
-      generated: false,
-      error: "Не удалось определить общее число раундов",
-    };
+    return { generated: false, error: dict["error.failed.total_rounds"] };
   }
   if (nextRoundNumber > maxRounds) return { generated: false };
 
   const pairs = pairsFromRegistrations(loaded.regs);
   if (pairs.length !== playerCount / 2) {
-    return {
-      generated: false,
-      error: "Не удалось собрать пары для следующего раунда",
-    };
+    return { generated: false, error: dict["error.failed.next_round_pairs"] };
   }
 
   const pairLeaderboard = computePairLeaderboard(

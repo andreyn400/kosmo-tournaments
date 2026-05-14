@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { DisplayEvent } from "@/lib/queries/display";
 import { Avatar, OverflowPill } from "@/components/ui/Avatar";
 
@@ -8,6 +11,7 @@ type UpcomingBodyProps = {
 };
 
 export function UpcomingBody({ event }: UpcomingBodyProps) {
+  const { t } = useTranslation();
   const visible = event.registeredPlayers.slice(0, MAX_VISIBLE);
   const overflow = Math.max(0, event.registeredPlayers.length - MAX_VISIBLE);
 
@@ -28,13 +32,14 @@ export function UpcomingBody({ event }: UpcomingBodyProps) {
         </div>
       ) : (
         <p className="text-muted text-sm italic">
-          Пока нет зарегистрированных игроков
+          {t("display.upcoming.empty_players")}
         </p>
       )}
       <p className="text-secondary text-base font-medium tabular-nums">
-        {event.playerCount}
-        {event.maxPlayers != null ? ` / ${event.maxPlayers}` : ""} игроков
-        зарегистрировано
+        {t("display.upcoming.players_registered", {
+          count: event.playerCount,
+          maxSuffix: event.maxPlayers != null ? ` / ${event.maxPlayers}` : "",
+        })}
       </p>
     </div>
   );

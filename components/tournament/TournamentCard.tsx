@@ -6,22 +6,18 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Avatar, OverflowPill } from "@/components/ui/Avatar";
-import { FORMAT_LABEL_RU, STATUS_LABEL_RU } from "@/lib/constants";
-import { formatDateRangeRu, formatTimeRu } from "@/lib/format-date";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDateRange, formatTime } from "@/lib/i18n/format";
+import {
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
 import { statusTone } from "@/lib/status-tone";
 import type { Court, Tournament } from "@/lib/types";
 import { deleteTournamentListAction } from "@/app/delete-tournament-list-action";
 
 const MAX_COURTS_SHOWN = 3;
 const MAX_PLAYERS_SHOWN = 6;
-
-function pluralizeDivisions(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "дивизион";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "дивизиона";
-  return "дивизионов";
-}
 
 type PlayerSummary = {
   id: string;
@@ -41,6 +37,7 @@ export function TournamentCard({
   divisionCount?: number;
 }) {
   const t = tournament;
+  const { t: tr, tPlural, lang } = useTranslation();
   const [mode, setMode] = useState<"idle" | "confirming" | "deleted">("idle");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -65,11 +62,14 @@ export function TournamentCard({
   const levelRange =
     t.level_min && t.level_max
       ? t.level_min === t.level_max
-        ? `Уровень ${t.level_min}`
-        : `Уровни ${t.level_min} – ${t.level_max}`
-      : "Все уровни";
-  const dateRange = formatDateRangeRu(t.date_start, t.date_end);
-  const startTimeStr = formatTimeRu(t.start_time);
+        ? tr("tournament.card.level_one", { level: t.level_min })
+        : tr("tournament.card.level_range", {
+            min: t.level_min,
+            max: t.level_max,
+          })
+      : tr("tournament.card.level_all");
+  const dateRange = formatDateRange(t.date_start, t.date_end, lang);
+  const startTimeStr = formatTime(t.start_time);
   const dateLine = startTimeStr ? `${dateRange} · ${startTimeStr}` : dateRange;
 
   const leftBorderClass =
@@ -100,6 +100,7 @@ export function TournamentCard({
   const extraCourts = Math.max(0, assignedCourts.length - MAX_COURTS_SHOWN);
   const shownPlayers = players.slice(0, MAX_PLAYERS_SHOWN);
   const extraPlayers = Math.max(0, players.length - MAX_PLAYERS_SHOWN);
+  const courtPrefix = tr("tournament.card.court_short_prefix");
 
   return (
     <Link
@@ -116,7 +117,16 @@ export function TournamentCard({
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-sm text-black">
-              Удалить <span className="font-semibold">{t.name}</span>?
+              {tr("tournament.card.delete_confirm")
+                .split("{name}")
+                .map((chunk, i, arr) => (
+                  <span key={i}>
+                    {chunk}
+                    {i < arr.length - 1 ? (
+                      <span className="font-semibold">{t.name}</span>
+                    ) : null}
+                  </span>
+                ))}
             </p>
             <div className="flex items-center gap-2">
               <Button
@@ -129,7 +139,9 @@ export function TournamentCard({
                   confirmDelete();
                 }}
               >
-                {pending ? "Удаление…" : "Да"}
+                {pending
+                  ? tr("tournament.card.delete_pending")
+                  : tr("tournament.card.confirm_yes")}
               </Button>
               <Button
                 type="button"
@@ -142,7 +154,7 @@ export function TournamentCard({
                   setError(null);
                 }}
               >
-                Нет
+                {tr("tournament.card.confirm_no")}
               </Button>
             </div>
             {error ? (
@@ -158,10 +170,10 @@ export function TournamentCard({
                 {t.name}
               </h3>
               <div className="flex items-center gap-1.5 shrink-0">
-                <Badge tone="format">{FORMAT_LABEL_RU[t.format]}</Badge>
+                <Badge tone="format">{tr(TOURNAMENT_FORMAT_KEY[t.format])}</Badge>
                 <button
                   type="button"
-                  aria-label="Удалить турнир"
+                  aria-label={tr("tournament.card.delete_aria")}
                   onClick={(e) => {
                     stop(e);
                     setMode("confirming");
@@ -211,7 +223,11 @@ export function TournamentCard({
               <div className="flex flex-wrap items-center gap-1.5">
                 {divisionCount > 0 ? (
                   <span className="inline-flex items-center h-6 px-2 rounded-[var(--radius-button)] bg-accent-soft border border-accent/30 text-[11px] font-semibold text-accent uppercase tracking-[0.06em]">
-                    {divisionCount} {pluralizeDivisions(divisionCount)}
+                    {tPlural(divisionCount, {
+                      one: "tournament.card.divisions_one",
+                      few: "tournament.card.divisions_few",
+                      many: "tournament.card.divisions_many",
+                    })}
                   </span>
                 ) : null}
                 {shownCourts.map((c) => (
@@ -219,7 +235,8 @@ export function TournamentCard({
                     key={c.id}
                     className="inline-flex items-center h-6 px-2 rounded-[var(--radius-button)] bg-subtle border border-border text-[11px] font-semibold text-secondary tabular-nums"
                   >
-                    К{c.number}
+                    {courtPrefix}
+                    {c.number}
                   </span>
                 ))}
                 {extraCourts > 0 ? (
@@ -230,10 +247,14 @@ export function TournamentCard({
               </div>
             ) : null}
             <div className="flex items-center justify-between pt-1">
-              <Badge tone={tone}>{STATUS_LABEL_RU[t.status]}</Badge>
+              <Badge tone={tone}>{tr(TOURNAMENT_STATUS_KEY[t.status])}</Badge>
               {t.max_players ? (
                 <span className="text-sm text-muted">
-                  макс. {t.max_players} игроков
+                  {tPlural(t.max_players, {
+                    one: "tournament.card.max_players_one",
+                    few: "tournament.card.max_players_few",
+                    many: "tournament.card.max_players_many",
+                  })}
                 </span>
               ) : null}
             </div>

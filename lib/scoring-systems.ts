@@ -1,4 +1,5 @@
 import type { ScoringSystem } from "./types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 export type ScoringGroup = "points" | "games" | "combined" | "sets";
 
@@ -17,46 +18,6 @@ export const SCORING_SYSTEMS: ScoringSystem[] = [
 ];
 
 export const DEFAULT_SCORING_SYSTEM: ScoringSystem = "games_24";
-
-export const SCORING_SYSTEM_LABEL_RU: Record<ScoringSystem, string> = {
-  points_16: "До 16 очков",
-  points_21: "До 21 очка",
-  points_32: "До 32 очков",
-  games_16: "До 16 геймов",
-  games_24: "До 24 геймов (рекомендуется)",
-  games_32: "До 32 геймов",
-  combined_21: "До 21 в сумме",
-  combined_32: "До 32 в сумме (рекомендуется для Американо)",
-  combined_42: "До 42 в сумме",
-  sets_best3: "3 сета (с тай-брейком)",
-  sets_supertiebreak: "2 сета + супер тай-брейк",
-};
-
-export const SCORING_SYSTEM_HELPER_RU: Record<ScoringSystem, string> = {
-  points_16: "Команды играют, пока одна не наберёт 16 очков.",
-  points_21: "Команды играют, пока одна не наберёт 21 очко.",
-  points_32: "Команды играют, пока одна не наберёт 32 очка.",
-  games_16: "Около 16 геймов на матч (±2). Без ничьих.",
-  games_24: "Стандарт Kosmo: около 24 геймов на матч (±2). Без ничьих.",
-  games_32: "Около 32 геймов на матч (±2). Без ничьих.",
-  combined_21:
-    "Игра идёт до тех пор, пока сумма очков обеих команд не достигнет 21. Побеждает команда с большим количеством очков.",
-  combined_32:
-    "Игра идёт до тех пор, пока сумма очков обеих команд не достигнет 32. Побеждает команда с большим количеством очков.",
-  combined_42:
-    "Игра идёт до тех пор, пока сумма очков обеих команд не достигнет 42. Побеждает команда с большим количеством очков.",
-  sets_best3:
-    "Лучший из 3 сетов. Сет до 6 геймов с тай-брейком при 6-6, 7-5 при 5-5.",
-  sets_supertiebreak:
-    "Два сета по 6 геймов; при счёте 1-1 — супер тай-брейк до 10.",
-};
-
-export const SCORING_GROUP_LABEL_RU: Record<ScoringGroup, string> = {
-  points: "Очки",
-  games: "Геймы",
-  combined: "Сумма очков (Американо)",
-  sets: "Сеты",
-};
 
 export function scoringGroup(s: ScoringSystem): ScoringGroup {
   if (s.startsWith("points_")) return "points";
@@ -93,7 +54,7 @@ export interface SetsDetail {
 
 export type ValidationResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validatePointsScore(
   system: ScoringSystem,
@@ -101,25 +62,25 @@ export function validatePointsScore(
   b: number,
 ): ValidationResult {
   const target = scoringTarget(system);
-  if (target == null) return { ok: false, error: "Неверная система счёта" };
+  if (target == null) return { ok: false, error: fieldErr("error.score.invalid_system") };
   if (!Number.isInteger(a) || !Number.isInteger(b))
-    return { ok: false, error: "Очки должны быть целыми числами" };
+    return { ok: false, error: fieldErr("error.score.points_integer") };
   if (a < 0 || b < 0)
-    return { ok: false, error: "Очки не могут быть отрицательными" };
+    return { ok: false, error: fieldErr("error.score.points_negative") };
   const aAt = a === target;
   const bAt = b === target;
   if (aAt && bAt)
-    return { ok: false, error: "Обе команды не могут набрать ровно" };
+    return { ok: false, error: fieldErr("error.score.both_teams_equal") };
   if (!aAt && !bAt)
     return {
       ok: false,
-      error: `Одна из команд должна набрать ${target} очков`,
+      error: fieldErr("error.score.one_team_must_reach", { target }),
     };
   const loser = aAt ? b : a;
   if (loser >= target)
     return {
       ok: false,
-      error: `Проигравший должен набрать меньше ${target}`,
+      error: fieldErr("error.score.loser_must_be_less", { target }),
     };
   return { ok: true };
 }
@@ -130,17 +91,20 @@ export function validateGamesScore(
   b: number,
 ): ValidationResult {
   const target = scoringTarget(system);
-  if (target == null) return { ok: false, error: "Неверная система счёта" };
+  if (target == null) return { ok: false, error: fieldErr("error.score.invalid_system") };
   if (!Number.isInteger(a) || !Number.isInteger(b))
-    return { ok: false, error: "Геймы должны быть целыми числами" };
+    return { ok: false, error: fieldErr("error.score.games_integer") };
   if (a < 0 || b < 0)
-    return { ok: false, error: "Геймы не могут быть отрицательными" };
-  if (a === b) return { ok: false, error: "Не может быть ничьей" };
+    return { ok: false, error: fieldErr("error.score.games_negative") };
+  if (a === b) return { ok: false, error: fieldErr("error.score.no_tie") };
   const total = a + b;
   if (total < target - 2 || total > target + 2)
     return {
       ok: false,
-      error: `Сумма геймов должна быть от ${target - 2} до ${target + 2}`,
+      error: fieldErr("error.score.games_sum_range", {
+        min: target - 2,
+        max: target + 2,
+      }),
     };
   return { ok: true };
 }
@@ -151,22 +115,22 @@ export function validateCombinedScore(
   b: number,
 ): ValidationResult {
   const target = scoringTarget(system);
-  if (target == null) return { ok: false, error: "Неверная система счёта" };
+  if (target == null) return { ok: false, error: fieldErr("error.score.invalid_system") };
   if (!Number.isInteger(a) || !Number.isInteger(b))
-    return { ok: false, error: "Очки должны быть целыми числами" };
+    return { ok: false, error: fieldErr("error.score.points_integer") };
   if (a < 0 || b < 0)
-    return { ok: false, error: "Очки не могут быть отрицательными" };
+    return { ok: false, error: fieldErr("error.score.points_negative") };
   const total = a + b;
   if (total !== target)
     return {
       ok: false,
-      error: `Сумма очков должна равняться ${target} (сейчас: ${total})`,
+      error: fieldErr("error.score.combined_sum_must_equal", {
+        target,
+        total,
+      }),
     };
   if (a === b)
-    return {
-      ok: false,
-      error: "Ничья не допускается, сыграйте решающее очко",
-    };
+    return { ok: false, error: fieldErr("error.score.combined_no_tie") };
   return { ok: true };
 }
 
@@ -196,16 +160,19 @@ export function validateSetsScore(
   detail: SetsDetail,
 ): ValidationResult {
   if (!detail || !Array.isArray(detail.sets))
-    return { ok: false, error: "Введите счёт сетов" };
+    return { ok: false, error: fieldErr("error.score.sets_required") };
   if (detail.sets.length < 2)
-    return { ok: false, error: "Введите оба сета" };
+    return { ok: false, error: fieldErr("error.score.sets_both_required") };
   if (detail.sets.length > 3)
-    return { ok: false, error: "Не больше 3 сетов" };
+    return { ok: false, error: fieldErr("error.score.sets_max_3") };
 
   for (let i = 0; i < 2; i++) {
     const [a, b] = detail.sets[i];
     if (!isValidRegularSet(a, b))
-      return { ok: false, error: `Неверный счёт сета ${i + 1}` };
+      return {
+        ok: false,
+        error: fieldErr("error.score.set_invalid", { n: i + 1 }),
+      };
   }
 
   const t1FirstTwo = detail.sets
@@ -215,9 +182,12 @@ export function validateSetsScore(
 
   if (t1FirstTwo === 2 || t2FirstTwo === 2) {
     if (detail.sets.length !== 2)
-      return { ok: false, error: "Третий сет не нужен — счёт 2-0" };
+      return { ok: false, error: fieldErr("error.score.third_set_not_needed") };
     if (detail.supertiebreak)
-      return { ok: false, error: "Супер тай-брейк не нужен — счёт 2-0" };
+      return {
+        ok: false,
+        error: fieldErr("error.score.supertiebreak_not_needed"),
+      };
     return { ok: true };
   }
 
@@ -225,21 +195,30 @@ export function validateSetsScore(
     if (detail.sets.length !== 2)
       return {
         ok: false,
-        error: "Третий обычный сет не играется — должен быть супер тай-брейк",
+        error: fieldErr("error.score.no_third_regular_set"),
       };
     if (!detail.supertiebreak)
-      return { ok: false, error: "Введите супер тай-брейк" };
+      return {
+        ok: false,
+        error: fieldErr("error.score.supertiebreak_required"),
+      };
     if (!isValidSuperTiebreak(...detail.supertiebreak))
-      return { ok: false, error: "Неверный супер тай-брейк (до 10, +2)" };
+      return {
+        ok: false,
+        error: fieldErr("error.score.supertiebreak_invalid"),
+      };
     return { ok: true };
   }
 
   if (detail.sets.length !== 3)
-    return { ok: false, error: "Введите третий сет" };
+    return { ok: false, error: fieldErr("error.score.third_set_required") };
   if (!isValidRegularSet(...detail.sets[2]))
-    return { ok: false, error: "Неверный счёт третьего сета" };
+    return { ok: false, error: fieldErr("error.score.third_set_invalid") };
   if (detail.supertiebreak)
-    return { ok: false, error: "Супер тай-брейк не используется в этой системе" };
+    return {
+      ok: false,
+      error: fieldErr("error.score.supertiebreak_not_used"),
+    };
   return { ok: true };
 }
 

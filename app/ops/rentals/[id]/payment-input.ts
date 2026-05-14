@@ -3,6 +3,7 @@ import type {
   RentalPaymentMethod,
   RentalPaymentType,
 } from "@/lib/types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -18,20 +19,20 @@ export interface RawRentalPaymentInput {
 
 export type ValidatedRentalPayment =
   | { ok: true; value: Omit<RentalPaymentInput, "contract_id"> }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validateRentalPaymentInput(
   raw: RawRentalPaymentInput,
 ): ValidatedRentalPayment {
   if (!DATE_RE.test(raw.payment_date)) {
-    return { ok: false, error: "Укажите дату" };
+    return { ok: false, error: fieldErr("error.required.date") };
   }
   const amount = Number.parseInt(raw.amount_rub, 10);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return { ok: false, error: "Сумма должна быть больше нуля" };
+    return { ok: false, error: fieldErr("error.invalid.amount_positive") };
   }
   if (amount > 1_000_000_000) {
-    return { ok: false, error: "Сумма выглядит слишком большой" };
+    return { ok: false, error: fieldErr("error.invalid.amount_too_large") };
   }
   return {
     ok: true,
@@ -66,18 +67,21 @@ export type ValidatedScheduleEntry =
         notes: string | null;
       };
     }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validateScheduleEntryInput(
   raw: RawScheduleEntryInput,
 ): ValidatedScheduleEntry {
   const label = raw.period_label.trim();
-  if (!label) return { ok: false, error: "Укажите название периода" };
+  if (!label) return { ok: false, error: fieldErr("error.required.period_name") };
   if (!DATE_RE_2.test(raw.due_date))
-    return { ok: false, error: "Укажите дату оплаты" };
+    return { ok: false, error: fieldErr("error.required.payment_date") };
   const amount = Number.parseInt(raw.amount_due_rub, 10);
   if (!Number.isFinite(amount) || amount < 0) {
-    return { ok: false, error: "Сумма: целое число ≥ 0" };
+    return {
+      ok: false,
+      error: fieldErr("error.invalid.amount_non_negative_int"),
+    };
   }
   return {
     ok: true,

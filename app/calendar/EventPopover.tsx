@@ -4,12 +4,17 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDate } from "@/lib/i18n/format";
 import {
-  FORMAT_LABEL_RU,
-  STATUS_LABEL_RU,
-  TYPE_LABEL_RU,
-} from "@/lib/constants";
-import { formatDateRu } from "@/lib/format-date";
+  EVENT_KIND_LABEL_KEY,
+  SESSION_STATUS_LABEL_KEY,
+  TOURNAMENT_TYPE_KEY,
+} from "@/lib/i18n/calendar-keys";
+import {
+  TOURNAMENT_FORMAT_KEY,
+  TOURNAMENT_STATUS_KEY,
+} from "@/lib/i18n/tournament-keys";
 import { formatTimeRange } from "@/lib/calendar-layout";
 import type { CalendarEvent } from "@/lib/queries/calendar";
 import {
@@ -19,19 +24,6 @@ import {
   eventTitle,
 } from "@/lib/calendar-events";
 import type { Court, TournamentStatus } from "@/lib/types";
-
-const KIND_LABEL_RU: Record<CalendarEvent["kind"], string> = {
-  tournament: "Турнир",
-  league_session: "Сессия лиги",
-  rental: "Аренда",
-  schedule_session: "Сессия ОПС",
-};
-
-const SESSION_STATUS_LABEL_RU: Record<string, string> = {
-  scheduled: "Запланирована",
-  in_progress: "В процессе",
-  completed: "Завершена",
-};
 
 function statusTone(
   status: TournamentStatus,
@@ -67,6 +59,7 @@ export function EventPopover({
   courts: Court[];
   onClose: () => void;
 }) {
+  const { t, lang } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -81,12 +74,12 @@ export function EventPopover({
 
   const when = event
     ? event.startTime
-      ? `${formatDateRu(event.date)} · ${formatTimeRange(event.startTime, event.durationHours)}`
-      : formatDateRu(event.date)
+      ? `${formatDate(event.date, lang)} · ${formatTimeRange(event.startTime, event.durationHours)}`
+      : formatDate(event.date, lang)
     : "";
 
   const courtLabel = event ? courtListLabel(event.courtIds, courts) : null;
-  const title = event ? eventTitle(event) : "";
+  const title = event ? eventTitle(event, t) : "";
   const detailLines = event ? eventDetailLines(event) : [];
   const links = event ? eventLinks(event) : [];
   const blockStyle = event ? eventBlockStyle(event) : null;
@@ -119,7 +112,7 @@ export function EventPopover({
                   style={{ background: kindChipColor ?? "var(--color-accent)" }}
                 />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                  {KIND_LABEL_RU[event.kind]}
+                  {t(EVENT_KIND_LABEL_KEY[event.kind])}
                 </span>
               </div>
               <h2 className="text-lg font-semibold text-black leading-snug">
@@ -129,7 +122,7 @@ export function EventPopover({
             <button
               type="button"
               onClick={() => dialogRef.current?.close()}
-              aria-label="Закрыть"
+              aria-label={t("event.popover.close")}
               className="shrink-0 -mr-1 -mt-1 h-8 w-8 inline-flex items-center justify-center rounded-[var(--radius-button)] text-muted hover:text-black hover:bg-subtle"
             >
               <svg
@@ -153,12 +146,12 @@ export function EventPopover({
 
           {(event.kind === "tournament" || event.kind === "league_session") && (
             <div className="flex flex-wrap gap-1.5">
-              <Badge tone="format">{FORMAT_LABEL_RU[event.format]}</Badge>
+              <Badge tone="format">{t(TOURNAMENT_FORMAT_KEY[event.format])}</Badge>
               <Badge tone={statusTone(event.tournamentStatus)}>
-                {STATUS_LABEL_RU[event.tournamentStatus]}
+                {t(TOURNAMENT_STATUS_KEY[event.tournamentStatus])}
               </Badge>
               <Badge tone="neutral">
-                {TYPE_LABEL_RU[event.tournamentType]}
+                {t(TOURNAMENT_TYPE_KEY[event.tournamentType])}
               </Badge>
             </div>
           )}
@@ -166,26 +159,37 @@ export function EventPopover({
           <dl className="flex flex-col gap-2 text-sm">
             {courtLabel && (
               <div className="flex gap-2">
-                <dt className="text-muted shrink-0">Корты:</dt>
+                <dt className="text-muted shrink-0">
+                  {t("event.popover.courts_label")}
+                </dt>
                 <dd className="text-secondary">{courtLabel}</dd>
               </div>
             )}
             {event.kind === "league_session" && (
               <div className="flex gap-2">
-                <dt className="text-muted shrink-0">Сессия:</dt>
+                <dt className="text-muted shrink-0">
+                  {t("event.popover.session_label")}
+                </dt>
                 <dd className="text-secondary">
                   №{event.sessionNumber}
                   {event.sessionStatus
-                    ? ` · ${SESSION_STATUS_LABEL_RU[event.sessionStatus] ?? event.sessionStatus}`
+                    ? ` · ${
+                        SESSION_STATUS_LABEL_KEY[event.sessionStatus]
+                          ? t(SESSION_STATUS_LABEL_KEY[event.sessionStatus])
+                          : event.sessionStatus
+                      }`
                     : ""}
                 </dd>
               </div>
             )}
-            {detailLines.map((line, i) => (
-              <div key={i} className="flex gap-2">
-                <dd className="text-secondary">{line}</dd>
-              </div>
-            ))}
+            {detailLines.map((line, i) => {
+              const text = line.key ? t(line.key, line.vars) : (line.text ?? "");
+              return (
+                <div key={i} className="flex gap-2">
+                  <dd className="text-secondary">{text}</dd>
+                </div>
+              );
+            })}
           </dl>
 
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -195,7 +199,7 @@ export function EventPopover({
               size="sm"
               onClick={() => dialogRef.current?.close()}
             >
-              Закрыть
+              {t("event.popover.close")}
             </Button>
             {links.map((link) =>
               link.primary ? (
@@ -204,7 +208,7 @@ export function EventPopover({
                   href={link.href}
                   className="inline-flex items-center justify-center h-9 px-3 rounded-[var(--radius-button)] bg-accent text-white text-sm font-semibold hover:bg-[var(--color-accent-hover)]"
                 >
-                  {link.label}
+                  {t(link.labelKey)}
                 </Link>
               ) : (
                 <Link
@@ -212,7 +216,7 @@ export function EventPopover({
                   href={link.href}
                   className="inline-flex items-center justify-center h-9 px-3 rounded-[var(--radius-button)] border border-border bg-surface text-sm font-semibold text-black hover:bg-subtle"
                 >
-                  {link.label}
+                  {t(link.labelKey)}
                 </Link>
               ),
             )}

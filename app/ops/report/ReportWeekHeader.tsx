@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatDate } from "@/lib/i18n/format";
 import { addDays, startOfWeekMon, todayIso } from "@/lib/calendar-range";
-import { formatDateRu } from "@/lib/format-date";
 
 export function ReportWeekHeader({
   weekStartIso,
@@ -13,6 +14,7 @@ export function ReportWeekHeader({
   weekEndIso: string;
 }) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
   const navigate = (iso: string) => router.push(`/ops/report?week=${iso}`);
 
   const thisWeek = startOfWeekMon(todayIso());
@@ -23,7 +25,7 @@ export function ReportWeekHeader({
       <div className="flex items-center gap-2">
         <button
           type="button"
-          aria-label="Предыдущая неделя"
+          aria-label={t("report.aria.prev_week")}
           onClick={() => navigate(addDays(weekStartIso, -7))}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-secondary hover:bg-subtle hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
@@ -43,7 +45,7 @@ export function ReportWeekHeader({
         </button>
         <button
           type="button"
-          aria-label="Следующая неделя"
+          aria-label={t("report.aria.next_week")}
           onClick={() => navigate(addDays(weekStartIso, 7))}
           className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-secondary hover:bg-subtle hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
@@ -68,11 +70,11 @@ export function ReportWeekHeader({
           onClick={() => navigate(thisWeek)}
           disabled={isThisWeek}
         >
-          Эта неделя
+          {t("report.this_week_cta")}
         </Button>
       </div>
       <div className="text-sm text-secondary tabular-nums">
-        {formatDateRu(weekStartIso)} — {formatDateRu(weekEndIso)}
+        {formatDate(weekStartIso, lang)} — {formatDate(weekEndIso, lang)}
       </div>
     </div>
   );

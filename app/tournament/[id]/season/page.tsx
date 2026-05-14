@@ -12,6 +12,8 @@ import { listMatchesByRound } from "@/lib/queries/matches";
 import { listPlayers } from "@/lib/queries/players";
 import { getLeagueSeason } from "@/lib/queries/league-seasons";
 import { computeSeasonLeaderboard } from "@/lib/season-leaderboard";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
 import type { Match } from "@/lib/types";
 
 export default async function SeasonLeaderboardPage({
@@ -61,13 +63,19 @@ export default async function SeasonLeaderboardPage({
 
   const playerById = new Map(players.map((p) => [p.id, p]));
 
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
+
   return (
     <PageShell
-      title={`Таблица · ${tournament.name}`}
+      title={tr("season.short_title_with_name", { name: tournament.name })}
       action={
         <Link href={`/tournament/${id}`}>
           <Button variant="secondary" size="md">
-            К лиге
+            {tr("season.back_to_league")}
           </Button>
         </Link>
       }
@@ -77,15 +85,20 @@ export default async function SeasonLeaderboardPage({
           href={`/tournament/${id}`}
           className="text-sm text-muted hover:text-black inline-flex items-center gap-1.5 self-start"
         >
-          <span aria-hidden>←</span> К лиге · {tournament.name}
+          <span aria-hidden>←</span>{" "}
+          {tr("season.back_to_league_with_name", { name: tournament.name })}
         </Link>
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-3 justify-between">
             <div>
-              <h2 className="font-semibold text-black">Турнирная таблица</h2>
+              <h2 className="font-semibold text-black">{tr("season.title")}</h2>
               <p className="text-xs text-muted">
-                Сессий сыграно: {completed.length} из {sessions.length}
-                {" · "}Квалификационных мест: {league.qualification_spots}
+                {tr("season.played_of_total", {
+                  played: completed.length,
+                  total: sessions.length,
+                })}
+                {" · "}
+                {tr("season.quota_short", { n: league.qualification_spots })}
               </p>
             </div>
           </div>
@@ -97,11 +110,10 @@ export default async function SeasonLeaderboardPage({
               </div>
               <div className="flex flex-col gap-1">
                 <h3 className="font-semibold text-black">
-                  Нет завершённых сессий
+                  {tr("season.empty_title")}
                 </h3>
                 <p className="text-sm text-muted max-w-sm">
-                  Таблица обновится автоматически, как только директор
-                  завершит первую сессию.
+                  {tr("season.empty_copy")}
                 </p>
               </div>
             </div>
@@ -110,13 +122,23 @@ export default async function SeasonLeaderboardPage({
               <table className="w-full text-sm">
                 <thead className="bg-subtle">
                   <tr className="text-left text-xs text-muted uppercase tracking-wider">
-                    <th className="px-3 py-2 w-10">#</th>
-                    <th className="px-3 py-2">Игрок</th>
-                    <th className="px-3 py-2 w-16">Ур.</th>
-                    <th className="px-3 py-2 w-14 text-right">Очки</th>
-                    <th className="px-3 py-2 w-14 text-right">С</th>
-                    <th className="px-3 py-2 w-14 text-right">Луч.</th>
-                    <th className="px-3 py-2 w-16 text-right">Средн.</th>
+                    <th className="px-3 py-2 w-10">{tr("season.col.rank")}</th>
+                    <th className="px-3 py-2">{tr("season.col.player")}</th>
+                    <th className="px-3 py-2 w-16">
+                      {tr("season.col.level_short")}
+                    </th>
+                    <th className="px-3 py-2 w-14 text-right">
+                      {tr("season.col.points")}
+                    </th>
+                    <th className="px-3 py-2 w-14 text-right">
+                      {tr("season.col.matches_short")}
+                    </th>
+                    <th className="px-3 py-2 w-14 text-right">
+                      {tr("season.col.best_position")}
+                    </th>
+                    <th className="px-3 py-2 w-16 text-right">
+                      {tr("season.col.average_points")}
+                    </th>
                     <th className="px-3 py-2 w-24" />
                   </tr>
                 </thead>
@@ -148,7 +170,9 @@ export default async function SeasonLeaderboardPage({
                         </td>
                         <td className="px-3 py-2 text-right">
                           {row.qualified ? (
-                            <Badge tone="qualified">В финал</Badge>
+                            <Badge tone="qualified">
+                              {tr("season.qualified_badge")}
+                            </Badge>
                           ) : null}
                         </td>
                       </tr>

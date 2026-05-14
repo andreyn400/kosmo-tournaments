@@ -4,15 +4,17 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type { Coach } from "@/lib/types";
 import { CoachForm } from "../CoachForm";
 import { updateCoachAction } from "../update-coach-action";
 import { deleteCoachAction } from "../delete-coach-action";
-import { formatRub } from "../format";
 import type { RawCoachInput } from "../coach-input";
 
 export function CoachProfileCard({ coach }: { coach: Coach }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -30,7 +32,7 @@ export function CoachProfileCard({ coach }: { coach: Coach }) {
   }
 
   function handleDelete() {
-    if (!confirm(`Удалить тренера «${coach.name}»? Сессии останутся в базе.`)) {
+    if (!confirm(t("coaches.delete_confirm", { name: coach.name }))) {
       return;
     }
     startTransition(async () => {
@@ -78,7 +80,7 @@ export function CoachProfileCard({ coach }: { coach: Coach }) {
                   )}
                   {!coach.is_active && (
                     <span className="inline-flex items-center px-2 h-6 rounded text-[10.5px] font-semibold tracking-wider uppercase bg-subtle text-muted border border-border">
-                      Неактивен
+                      {t("coaches.inactive_chip_upper")}
                     </span>
                   )}
                 </div>
@@ -93,18 +95,21 @@ export function CoachProfileCard({ coach }: { coach: Coach }) {
                 size="sm"
                 onClick={() => setEditing(true)}
               >
-                Изменить
+                {t("coaches.edit_cta")}
               </Button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Телефон" value={coach.phone} />
-              <Field label="Модель оплаты" value={<RateLine coach={coach} />} />
+              <Field label={t("coach.profile.aria.phone")} value={coach.phone} />
+              <Field
+                label={t("coach.profile.aria.pay_model")}
+                value={<RateLine coach={coach} />}
+              />
             </div>
 
             {coach.bio && (
               <div>
-                <Label>О тренере</Label>
+                <Label>{t("coach.profile.aria.bio")}</Label>
                 <p className="text-sm text-secondary whitespace-pre-wrap">
                   {coach.bio}
                 </p>
@@ -113,7 +118,7 @@ export function CoachProfileCard({ coach }: { coach: Coach }) {
 
             {coach.notes && (
               <div>
-                <Label>Заметки</Label>
+                <Label>{t("coach.profile.aria.notes")}</Label>
                 <p className="text-sm text-secondary whitespace-pre-wrap">
                   {coach.notes}
                 </p>
@@ -152,21 +157,27 @@ function Label({ children }: { children: React.ReactNode }) {
 }
 
 function RateLine({ coach }: { coach: Coach }) {
+  const { t, lang } = useTranslation();
   if (coach.rate_type === "flat") {
     return (
       <span className="tabular-nums">
-        Фикс. <strong>{formatRub(coach.flat_rate_rub)}</strong>{" "}
-        <span className="text-muted">/ сессия</span>
+        {t("coaches.rate.flat_short")}{" "}
+        <strong>{formatRub(coach.flat_rate_rub, lang)}</strong>{" "}
+        <span className="text-muted">{t("coaches.rate.flat_per_session")}</span>
       </span>
     );
   }
   return (
     <span className="tabular-nums">
       <strong>{coach.rate_court_percent}%</strong>{" "}
-      <span className="text-muted">с корта</span>
+      <span className="text-muted">
+        {t("coaches.rate.percent_court_from")}
+      </span>
       <span className="text-fade px-1.5">+</span>
       <strong>{coach.rate_coaching_percent}%</strong>{" "}
-      <span className="text-muted">с тренировки</span>
+      <span className="text-muted">
+        {t("coaches.rate.percent_coaching_from")}
+      </span>
     </span>
   );
 }

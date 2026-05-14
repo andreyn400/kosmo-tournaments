@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { getWeekdayShortLabels } from "@/lib/i18n/format";
 import type {
   Court,
   RentalBlockForGrid,
@@ -16,10 +18,11 @@ import {
   timeFromSlotIndex,
 } from "@/lib/ops-constants";
 import {
-  formatDayHeader,
+  dayOfMonth,
   todayIso,
   weekDays,
   weekMondayIso,
+  weekdayMonFirst,
 } from "./date-helpers";
 import {
   COURT_COL_WIDTH,
@@ -64,7 +67,7 @@ interface WeekGridProps {
  * same row geometry as `DayGrid`. Multi-court sessions still appear here as
  * long as the selected court is in their `court_ids`; the in-block courts
  * label is suppressed (operators see this view *to scan one court*, so
- * repeating "К1" everywhere would be noise).
+ * repeating "C1" everywhere would be noise).
  */
 export function WeekGrid({
   date,
@@ -76,6 +79,8 @@ export function WeekGrid({
   onSessionClick,
   onRentalClick,
 }: WeekGridProps) {
+  const { lang } = useTranslation();
+  const weekdayShort = getWeekdayShortLabels(lang);
   const scrollRef = useRef<HTMLDivElement>(null);
   const today = todayIso();
 
@@ -188,7 +193,8 @@ export function WeekGrid({
             {courtName}
           </div>
           {days.map((d) => {
-            const { dow, day } = formatDayHeader(d);
+            const dow = weekdayShort[weekdayMonFirst(d)].toUpperCase();
+            const day = dayOfMonth(d);
             const isToday = d === today;
             return (
               <div

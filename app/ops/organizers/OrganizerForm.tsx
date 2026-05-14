@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Organizer } from "@/lib/types";
 import type { RawOrganizerInput } from "./organizer-input";
 
@@ -36,6 +37,7 @@ export function OrganizerForm({
   pending,
   onDelete,
 }: OrganizerFormProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<RawOrganizerInput>(() =>
     makeInitial(organizer),
   );
@@ -61,32 +63,32 @@ export function OrganizerForm({
       className="grid gap-3 p-4 rounded-card border border-border bg-surface"
     >
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Название организатора *">
+        <Field label={t("organizer.form.field.name")}>
           <Input
             value={state.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="ИП Иванов / Padel Pro Russia"
+            placeholder={t("organizer.form.placeholder.name")}
             autoFocus
           />
         </Field>
-        <Field label="Контактное лицо">
+        <Field label={t("organizer.form.field.contact_name")}>
           <Input
             value={state.contact_name}
             onChange={(e) => set("contact_name", e.target.value)}
-            placeholder="Иван Иванов"
+            placeholder={t("organizer.form.placeholder.contact_name")}
           />
         </Field>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Телефон">
+        <Field label={t("organizer.form.field.phone")}>
           <Input
             value={state.phone}
             onChange={(e) => set("phone", e.target.value)}
             placeholder="+7 …"
           />
         </Field>
-        <Field label="Email">
+        <Field label={t("organizer.form.field.email")}>
           <Input
             type="email"
             value={state.email}
@@ -96,12 +98,12 @@ export function OrganizerForm({
         </Field>
       </div>
 
-      <Field label="Заметки">
+      <Field label={t("organizer.form.field.notes")}>
         <Textarea
           rows={3}
           value={state.notes}
           onChange={(e) => set("notes", e.target.value)}
-          placeholder="Любая дополнительная информация: условия аренды, бронируемые корты…"
+          placeholder={t("organizer.form.placeholder.notes")}
         />
       </Field>
 
@@ -117,7 +119,7 @@ export function OrganizerForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -127,14 +129,14 @@ export function OrganizerForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Создать"
-              : "Сохранить"}
+              ? t("organizer.form.submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { updatePayment } from "@/lib/queries/organizers";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import { validatePaymentInput, type RawPaymentInput } from "./payment-input";
 
 export async function updatePaymentAction(
@@ -9,8 +11,9 @@ export async function updatePaymentAction(
   paymentId: string,
   raw: RawPaymentInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const v = validatePaymentInput(raw);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
 
   try {
     await updatePayment(paymentId, { ...v.value, organizer_id: organizerId });
@@ -19,7 +22,10 @@ export async function updatePaymentAction(
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось обновить запись.",
+      error:
+        e instanceof Error
+          ? e.message
+          : dict["error.failed.update.schedule_record"],
     };
   }
 }

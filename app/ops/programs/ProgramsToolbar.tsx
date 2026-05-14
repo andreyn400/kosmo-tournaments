@@ -2,6 +2,7 @@
 
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { ALL_PROGRAM_TYPES } from "@/lib/program-groups";
 import type { ViewMode } from "./view-mode";
 
@@ -30,24 +31,25 @@ export function ProgramsToolbar({
   total,
   visible,
 }: ProgramsToolbarProps) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-border bg-surface p-4 flex flex-col gap-3">
       <div className="grid gap-3 sm:grid-cols-[1fr_minmax(0,14rem)_auto]">
         <Input
-          placeholder="Поиск по названию, типу, коду…"
+          placeholder={t("programs.search_placeholder")}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          aria-label="Поиск программ"
+          aria-label={t("programs.aria.search")}
         />
         <Select
           value={typeFilter}
           onChange={(e) => onTypeFilterChange(e.target.value)}
-          aria-label="Фильтр по типу"
+          aria-label={t("programs.aria.type_filter")}
         >
-          <option value="">Все типы</option>
-          {ALL_PROGRAM_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
+          <option value="">{t("programs.type_all")}</option>
+          {ALL_PROGRAM_TYPES.map((tp) => (
+            <option key={tp} value={tp}>
+              {tp}
             </option>
           ))}
         </Select>
@@ -58,30 +60,30 @@ export function ProgramsToolbar({
             onChange={(e) => onShowInactiveChange(e.target.checked)}
             className="h-4 w-4 accent-[var(--color-accent)]"
           />
-          Показать неактивные
+          {t("programs.show_inactive")}
         </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted">
         <span className="tabular-nums">
-          Видно {visible} из {total}
+          {t("programs.visible_of_total", { visible, total })}
         </span>
         <div
           role="tablist"
-          aria-label="Вид"
+          aria-label={t("programs.aria.view")}
           className="ml-auto inline-flex p-0.5 rounded-md bg-subtle border border-border"
         >
           <ViewPill
             active={view === "table"}
             onClick={() => onViewChange("table")}
             icon="☰"
-            label="Таблица"
+            label={t("programs.view.table")}
           />
           <ViewPill
             active={view === "cards"}
             onClick={() => onViewChange("cards")}
             icon="⊞"
-            label="Карточки"
+            label={t("programs.view.cards")}
           />
         </div>
       </div>

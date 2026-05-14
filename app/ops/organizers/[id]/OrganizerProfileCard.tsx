@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Organizer } from "@/lib/types";
 import { OrganizerForm } from "../OrganizerForm";
 import { updateOrganizerAction } from "../update-organizer-action";
@@ -11,6 +12,7 @@ import type { RawOrganizerInput } from "../organizer-input";
 
 export function OrganizerProfileCard({ organizer }: { organizer: Organizer }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
 
@@ -28,7 +30,7 @@ export function OrganizerProfileCard({ organizer }: { organizer: Organizer }) {
   }
 
   function handleDelete() {
-    const msg = `Удалить организатора «${organizer.name}»? Все записи ленты будут также удалены.`;
+    const msg = t("organizer.detail.delete_confirm", { name: organizer.name });
     if (!confirm(msg)) return;
     startTransition(async () => {
       const res = await deleteOrganizerAction(organizer.id);
@@ -69,18 +71,18 @@ export function OrganizerProfileCard({ organizer }: { organizer: Organizer }) {
           size="sm"
           onClick={() => setEditing(true)}
         >
-          Изменить
+          {t("organizer.detail.edit_cta")}
         </Button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 mt-4">
-        <Field label="Телефон" value={organizer.phone} />
-        <Field label="Email" value={organizer.email} />
+        <Field label={t("organizer.detail.field.phone")} value={organizer.phone} />
+        <Field label={t("organizer.detail.field.email")} value={organizer.email} />
       </div>
 
       {organizer.notes && (
         <div className="mt-4">
-          <Label>Заметки</Label>
+          <Label>{t("organizer.detail.field.notes")}</Label>
           <p className="text-sm text-secondary whitespace-pre-wrap">
             {organizer.notes}
           </p>

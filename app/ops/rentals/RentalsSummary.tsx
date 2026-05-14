@@ -1,13 +1,15 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
 import type { RentalContractWithSummary } from "@/lib/types";
-import { formatRub } from "../coaches/format";
 
 interface RentalsSummaryProps {
   contracts: RentalContractWithSummary[];
 }
 
 export function RentalsSummary({ contracts }: RentalsSummaryProps) {
+  const { t, tPlural, lang } = useTranslation();
   const total = contracts.length;
   const active = contracts.filter((c) => c.status === "active").length;
   const overdueList = contracts.filter((c) => c.overdue_rub > 0);
@@ -19,38 +21,43 @@ export function RentalsSummary({ contracts }: RentalsSummaryProps) {
   const monthlyRecurring = contracts
     .filter((c) => c.status === "active")
     .reduce((acc, c) => {
-      // Rough monthly run-rate: contract value / months in contract.
       const months = monthsBetween(c.start_date, c.end_date);
       return acc + (months > 0 ? Math.round(c.total_value_rub / months) : 0);
     }, 0);
 
+  const contractWord = tPlural(total, {
+    one: "rentals.contracts.one",
+    few: "rentals.contracts.few",
+    many: "rentals.contracts.many",
+  });
+
   return (
     <div className="rounded-card border border-border bg-surface px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px]">
       <Stat
-        label="Контрактов"
+        label={t("rentals.summary.contracts")}
         value={String(total)}
-        suffix={pluralContracts(total)}
+        suffix={contractWord}
       />
       <Sep />
       <Stat
-        label="Активных"
+        label={t("rentals.summary.active")}
         value={String(active)}
         tone={active > 0 ? "black" : "muted"}
       />
       <Sep />
       <Stat
-        label="Просрочено"
+        label={t("rentals.summary.overdue")}
         value={
           overdueCount > 0
-            ? `${overdueCount} · ${formatRub(overdueAmount)}`
+            ? `${overdueCount} · ${formatRub(overdueAmount, lang)}`
             : "—"
         }
         tone={overdueCount > 0 ? "danger" : "muted"}
       />
       <Sep />
       <Stat
-        label="Поток в месяц"
-        value={monthlyRecurring > 0 ? formatRub(monthlyRecurring) : "—"}
+        label={t("rentals.summary.monthly_run_rate")}
+        value={monthlyRecurring > 0 ? formatRub(monthlyRecurring, lang) : "—"}
         tone="success"
       />
     </div>
@@ -102,13 +109,4 @@ function Sep() {
       ·
     </span>
   );
-}
-
-function pluralContracts(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "контрактов";
-  if (mod10 === 1) return "контракт";
-  if (mod10 >= 2 && mod10 <= 4) return "контракта";
-  return "контрактов";
 }

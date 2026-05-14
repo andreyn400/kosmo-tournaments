@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type {
   Court,
   RentalBlockForGrid,
@@ -58,6 +59,7 @@ export function DayGrid({
   onSessionClick,
   onRentalClick,
 }: DayGridProps) {
+  const { t } = useTranslation();
   const isToday = date === todayIso();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -143,10 +145,7 @@ export function DayGrid({
   if (courts.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center">
-        <p className="text-sm text-muted">
-          Нет активных кортов. Добавьте корт в разделе «Корты», чтобы строить
-          расписание.
-        </p>
+        <p className="text-sm text-muted">{t("schedule.no_courts_grid")}</p>
       </div>
     );
   }
@@ -169,7 +168,7 @@ export function DayGrid({
             className="flex items-center justify-center text-[10.5px] font-semibold uppercase tracking-wider text-muted border-r border-border"
             style={{ width: TIME_GUTTER_WIDTH }}
           >
-            Время
+            {t("schedule.col.time")}
           </div>
           {courts.map((c) => (
             <div

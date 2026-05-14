@@ -6,6 +6,7 @@ import {
   bulkInsertPrograms,
   countPrograms,
 } from "@/lib/queries/programs";
+import { getServerDict } from "@/lib/i18n/server";
 import type { ProgramInput } from "@/lib/types";
 
 interface SeedRow {
@@ -23,11 +24,15 @@ export async function seedProgramsAction(): Promise<{
   inserted?: number;
   error?: string;
 }> {
+  const dict = await getServerDict();
   try {
     const existing = await countPrograms();
     if (existing > 0) {
       return {
-        error: `В библиотеке уже есть программы (${existing}). Удалите их вручную, если хотите перезалить набор padel-ops.`,
+        error: dict["error.programs_already_seeded"].replace(
+          "{n}",
+          String(existing),
+        ),
       };
     }
 
@@ -48,7 +53,7 @@ export async function seedProgramsAction(): Promise<{
     return { inserted };
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Ошибка при загрузке набора.",
+      error: e instanceof Error ? e.message : dict["error.failed.load_dataset"],
     };
   }
 }

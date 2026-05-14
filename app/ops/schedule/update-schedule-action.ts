@@ -9,21 +9,26 @@ import {
   detectCollision,
   type CollisionExisting,
 } from "@/lib/schedule-collisions";
+import { getServerDict } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import { validateScheduleInput, type RawScheduleInput } from "./schedule-input";
 
 export async function updateScheduleAction(
   sessionId: string,
   raw: RawScheduleInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const program = raw.program_id ? await getProgram(raw.program_id) : null;
 
   const v = validateScheduleInput(raw, program);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
 
   const [existingSessions, existingRentals] = await Promise.all([
     listSessionsForRange(v.value.date, v.value.date),
     listRentalBlocksForRange(v.value.date, v.value.date),
   ]);
+  const rentalLabel = (client: string) =>
+    dict["error.schedule.rental_label"].replace("{client}", client);
   const existing: CollisionExisting[] = [
     ...existingSessions.map((s) => ({
       id: s.id,
@@ -41,7 +46,7 @@ export async function updateScheduleAction(
       end_time: b.end_time,
       court_ids: b.court_ids,
       status: "scheduled" as const,
-      program_name: `Аренда: ${b.client_name}`,
+      program_name: rentalLabel(b.client_name),
     })),
   ];
   const conflict = detectCollision(existing, {
@@ -51,7 +56,7 @@ export async function updateScheduleAction(
     end_time: v.value.end_time,
     court_ids: v.value.court_ids,
   });
-  if (conflict) return { error: conflict };
+  if (conflict) return { error: resolveErrorWithDict(conflict, dict) };
 
   try {
     await updateScheduleSession(sessionId, v.value, v.coachIds);
@@ -60,7 +65,8 @@ export async function updateScheduleAction(
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось обновить сессию.",
+      error:
+        e instanceof Error ? e.message : dict["error.failed.update.session"],
     };
   }
 }

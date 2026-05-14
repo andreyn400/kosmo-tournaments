@@ -12,20 +12,22 @@ import {
   listSessionsByTournament,
   updateSessionStatus,
 } from "@/lib/queries/sessions";
+import { getServerDict } from "@/lib/i18n/server";
 
 export async function finalizeTournamentAction(
   tournamentId: string,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   let redirectPath: string | null = null;
 
   try {
     const tournament = await getTournament(tournamentId);
-    if (!tournament) return { error: "Турнир не найден" };
+    if (!tournament) return { error: dict["error.not_found.tournament"] };
 
     if (tournament.type === "league_season") {
       const sessions = await listSessionsByTournament(tournamentId);
       const active = sessions.find((s) => s.status === "in_progress");
-      if (!active) return { error: "Нет активной сессии" };
+      if (!active) return { error: dict["error.state.no_active_session"] };
 
       await finalizeSessionElo({
         sessionId: active.id,
@@ -47,8 +49,13 @@ export async function finalizeTournamentAction(
       redirectPath = `/tournament/${tournamentId}/results`;
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось завершить: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.finalize_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
 
   redirect(redirectPath);

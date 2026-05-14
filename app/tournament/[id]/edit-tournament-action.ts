@@ -8,6 +8,7 @@ import {
 import { listActiveCourts } from "@/lib/queries/courts";
 import { normalizeTime } from "@/lib/time-slots";
 import { PADEL_LEVELS } from "@/lib/constants";
+import { getServerDict } from "@/lib/i18n/server";
 import type { PadelLevel } from "@/lib/types";
 
 export interface EditTournamentInput {
@@ -32,26 +33,27 @@ function parseLevel(v: string | null): PadelLevel | null {
 export async function editTournamentAction(
   input: EditTournamentInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const tournament = await getTournament(input.tournamentId);
-  if (!tournament) return { error: "Турнир не найден" };
+  if (!tournament) return { error: dict["error.not_found.tournament"] };
 
   const name = input.name.trim();
-  if (!name) return { error: "Введите название" };
-  if (name.length > 120) return { error: "Название слишком длинное" };
+  if (!name) return { error: dict["error.required.name"] };
+  if (name.length > 120) return { error: dict["error.too_long.name"] };
 
   if (input.courtIds.length === 0)
-    return { error: "Выберите хотя бы один корт" };
+    return { error: dict["error.courts.at_least_one"] };
 
   const activeCourts = await listActiveCourts();
   const activeIds = new Set(activeCourts.map((c) => c.id));
   const validCourtIds = input.courtIds.filter((id) => activeIds.has(id));
   if (validCourtIds.length === 0)
-    return { error: "Выбранные корты больше не активны" };
+    return { error: dict["error.courts.no_longer_active"] };
 
   let startTime: string | null = null;
   if (input.startTime) {
     const normalized = normalizeTime(input.startTime);
-    if (!normalized) return { error: "Неверное время начала" };
+    if (!normalized) return { error: dict["error.invalid.start_time"] };
     startTime = normalized;
   }
 
@@ -60,11 +62,11 @@ export async function editTournamentAction(
     input.durationHours < 1 ||
     input.durationHours > 12
   ) {
-    return { error: "Длительность должна быть от 1 до 12 часов" };
+    return { error: dict["error.invalid.duration_hours_1_12"] };
   }
 
   if (!Number.isFinite(input.entryFee) || input.entryFee < 0) {
-    return { error: "Взнос не может быть отрицательным" };
+    return { error: dict["error.invalid.entry_fee_negative"] };
   }
 
   if (input.maxPlayers != null) {
@@ -73,7 +75,7 @@ export async function editTournamentAction(
       input.maxPlayers < 4 ||
       input.maxPlayers % 4 !== 0
     ) {
-      return { error: "Макс. игроков должно быть кратно 4 и не меньше 4" };
+      return { error: dict["error.invalid.max_players_multiple_of_4"] };
     }
   }
 
@@ -97,8 +99,13 @@ export async function editTournamentAction(
       notes: input.notes && input.notes.trim() ? input.notes.trim() : null,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось сохранить: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.save_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
 
   revalidatePath(`/tournament/${input.tournamentId}`);

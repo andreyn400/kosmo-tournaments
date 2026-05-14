@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   setsWon,
   validateSetsScore,
@@ -31,6 +32,7 @@ export function SetsScoreInput({
   isCompleted: boolean;
   editable: boolean;
 }) {
+  const { t } = useTranslation();
   const [s1a, setS1a] = useState<string>(
     initial?.sets[0]?.[0] != null ? String(initial.sets[0][0]) : "",
   );
@@ -75,13 +77,13 @@ export function SetsScoreInput({
 
   const thirdLabel =
     scoringSystem === "sets_supertiebreak"
-      ? "Супер тай-брейк · до 10"
-      : "Решающий сет";
+      ? t("match.field.supertiebreak_to_10")
+      : t("match.field.deciding_set");
 
   const submit = () => {
     setError(null);
     if (!set1Filled || !set2Filled) {
-      setError("Введите счёт первых двух сетов");
+      setError(t("match.error.enter_first_two"));
       return;
     }
     const detail: SetsDetail = {
@@ -92,7 +94,7 @@ export function SetsScoreInput({
     };
     if (needsThirdRow) {
       if (s3a === "" || s3b === "") {
-        setError(`Введите счёт: ${thirdLabel}`);
+        setError(t("match.error.enter_label", { label: thirdLabel }));
         return;
       }
       if (scoringSystem === "sets_supertiebreak") {
@@ -104,7 +106,7 @@ export function SetsScoreInput({
 
     const v = validateSetsScore(scoringSystem, detail);
     if (!v.ok) {
-      setError(v.error);
+      setError(t(v.error.key, v.error.vars));
       return;
     }
 
@@ -123,13 +125,18 @@ export function SetsScoreInput({
   const wonArr = isCompleted && initial ? setsWon(initial) : null;
   const team1Won = wonArr ? wonArr[0] > wonArr[1] : false;
   const team2Won = wonArr ? wonArr[1] > wonArr[0] : false;
+  const courtPrefix = t("court.prefix");
 
   return (
     <>
       <div className="px-5 pt-3 grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-baseline text-[11px] font-semibold text-muted uppercase tracking-[0.08em]">
         <span></span>
-        <span className="w-[60px] text-center text-secondary">К1</span>
-        <span className="w-[60px] text-center text-secondary">К2</span>
+        <span className="w-[60px] text-center text-secondary">
+          {courtPrefix}1
+        </span>
+        <span className="w-[60px] text-center text-secondary">
+          {courtPrefix}2
+        </span>
       </div>
       <div className="px-5 pt-1 grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 items-center">
         <span
@@ -153,7 +160,7 @@ export function SetsScoreInput({
 
       <div className="px-5 py-4 flex flex-col gap-2">
         <SetRow
-          label="Сет 1"
+          label={t("match.field.set1")}
           a={s1a}
           b={s1b}
           onA={setS1a}
@@ -164,7 +171,7 @@ export function SetsScoreInput({
           maxLen={2}
         />
         <SetRow
-          label="Сет 2"
+          label={t("match.field.set2")}
           a={s2a}
           b={s2b}
           onA={setS2a}
@@ -201,10 +208,10 @@ export function SetsScoreInput({
           ) : null}
           <Button size="lg" fullWidth disabled={pending} onClick={submit}>
             {pending
-              ? "Сохранение…"
+              ? t("match.saving")
               : isCompleted
-                ? "Обновить счёт"
-                : "Сохранить счёт"}
+                ? t("match.update_score")
+                : t("match.save_score")}
           </Button>
         </div>
       ) : null}

@@ -1,12 +1,17 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
+
 export type ConnectionState = "connecting" | "connected" | "disconnected";
 
 export function ConnectionIndicator({ state }: { state: ConnectionState }) {
+  const { t } = useTranslation();
   if (state === "connected") return null;
 
   const label =
-    state === "connecting" ? "Подключение…" : "Соединение потеряно";
+    state === "connecting"
+      ? t("play.connection.connecting")
+      : t("play.connection.disconnected");
   const tone =
     state === "connecting"
       ? "bg-subtle text-muted border-border"

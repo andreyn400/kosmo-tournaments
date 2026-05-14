@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import {
+  formatDateRange,
+  formatDateWithWeekday,
+} from "@/lib/i18n/format";
 import type {
   Coach,
   Court,
@@ -12,8 +17,6 @@ import type {
   ScheduleSessionForGrid,
 } from "@/lib/types";
 import {
-  formatDayLong,
-  formatWeekRange,
   shiftDays,
   todayIso,
   weekMondayIso,
@@ -32,7 +35,7 @@ export type SchedulerView = "day" | "week";
 
 interface SchedulerShellProps {
   view: SchedulerView;
-  date: string; // YYYY-MM-DD
+  date: string;
   courtId: string | null;
   sessions: ScheduleSessionForGrid[];
   rentalBlocks: RentalBlockForGrid[];
@@ -52,12 +55,10 @@ export function SchedulerShell({
   coaches,
 }: SchedulerShellProps) {
   const router = useRouter();
+  const { t, tPlural, lang } = useTranslation();
   const today = todayIso();
   const isToday = view === "day" && date === today;
 
-  // Popover state. `null` = closed. The anchor `DOMRect` is captured at click
-  // time so the popover positions itself relative to the cell/block the
-  // operator just interacted with.
   type PopoverState =
     | {
         mode: "create";
@@ -68,8 +69,6 @@ export function SchedulerShell({
       }
     | { mode: "edit"; anchor: DOMRect; session: ScheduleSessionForGrid };
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  // Rental popover is separate state — different shape (read-only) and
-  // mutually exclusive with the session popover at the UX layer.
   const [rentalPopover, setRentalPopover] = useState<{
     block: RentalBlockForGrid;
     anchor: DOMRect;
@@ -148,8 +147,6 @@ export function SchedulerShell({
     navigate({ date: today });
   }, [navigate, today]);
 
-  // Keyboard navigation. Skip when focus is inside form controls so date /
-  // time inputs in the popover still work normally.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -183,26 +180,33 @@ export function SchedulerShell({
   }, [date, navigate, stepBack, stepForward, jumpToday]);
 
   const dateLabel = useMemo(() => {
-    if (view === "day") return formatDayLong(date);
-    return formatWeekRange(weekMondayIso(date), weekSundayIso(date));
-  }, [view, date]);
+    if (view === "day") return formatDateWithWeekday(date, lang);
+    return formatDateRange(weekMondayIso(date), weekSundayIso(date), lang);
+  }, [view, date, lang]);
 
   const sessionCount = sessions.length;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Date navigation */}
         <div className="inline-flex items-center gap-1.5">
-          <NavArrow direction="left" onClick={stepBack} title="Назад (←)" />
-          <NavArrow direction="right" onClick={stepForward} title="Вперёд (→)" />
+          <NavArrow
+            direction="left"
+            onClick={stepBack}
+            title={t("schedule.aria.prev")}
+          />
+          <NavArrow
+            direction="right"
+            onClick={stepForward}
+            title={t("schedule.aria.next")}
+          />
           <Button
             variant={isToday ? "primary" : "secondary"}
             size="sm"
             onClick={jumpToday}
-            title="Сегодня (T)"
+            title={t("schedule.aria.today")}
           >
-            Сегодня
+            {t("schedule.today_cta")}
           </Button>
         </div>
 
@@ -212,16 +216,15 @@ export function SchedulerShell({
           </span>
           {isToday && (
             <span className="inline-flex items-center px-1.5 h-5 rounded text-[10px] font-bold uppercase tracking-wider bg-accent-soft text-accent flex-shrink-0">
-              Сегодня
+              {t("schedule.today_chip")}
             </span>
           )}
         </div>
 
-        {/* Right cluster: view toggle + (week-only) court selector */}
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {view === "week" && courts.length > 0 && (
             <label className="inline-flex items-center gap-2 text-xs">
-              <span className="text-muted">Корт</span>
+              <span className="text-muted">{t("schedule.court_label")}</span>
               <Select
                 value={courtId ?? ""}
                 onChange={(e) => navigate({ courtId: e.target.value })}
@@ -239,21 +242,23 @@ export function SchedulerShell({
         </div>
       </div>
 
-      {/* Subtitle / status strip */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-muted">
         <span>
-          {view === "day" ? "День" : "Неделя"} ·{" "}
+          {view === "day" ? t("schedule.subtitle.day") : t("schedule.subtitle.week")} ·{" "}
           <span className="tabular-nums text-secondary font-semibold">
             {sessionCount}
           </span>{" "}
-          {pluralSessions(sessionCount)}
+          {tPlural(sessionCount, {
+            one: "schedule.sessions.one",
+            few: "schedule.sessions.few",
+            many: "schedule.sessions.many",
+          })}
         </span>
         <span className="hidden sm:inline">
-          ← → день · Shift + ← → неделя · T сегодня
+          {t("schedule.subtitle.shortcuts")}
         </span>
       </div>
 
-      {/* Body */}
       {view === "day" ? (
         <DayGrid
           date={date}
@@ -277,10 +282,7 @@ export function SchedulerShell({
         />
       ) : (
         <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center">
-          <p className="text-sm text-muted">
-            Нет активных кортов. Добавьте корт в разделе «Корты», чтобы
-            пользоваться недельным видом.
-          </p>
+          <p className="text-sm text-muted">{t("schedule.no_courts_week")}</p>
         </div>
       )}
 
@@ -369,21 +371,22 @@ function ViewToggle({
   view: SchedulerView;
   onChange: (v: SchedulerView) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       role="tablist"
-      aria-label="Вид"
+      aria-label={t("schedule.aria.view_picker")}
       className="inline-flex p-0.5 rounded-md bg-subtle border border-border"
     >
       <ToggleButton
         active={view === "day"}
         onClick={() => onChange("day")}
-        label="День"
+        label={t("schedule.view.day")}
       />
       <ToggleButton
         active={view === "week"}
         onClick={() => onChange("week")}
-        label="Неделя"
+        label={t("schedule.view.week")}
       />
     </div>
   );
@@ -414,13 +417,4 @@ function ToggleButton({
       {label}
     </button>
   );
-}
-
-function pluralSessions(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "сессий";
-  if (mod10 === 1) return "сессия";
-  if (mod10 >= 2 && mod10 <= 4) return "сессии";
-  return "сессий";
 }

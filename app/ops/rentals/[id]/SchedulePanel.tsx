@@ -4,11 +4,13 @@ import { Fragment, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub, formatShortDateWithWeekday } from "@/lib/i18n/format";
+import { todayIso } from "../../coaches/format";
 import type {
   RentalPayment,
   RentalPaymentScheduleEntry,
 } from "@/lib/types";
-import { formatDateRu, formatRub, todayIso } from "../../coaches/format";
 import {
   createScheduleEntryAction,
   deleteScheduleEntryAction,
@@ -34,11 +36,11 @@ export function SchedulePanel({
   payments,
 }: SchedulePanelProps) {
   const router = useRouter();
+  const { t, tPlural } = useTranslation();
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Pre-aggregate per-entry paid-so-far from payments linked by schedule_id.
   const paidByScheduleId = useMemo(() => {
     const m = new Map<string, number>();
     for (const p of payments) {
@@ -85,7 +87,7 @@ export function SchedulePanel({
   }
 
   async function handleDelete(entryId: string) {
-    if (!confirm("Удалить эту запись из графика?")) return;
+    if (!confirm(t("schedule_panel.delete_confirm"))) return;
     startTransition(async () => {
       const res = await deleteScheduleEntryAction(contractId, entryId);
       if (res.error) {
@@ -97,9 +99,7 @@ export function SchedulePanel({
   }
 
   async function handleRegenerate() {
-    const ok = confirm(
-      "Перегенерировать график? Это удалит существующие записи графика и создаст новые по условиям контракта. Сами платежи сохранятся, но потеряют связь с конкретными периодами.",
-    );
+    const ok = confirm(t("schedule_panel.regenerate_confirm"));
     if (!ok) return;
     startTransition(async () => {
       const res = await regenerateScheduleAction(contractId);
@@ -114,11 +114,17 @@ export function SchedulePanel({
   return (
     <section className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold text-black">График платежей</h2>
+        <h2 className="text-sm font-semibold text-black">
+          {t("schedule_panel.title")}
+        </h2>
         <span className="text-xs text-muted">
           {schedule.length === 0
-            ? "Записей нет"
-            : `${schedule.length} ${pluralEntries(schedule.length)}`}
+            ? t("schedule_panel.count_empty")
+            : `${schedule.length} ${tPlural(schedule.length, {
+                one: "schedule_panel.entries.one",
+                few: "schedule_panel.entries.few",
+                many: "schedule_panel.entries.many",
+              })}`}
         </span>
         <div className="ml-auto flex items-center gap-2">
           <Button
@@ -128,14 +134,14 @@ export function SchedulePanel({
             onClick={handleRegenerate}
             disabled={pending}
           >
-            Регенерировать
+            {t("schedule_panel.regenerate_cta")}
           </Button>
           <Button
             size="sm"
             onClick={() => setCreating(true)}
             disabled={creating}
           >
-            + Запись
+            {t("schedule_panel.add_entry_cta")}
           </Button>
         </div>
       </header>
@@ -151,26 +157,28 @@ export function SchedulePanel({
 
       {schedule.length === 0 && !creating ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-6 text-center">
-          <p className="text-sm text-muted">
-            Графика платежей нет. Нажмите «Регенерировать», чтобы создать
-            его автоматически по условиям контракта, или добавьте записи
-            вручную.
-          </p>
+          <p className="text-sm text-muted">{t("schedule_panel.empty")}</p>
         </div>
       ) : schedule.length > 0 ? (
         <div className="rounded-card border border-border bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-subtle/30 text-[10.5px] uppercase tracking-wider text-muted font-semibold">
-                <th className="pl-4 pr-2 py-2 text-left">Период</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">Дата</th>
-                <th className="px-2 py-2 text-right whitespace-nowrap">
-                  Сумма
+                <th className="pl-4 pr-2 py-2 text-left">
+                  {t("schedule_panel.col.period")}
+                </th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">
+                  {t("schedule_panel.col.date")}
                 </th>
                 <th className="px-2 py-2 text-right whitespace-nowrap">
-                  Оплачено
+                  {t("schedule_panel.col.amount")}
                 </th>
-                <th className="pl-2 pr-4 py-2 text-left">Статус</th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">
+                  {t("schedule_panel.col.paid")}
+                </th>
+                <th className="pl-2 pr-4 py-2 text-left">
+                  {t("schedule_panel.col.status")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -240,6 +248,7 @@ function ScheduleRow({
   zebra: boolean;
   onToggle: () => void;
 }) {
+  const { lang } = useTranslation();
   const rowBg = expanded
     ? "bg-accent-soft/50"
     : zebra
@@ -256,10 +265,10 @@ function ScheduleRow({
         {e.period_label}
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums whitespace-nowrap">
-        {formatDateRu(e.due_date)}
+        {formatShortDateWithWeekday(e.due_date, lang)}
       </td>
       <td className="px-2 align-middle text-xs text-secondary tabular-nums text-right whitespace-nowrap">
-        {formatRub(e.amount_due_rub)}
+        {formatRub(e.amount_due_rub, lang)}
       </td>
       <td className="px-2 align-middle text-xs tabular-nums text-right whitespace-nowrap">
         {paid > 0 ? (
@@ -270,7 +279,7 @@ function ScheduleRow({
                 : "text-[var(--color-warning)] font-semibold"
             }
           >
-            {formatRub(paid)}
+            {formatRub(paid, lang)}
           </span>
         ) : (
           <span className="text-fade">—</span>
@@ -284,31 +293,38 @@ function ScheduleRow({
 }
 
 function StatusBadge({ status }: { status: EntryStatus }) {
-  const map: Record<EntryStatus, { bg: string; text: string; label: string }> =
-    {
-      settled: {
-        bg: "bg-[var(--color-success-soft)]",
-        text: "text-[var(--color-success)]",
-        label: "Оплачено",
-      },
-      partial: {
-        bg: "bg-[var(--color-warning-soft)]",
-        text: "text-[var(--color-warning)]",
-        label: "Частично",
-      },
-      overdue: {
-        bg: "bg-[var(--color-danger-soft)]",
-        text: "text-[var(--color-danger)]",
-        label: "Просрочено",
-      },
-      upcoming: { bg: "bg-subtle", text: "text-secondary", label: "Ожидается" },
-    };
+  const { t } = useTranslation();
+  const map: Record<
+    EntryStatus,
+    { bg: string; text: string; labelKey: Parameters<typeof t>[0] }
+  > = {
+    settled: {
+      bg: "bg-[var(--color-success-soft)]",
+      text: "text-[var(--color-success)]",
+      labelKey: "schedule_panel.entry_status.settled",
+    },
+    partial: {
+      bg: "bg-[var(--color-warning-soft)]",
+      text: "text-[var(--color-warning)]",
+      labelKey: "schedule_panel.entry_status.partial",
+    },
+    overdue: {
+      bg: "bg-[var(--color-danger-soft)]",
+      text: "text-[var(--color-danger)]",
+      labelKey: "schedule_panel.entry_status.overdue",
+    },
+    upcoming: {
+      bg: "bg-subtle",
+      text: "text-secondary",
+      labelKey: "schedule_panel.entry_status.upcoming",
+    },
+  };
   const cfg = map[status];
   return (
     <span
       className={`inline-flex items-center px-2 h-6 rounded text-[10.5px] font-semibold uppercase tracking-wider ${cfg.bg} ${cfg.text}`}
     >
-      {cfg.label}
+      {t(cfg.labelKey)}
     </span>
   );
 }
@@ -328,6 +344,7 @@ function ScheduleEntryForm({
   onDelete?: () => void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const [state, setState] = useState<RawScheduleEntryInput>({
     period_label: entry?.period_label ?? "",
     amount_due_rub: entry ? String(entry.amount_due_rub) : "",
@@ -341,7 +358,7 @@ function ScheduleEntryForm({
     setError(null);
     const v = validateScheduleEntryInput(state);
     if (!v.ok) {
-      setError(v.error);
+      setError(t(v.error.key, v.error.vars));
       return;
     }
     const res = await onSubmit(state);
@@ -355,18 +372,18 @@ function ScheduleEntryForm({
       className="grid gap-3 p-3 rounded-md bg-surface border border-border"
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_8rem_8rem]">
-        <Field label="Период">
+        <Field label={t("schedule_panel.entry_form.field.period")}>
           <Input
             value={state.period_label}
             onChange={(e) =>
               setState((s) => ({ ...s, period_label: e.target.value }))
             }
-            placeholder="Май 2026 / Q2 2026 / Депозит"
+            placeholder={t("schedule_panel.entry_form.placeholder.period")}
             className="!h-9"
             autoFocus={mode === "create"}
           />
         </Field>
-        <Field label="Дата оплаты">
+        <Field label={t("schedule_panel.entry_form.field.due_date")}>
           <Input
             type="date"
             value={state.due_date}
@@ -376,7 +393,7 @@ function ScheduleEntryForm({
             className="!h-9"
           />
         </Field>
-        <Field label="Сумма, ₽">
+        <Field label={t("schedule_panel.entry_form.field.amount")}>
           <Input
             type="number"
             min={0}
@@ -390,7 +407,7 @@ function ScheduleEntryForm({
         </Field>
       </div>
 
-      <Field label="Заметка">
+      <Field label={t("schedule_panel.entry_form.field.notes")}>
         <Input
           value={state.notes}
           onChange={(e) =>
@@ -412,7 +429,7 @@ function ScheduleEntryForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить
+            {t("coaches.delete_cta")}
           </Button>
         )}
         <Button
@@ -422,14 +439,14 @@ function ScheduleEntryForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Создать"
-              : "Сохранить"}
+              ? t("slots.form.submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>
@@ -451,13 +468,4 @@ function Field({
       {children}
     </label>
   );
-}
-
-function pluralEntries(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 14) return "записей";
-  if (mod10 === 1) return "запись";
-  if (mod10 >= 2 && mod10 <= 4) return "записи";
-  return "записей";
 }

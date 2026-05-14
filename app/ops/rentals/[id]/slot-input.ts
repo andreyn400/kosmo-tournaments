@@ -3,6 +3,7 @@ import type {
   RentalSlotExceptionInput,
   RentalSlotInput,
 } from "@/lib/types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -17,20 +18,20 @@ export interface RawSlotInput {
 
 export type ValidatedSlot =
   | { ok: true; value: Omit<RentalSlotInput, "contract_id"> }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validateSlotInput(raw: RawSlotInput): ValidatedSlot {
   if (raw.court_ids.length === 0) {
-    return { ok: false, error: "Выберите хотя бы один корт" };
+    return { ok: false, error: fieldErr("error.courts.at_least_one") };
   }
   if (!Number.isInteger(raw.day_of_week) || raw.day_of_week < 0 || raw.day_of_week > 6) {
-    return { ok: false, error: "День недели вне диапазона" };
+    return { ok: false, error: fieldErr("error.invalid.weekday_out_of_range") };
   }
   if (!TIME_RE.test(raw.start_time) || !TIME_RE.test(raw.end_time)) {
-    return { ok: false, error: "Время в формате ЧЧ:ММ" };
+    return { ok: false, error: fieldErr("error.invalid.time_format_short") };
   }
   if (raw.end_time <= raw.start_time) {
-    return { ok: false, error: "Время окончания должно быть позже начала" };
+    return { ok: false, error: fieldErr("error.invalid.end_time_after_start") };
   }
   return {
     ok: true,
@@ -53,19 +54,25 @@ export interface RawExceptionInput {
 
 export type ValidatedException =
   | { ok: true; value: Omit<RentalSlotExceptionInput, "slot_id"> }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validateExceptionInput(
   raw: RawExceptionInput,
 ): ValidatedException {
   if (!DATE_RE.test(raw.from_date)) {
-    return { ok: false, error: "Укажите дату начала исключения" };
+    return {
+      ok: false,
+      error: fieldErr("error.required.exception_date_start"),
+    };
   }
   if (!DATE_RE.test(raw.to_date)) {
-    return { ok: false, error: "Укажите дату окончания исключения" };
+    return {
+      ok: false,
+      error: fieldErr("error.required.exception_date_end"),
+    };
   }
   if (raw.to_date < raw.from_date) {
-    return { ok: false, error: "Окончание не может быть раньше начала" };
+    return { ok: false, error: fieldErr("error.invalid.end_before_start") };
   }
   return {
     ok: true,

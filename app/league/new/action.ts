@@ -16,6 +16,7 @@ import {
   DEFAULT_SCORING_SYSTEM,
   SCORING_SYSTEMS,
 } from "@/lib/scoring-systems";
+import { getServerDict } from "@/lib/i18n/server";
 import type {
   PadelLevel,
   ScoringSystem,
@@ -58,6 +59,7 @@ export async function createLeagueAction(
   _prev: CreateLeagueState,
   formData: FormData,
 ): Promise<CreateLeagueState> {
+  const dict = await getServerDict();
   const name = String(formData.get("name") ?? "").trim();
   const formatRaw = String(formData.get("format") ?? "americano");
   const scoringRaw = String(
@@ -82,36 +84,35 @@ export async function createLeagueAction(
     ? normalizeTime(default_start_time_raw)
     : null;
   if (default_start_time_raw && default_start_time === null)
-    return { error: "Неверное время начала сессий" };
+    return { error: dict["error.invalid.start_time_sessions"] };
 
-  if (!name) return { error: "Введите название лиги" };
+  if (!name) return { error: dict["error.required.league_name"] };
   if (!INDIVIDUAL_FORMATS.includes(formatRaw as TournamentFormat)) {
     return {
-      error:
-        "Для лиги сейчас доступны только индивидуальные форматы (Американо, Мексикано, Круговой).",
+      error: dict["error.invalid.league_individual_formats_only"],
     };
   }
   if (!SCORING_SYSTEMS.includes(scoringRaw as ScoringSystem))
-    return { error: "Неизвестная система счёта" };
+    return { error: dict["error.invalid.scoring_unknown"] };
   if (sessionDates.length < 1)
-    return { error: "Добавьте хотя бы одну дату сессии" };
+    return { error: dict["error.required.at_least_one_session_date"] };
   if (max_players != null && (max_players < 4 || max_players % 4 !== 0))
-    return { error: "Макс. игроков должно быть кратно 4" };
+    return { error: dict["error.invalid.max_players_multiple_of_4"] };
   if (![2, 4, 8, 16, 32].includes(qualification_spots))
     return {
-      error: "Квалификационных мест должно быть степенью двойки: 2, 4, 8, 16 или 32",
+      error: dict["error.invalid.qualification_spots_power_of_2"],
     };
   if (duration_hours < 1 || duration_hours > 12)
-    return { error: "Длительность должна быть от 1 до 12 часов" };
+    return { error: dict["error.invalid.duration_hours_1_12"] };
 
   if (court_ids.length === 0)
-    return { error: "Выберите хотя бы один корт" };
+    return { error: dict["error.courts.at_least_one"] };
 
   const activeCourts = await listActiveCourts();
   const activeIds = new Set(activeCourts.map((c) => c.id));
   const validCourtIds = court_ids.filter((id) => activeIds.has(id));
   if (validCourtIds.length === 0)
-    return { error: "Выбранные корты больше не активны" };
+    return { error: dict["error.courts.no_longer_active"] };
 
   const sortedDates = [...sessionDates].sort();
   const date_start = sortedDates[0];
@@ -153,8 +154,10 @@ export async function createLeagueAction(
       default_start_time,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Ошибка сохранения: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.save_with_reason"].replace("{reason}", reason),
+    };
   }
 
   revalidatePath("/");

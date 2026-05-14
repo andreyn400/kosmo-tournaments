@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { CoachWithMonthlyStats } from "@/lib/queries/coaches";
 import { CoachesSummary } from "./CoachesSummary";
 import { CoachCard } from "./CoachCard";
@@ -19,6 +20,7 @@ interface CoachesPanelProps {
 
 export function CoachesPanel({ coaches, month }: CoachesPanelProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<FilterMode>("active");
   const [creating, setCreating] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -51,25 +53,25 @@ export function CoachesPanel({ coaches, month }: CoachesPanelProps) {
       <div className="flex flex-wrap items-center gap-3">
         <div
           role="tablist"
-          aria-label="Фильтр"
+          aria-label={t("coaches.aria.filter")}
           className="inline-flex p-0.5 rounded-md bg-subtle border border-border"
         >
           <FilterPill
             active={filter === "all"}
             onClick={() => setFilter("all")}
-            label="Все"
+            label={t("coaches.filter.all")}
             count={coaches.length}
           />
           <FilterPill
             active={filter === "active"}
             onClick={() => setFilter("active")}
-            label="Активные"
+            label={t("coaches.filter.active")}
             count={coaches.filter((c) => c.is_active).length}
           />
           <FilterPill
             active={filter === "inactive"}
             onClick={() => setFilter("inactive")}
-            label="Неактивные"
+            label={t("coaches.filter.inactive")}
             count={coaches.filter((c) => !c.is_active).length}
           />
         </div>
@@ -79,7 +81,7 @@ export function CoachesPanel({ coaches, month }: CoachesPanelProps) {
           disabled={creating}
           className="ml-auto"
         >
-          + Добавить тренера
+          {t("coaches.add_cta")}
         </Button>
       </div>
 
@@ -152,20 +154,21 @@ function EmptyState({
   coachCount: number;
   onAdd: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center flex flex-col items-center gap-3">
       <h2 className="text-base font-semibold text-black">
         {coachCount === 0
-          ? "Тренеров пока нет"
-          : "В этой выборке никого нет"}
+          ? t("coaches.empty_zero_title")
+          : t("coaches.empty_filter_title")}
       </h2>
       <p className="text-sm text-muted max-w-md">
         {coachCount === 0
-          ? "Добавьте первого тренера — модель оплаты, контакты и расписание доступности."
-          : "Снимите фильтр или добавьте нового тренера."}
+          ? t("coaches.empty_zero_copy")
+          : t("coaches.empty_filter_copy")}
       </p>
       <Button size="sm" onClick={onAdd}>
-        + Добавить тренера
+        {t("coaches.add_cta")}
       </Button>
     </div>
   );

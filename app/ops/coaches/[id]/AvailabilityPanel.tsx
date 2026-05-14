@@ -4,8 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import {
+  getWeekdayLongLabels,
+  getWeekdayShortLabels,
+} from "@/lib/i18n/format";
 import type { AvailabilityWindow, CoachAvailability } from "@/lib/types";
-import { DAY_LABELS_SHORT, DAY_LABELS_LONG } from "../format";
 import { setAvailabilityAction } from "./set-availability-action";
 
 interface AvailabilityPanelProps {
@@ -37,6 +41,9 @@ export function AvailabilityPanel({
   windows,
 }: AvailabilityPanelProps) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
+  const dayShort = getWeekdayShortLabels(lang);
+  const dayLong = getWeekdayLongLabels(lang);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<DraftWindow[][]>(() =>
     groupByDay(windows),
@@ -113,10 +120,12 @@ export function AvailabilityPanel({
   return (
     <section className="rounded-card border border-border bg-surface p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-black">Расписание</h2>
+        <h2 className="text-sm font-semibold text-black">
+          {t("coach.availability.title")}
+        </h2>
         {!editing && (
           <Button variant="secondary" size="sm" onClick={startEdit}>
-            Изменить
+            {t("coaches.edit_cta")}
           </Button>
         )}
       </header>
@@ -124,14 +133,17 @@ export function AvailabilityPanel({
       {editing ? (
         <>
           <p className="text-[11px] text-muted">
-            Добавьте окна доступности по дням недели. Можно несколько окон в один день.
+            {t("coach.availability.edit_help")}
           </p>
           <div className="grid gap-2">
             {draft.map((day, i) => (
               <DayEditor
                 key={i}
-                dayIndex={i}
+                dayShort={dayShort[i]}
+                dayLong={dayLong[i]}
                 windows={day}
+                removeLabel={t("coach.availability.aria.remove_window")}
+                addLabel={t("coach.availability.add_window")}
                 onAdd={() => addWindow(i)}
                 onRemove={(idx) => removeWindow(i, idx)}
                 onUpdate={(idx, key, value) => updateWindow(i, idx, key, value)}
@@ -146,21 +158,25 @@ export function AvailabilityPanel({
               onClick={cancel}
               disabled={pending}
             >
-              Отмена
+              {t("btn.cancel")}
             </Button>
             <Button size="sm" onClick={save} disabled={pending}>
-              {pending ? "Сохранение…" : "Сохранить"}
+              {pending ? t("btn.saving") : t("btn.save")}
             </Button>
           </div>
         </>
       ) : !hasAny ? (
-        <p className="text-sm text-muted">
-          Расписание не задано. Нажмите «Изменить», чтобы добавить окна.
-        </p>
+        <p className="text-sm text-muted">{t("coach.availability.empty")}</p>
       ) : (
         <div className="grid gap-1.5">
           {grouped.map((day, i) => (
-            <DayRow key={i} dayIndex={i} windows={day} />
+            <DayRow
+              key={i}
+              dayShort={dayShort[i]}
+              dayLong={dayLong[i]}
+              windows={day}
+              dayOffLabel={t("coach.availability.day_off")}
+            />
           ))}
         </div>
       )}
@@ -169,22 +185,26 @@ export function AvailabilityPanel({
 }
 
 function DayRow({
-  dayIndex,
+  dayShort,
+  dayLong,
   windows,
+  dayOffLabel,
 }: {
-  dayIndex: number;
+  dayShort: string;
+  dayLong: string;
   windows: DraftWindow[];
+  dayOffLabel: string;
 }) {
   return (
     <div className="flex items-center gap-3 min-h-7">
       <span
         className="inline-flex items-center justify-center w-9 h-6 rounded text-[10px] font-bold uppercase tracking-wider bg-subtle text-secondary border border-border"
-        title={DAY_LABELS_LONG[dayIndex]}
+        title={dayLong}
       >
-        {DAY_LABELS_SHORT[dayIndex]}
+        {dayShort}
       </span>
       {windows.length === 0 ? (
-        <span className="text-xs text-fade">Не работает</span>
+        <span className="text-xs text-fade">{dayOffLabel}</span>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {windows.map((w, idx) => (
@@ -202,14 +222,20 @@ function DayRow({
 }
 
 function DayEditor({
-  dayIndex,
+  dayShort,
+  dayLong,
   windows,
+  removeLabel,
+  addLabel,
   onAdd,
   onRemove,
   onUpdate,
 }: {
-  dayIndex: number;
+  dayShort: string;
+  dayLong: string;
   windows: DraftWindow[];
+  removeLabel: string;
+  addLabel: string;
   onAdd: () => void;
   onRemove: (idx: number) => void;
   onUpdate: (idx: number, key: keyof DraftWindow, value: string) => void;
@@ -218,9 +244,9 @@ function DayEditor({
     <div className="flex items-start gap-3 py-1">
       <span
         className="inline-flex items-center justify-center w-9 h-6 mt-1 rounded text-[10px] font-bold uppercase tracking-wider bg-subtle text-secondary border border-border flex-shrink-0"
-        title={DAY_LABELS_LONG[dayIndex]}
+        title={dayLong}
       >
-        {DAY_LABELS_SHORT[dayIndex]}
+        {dayShort}
       </span>
       <div className="flex-1 flex flex-wrap items-center gap-2">
         {windows.map((w, idx) => (
@@ -246,7 +272,7 @@ function DayEditor({
             <button
               type="button"
               onClick={() => onRemove(idx)}
-              aria-label="Удалить окно"
+              aria-label={removeLabel}
               className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded text-fade hover:text-[var(--color-danger)] hover:bg-surface"
             >
               ×
@@ -258,7 +284,7 @@ function DayEditor({
           onClick={onAdd}
           className="inline-flex items-center px-2 h-8 rounded bg-surface border border-dashed border-border text-xs text-muted hover:text-black hover:border-border-strong"
         >
-          + Окно
+          {addLabel}
         </button>
       </div>
     </div>

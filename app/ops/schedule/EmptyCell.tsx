@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "@/components/i18n/useTranslation";
+
 interface EmptyCellProps {
   date: string;
   time: string; // HH:MM
@@ -33,6 +35,7 @@ export function EmptyCell({
   isOccupied,
   onClick,
 }: EmptyCellProps) {
+  const { t } = useTranslation();
   if (isOccupied) {
     return (
       <div
@@ -52,7 +55,7 @@ export function EmptyCell({
       onClick={(e) =>
         onClick(date, time, courtId, e.currentTarget.getBoundingClientRect())
       }
-      aria-label={`Создать сессию ${time} · корт`}
+      aria-label={t("schedule.cell.aria_create", { time })}
       className={[
         "group h-full w-full text-left transition-colors focus:outline-none focus-visible:bg-accent-soft",
         isPeak

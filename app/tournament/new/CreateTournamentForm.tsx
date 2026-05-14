@@ -9,12 +9,18 @@ import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { COURT_SURFACE_KEY } from "@/lib/i18n/court-keys";
 import {
-  PADEL_LEVELS,
-  FORMAT_LABEL_RU,
-  TYPE_LABEL_RU,
-  COURT_SURFACE_LABEL_RU,
-} from "@/lib/constants";
+  TOURNAMENT_FORMAT_KEY,
+} from "@/lib/i18n/tournament-keys";
+import { TOURNAMENT_TYPE_KEY } from "@/lib/i18n/calendar-keys";
+import {
+  SCORING_GROUP_LABEL_KEY,
+  SCORING_SYSTEM_HELPER_KEY,
+  SCORING_SYSTEM_LABEL_KEY,
+} from "@/lib/i18n/scoring-keys";
+import { PADEL_LEVELS } from "@/lib/constants";
 import type {
   Court,
   ScoringSystem,
@@ -24,9 +30,6 @@ import type {
 import { generateTimeSlots } from "@/lib/time-slots";
 import {
   DEFAULT_SCORING_SYSTEM,
-  SCORING_GROUP_LABEL_RU,
-  SCORING_SYSTEM_HELPER_RU,
-  SCORING_SYSTEM_LABEL_RU,
   SCORING_SYSTEMS,
   scoringGroup,
 } from "@/lib/scoring-systems";
@@ -61,6 +64,7 @@ const SCORING_GROUPED: Record<
 const initial: CreateTournamentState = {};
 
 export function CreateTournamentForm({ courts }: { courts: Court[] }) {
+  const { t, tPlural } = useTranslation();
   const [state, formAction, pending] = useActionState(
     createTournamentAction,
     initial,
@@ -106,7 +110,7 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
     if (!conflictInputsValid) return;
     const ids = Array.from(selectedCourts);
     let cancelled = false;
-    const t = setTimeout(async () => {
+    const tm = setTimeout(async () => {
       try {
         const res = await checkConflictsAction({
           courtIds: ids,
@@ -121,15 +125,9 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
     }, 300);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(tm);
     };
-  }, [
-    conflictInputsValid,
-    selectedCourts,
-    dateStart,
-    startTime,
-    parsedDur,
-  ]);
+  }, [conflictInputsValid, selectedCourts, dateStart, startTime, parsedDur]);
 
   const toggleCourt = (id: string) => {
     setSelectedCourts((prev) => {
@@ -140,41 +138,54 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
     });
   };
 
+  const courtsWord = (n: number) =>
+    tPlural(n, {
+      one: "division_form.courts.one",
+      few: "division_form.courts.few",
+      many: "division_form.courts.many",
+    });
+
   const courtsHelper =
     courtsNeeded == null
-      ? "Выберите хотя бы один корт. По умолчанию выбраны все активные."
-      : `Для ${parsedMax} игроков нужно ${courtsNeeded} ${courtsNeeded === 1 ? "корт" : courtsNeeded < 5 ? "корта" : "кортов"}.`;
+      ? t("create.courts_hint_default")
+      : t("division_form.courts_hint_needed", {
+          players: parsedMax,
+          n: courtsNeeded,
+          word: courtsWord(courtsNeeded),
+        });
 
   const courtsShortfall =
     courtsNeeded != null && selectedCourts.size < courtsNeeded;
 
+  const courtPrefix = t("court.prefix");
+
   return (
     <form action={formAction} noValidate className="flex flex-col gap-6">
       <Card className="flex flex-col gap-5">
-        <Field label="Название" required>
+        <Field label={t("create.field.name")} required>
           <Input
             name="name"
             required
             maxLength={120}
-            placeholder="Например: Кубок Kosmo · Май"
+            placeholder={t("create.name_placeholder")}
           />
         </Field>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Тип">
+          <Field label={t("create.field.type")}>
             <Select name="type" defaultValue="one_day">
-              {TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABEL_RU[t]}
+              {TYPES.map((tp) => (
+                <option key={tp} value={tp}>
+                  {t(TOURNAMENT_TYPE_KEY[tp])}
                 </option>
               ))}
             </Select>
           </Field>
-          <Field label="Формат">
+          <Field label={t("create.field.format")}>
             <Select name="format" defaultValue="americano">
               {FORMATS.map((f) => (
                 <option key={f} value={f}>
-                  {FORMAT_LABEL_RU[f]}
+                  {t(TOURNAMENT_FORMAT_KEY[f])}
                 </option>
               ))}
             </Select>
@@ -182,39 +193,39 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
         </div>
 
         <Field
-          label="Система счёта"
-          hint={SCORING_SYSTEM_HELPER_RU[scoringSystem]}
+          label={t("create.field.scoring")}
+          hint={t(SCORING_SYSTEM_HELPER_KEY[scoringSystem])}
         >
           <Select
             name="scoring_system"
             value={scoringSystem}
             onChange={(e) => setScoringSystem(e.target.value as ScoringSystem)}
           >
-            <optgroup label={SCORING_GROUP_LABEL_RU.points}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.points)}>
               {SCORING_GROUPED.points.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
-            <optgroup label={SCORING_GROUP_LABEL_RU.games}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.games)}>
               {SCORING_GROUPED.games.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
-            <optgroup label={SCORING_GROUP_LABEL_RU.combined}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.combined)}>
               {SCORING_GROUPED.combined.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
-            <optgroup label={SCORING_GROUP_LABEL_RU.sets}>
+            <optgroup label={t(SCORING_GROUP_LABEL_KEY.sets)}>
               {SCORING_GROUPED.sets.map((s) => (
                 <option key={s} value={s}>
-                  {SCORING_SYSTEM_LABEL_RU[s]}
+                  {t(SCORING_SYSTEM_LABEL_KEY[s])}
                 </option>
               ))}
             </optgroup>
@@ -222,7 +233,7 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
         </Field>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Дата начала" required>
+          <Field label={t("create.field.date_start")} required>
             <Input
               type="date"
               name="date_start"
@@ -231,13 +242,16 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
               onChange={(e) => setDateStart(e.target.value)}
             />
           </Field>
-          <Field label="Время начала" hint="Можно оставить пустым">
+          <Field
+            label={t("create.field.start_time")}
+            hint={t("create.start_time_hint")}
+          >
             <Select
               name="start_time"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
             >
-              <option value="">Не указано</option>
+              <option value="">{t("create.start_time_unset")}</option>
               {TIME_SLOTS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -248,12 +262,15 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Дата окончания" hint="Оставьте пустым для однодневного">
+          <Field
+            label={t("create.field.date_end")}
+            hint={t("create.date_end_hint")}
+          >
             <Input type="date" name="date_end" />
           </Field>
           <Field
-            label="Длительность, часов"
-            hint="Используется для отображения в календаре"
+            label={t("create.field.duration")}
+            hint={t("create.duration_hint")}
           >
             <Input
               type="number"
@@ -268,9 +285,9 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Уровень от">
+          <Field label={t("create.field.level_min")}>
             <Select name="level_min" defaultValue="">
-              <option value="">Любой</option>
+              <option value="">{t("level.any")}</option>
               {PADEL_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -278,9 +295,9 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
               ))}
             </Select>
           </Field>
-          <Field label="Уровень до">
+          <Field label={t("create.field.level_max")}>
             <Select name="level_max" defaultValue="">
-              <option value="">Любой</option>
+              <option value="">{t("level.any")}</option>
               {PADEL_LEVELS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -291,7 +308,10 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Макс. игроков" hint="Должно быть кратно 4">
+          <Field
+            label={t("create.field.max_players")}
+            hint={t("create.max_players_hint")}
+          >
             <Input
               type="number"
               name="max_players"
@@ -302,20 +322,20 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
               onChange={(e) => handleMaxPlayersChange(e.target.value)}
             />
           </Field>
-          <Field label="Взнос, ₽">
+          <Field label={t("create.field.entry_fee")}>
             <Input type="number" name="entry_fee" min={0} placeholder="0" />
           </Field>
         </div>
 
-        <Field label="Приз">
+        <Field label={t("create.field.prize")}>
           <Input
             name="prize_description"
             maxLength={200}
-            placeholder="Например: сертификат в pro-shop"
+            placeholder={t("create.prize_placeholder")}
           />
         </Field>
 
-        <Field label="Корты" required hint={courtsHelper}>
+        <Field label={t("create.field.courts")} required hint={courtsHelper}>
           <div className="flex flex-col gap-1.5 border border-border rounded-[var(--radius-button)] bg-subtle p-2.5">
             {courts.map((c) => (
               <label
@@ -337,34 +357,41 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
                   </span>
                 </span>
                 <span className="text-xs text-muted">
-                  {COURT_SURFACE_LABEL_RU[c.surface]}
+                  {t(COURT_SURFACE_KEY[c.surface])}
                 </span>
               </label>
             ))}
           </div>
           {courtsShortfall ? (
             <span className="text-xs text-[var(--color-danger)]">
-              Для {parsedMax} игроков необходимо минимум {courtsNeeded}{" "}
-              {courtsNeeded === 1 ? "корт" : courtsNeeded! < 5 ? "корта" : "кортов"}.
+              {t("division_form.courts_shortfall", {
+                players: parsedMax,
+                n: courtsNeeded!,
+                word: courtsWord(courtsNeeded!),
+              })}
             </span>
           ) : null}
           {conflictInputsValid && conflicts.length > 0 ? (
             <div className="flex flex-col gap-1 text-xs text-[var(--color-warning)]">
               {conflicts.map((c) => (
                 <span key={c.tournamentId}>
-                  ⚠ {c.courtNumbers.map((n) => `К${n}`).join(", ")} занят «
-                  {c.tournamentName}» в это время
+                  {t("create.conflict", {
+                    courts: c.courtNumbers
+                      .map((n) => `${courtPrefix}${n}`)
+                      .join(", "),
+                    name: c.tournamentName,
+                  })}
                 </span>
               ))}
             </div>
           ) : null}
         </Field>
 
-        <Field label="Заметки">
+        <Field label={t("create.field.notes")}>
           <Textarea
             name="notes"
             maxLength={500}
-            placeholder="Любая служебная информация"
+            placeholder={t("create.notes_placeholder")}
           />
         </Field>
       </Card>
@@ -380,11 +407,11 @@ export function CreateTournamentForm({ courts }: { courts: Court[] }) {
 
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "Сохранение…" : "Создать турнир"}
+          {pending ? t("btn.saving") : t("create.submit")}
         </Button>
         <Link href="/">
           <Button type="button" variant="secondary" disabled={pending}>
-            Отмена
+            {t("btn.cancel")}
           </Button>
         </Link>
       </div>

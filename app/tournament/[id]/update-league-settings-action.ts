@@ -6,6 +6,7 @@ import {
   updateFinalsConfig,
 } from "@/lib/queries/league-seasons";
 import { SCORING_SYSTEMS } from "@/lib/scoring-systems";
+import { getServerDict } from "@/lib/i18n/server";
 import type { ScoringSystem } from "@/lib/types";
 
 export interface UpdateLeagueSettingsInput {
@@ -18,24 +19,23 @@ export interface UpdateLeagueSettingsInput {
 export async function updateLeagueSettingsAction(
   input: UpdateLeagueSettingsInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const league = await getLeagueSeason(input.tournamentId);
-  if (!league) return { error: "Сезон лиги не найден" };
+  if (!league) return { error: dict["error.not_found.league_season"] };
 
   if (![2, 4, 8, 16, 32].includes(input.qualificationSpots)) {
-    return {
-      error: "Квалификационных мест должно быть степенью двойки: 2, 4, 8, 16 или 32",
-    };
+    return { error: dict["error.invalid.qualification_spots_power_of_2"] };
   }
 
   if (!SCORING_SYSTEMS.includes(input.finalsScoringSystem as ScoringSystem)) {
-    return { error: "Неизвестная система счёта финала" };
+    return { error: dict["error.invalid.finals_scoring_unknown"] };
   }
 
   if (
     input.finalsDate &&
     !/^\d{4}-\d{2}-\d{2}$/.test(input.finalsDate)
   ) {
-    return { error: "Неверный формат даты финала" };
+    return { error: dict["error.invalid.finals_date_format"] };
   }
 
   try {
@@ -45,8 +45,13 @@ export async function updateLeagueSettingsAction(
       finals_scoring_system: input.finalsScoringSystem as ScoringSystem,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось сохранить: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.save_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
 
   revalidatePath(`/tournament/${input.tournamentId}`);

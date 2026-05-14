@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { getWeekdayLongLabels } from "@/lib/i18n/format";
 import type { Court, RentalSlot } from "@/lib/types";
-import { DAY_LABELS_LONG } from "../../coaches/format";
 import type { RawSlotInput } from "./slot-input";
 
 interface SlotFormProps {
@@ -32,7 +33,7 @@ function makeInitial(
   }
   return {
     court_ids: courts[0] ? [courts[0].id] : [],
-    day_of_week: 1, // Tuesday — common starting point
+    day_of_week: 1,
     start_time: "19:00",
     end_time: "21:00",
     notes: "",
@@ -48,6 +49,8 @@ export function SlotForm({
   onDelete,
   pending,
 }: SlotFormProps) {
+  const { t, lang } = useTranslation();
+  const dayLong = getWeekdayLongLabels(lang);
   const [state, setState] = useState<RawSlotInput>(() =>
     makeInitial(slot, courts),
   );
@@ -79,7 +82,7 @@ export function SlotForm({
       className="grid gap-3 p-4 rounded-md bg-subtle border border-border"
     >
       <div className="grid gap-3 sm:grid-cols-[1fr_5.5rem_5.5rem]">
-        <Field label="День недели">
+        <Field label={t("slots.form.field.day")}>
           <select
             value={state.day_of_week}
             onChange={(e) =>
@@ -87,14 +90,14 @@ export function SlotForm({
             }
             className="w-full h-9 px-3 rounded-[var(--radius-button)] bg-surface border border-border text-black text-sm"
           >
-            {DAY_LABELS_LONG.map((d, i) => (
+            {dayLong.map((d, i) => (
               <option key={d} value={i}>
                 {d}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="Начало">
+        <Field label={t("slots.form.field.start")}>
           <Input
             type="time"
             value={state.start_time}
@@ -102,7 +105,7 @@ export function SlotForm({
             className="!h-9"
           />
         </Field>
-        <Field label="Конец">
+        <Field label={t("slots.form.field.end")}>
           <Input
             type="time"
             value={state.end_time}
@@ -112,11 +115,11 @@ export function SlotForm({
         </Field>
       </div>
 
-      <Field label="Корты">
+      <Field label={t("slots.form.field.courts")}>
         <div className="flex flex-wrap gap-1.5">
           {courts.length === 0 ? (
             <span className="text-[11px] text-fade">
-              Нет активных кортов.
+              {t("slots.form.no_active_courts")}
             </span>
           ) : (
             courts.map((c) => {
@@ -142,11 +145,11 @@ export function SlotForm({
         </div>
       </Field>
 
-      <Field label="Заметка к слоту">
+      <Field label={t("slots.form.field.notes")}>
         <Input
           value={state.notes}
           onChange={(e) => set("notes", e.target.value)}
-          placeholder="Необязательная заметка"
+          placeholder={t("slots.form.placeholder.notes")}
           className="!h-9"
         />
       </Field>
@@ -163,7 +166,7 @@ export function SlotForm({
             disabled={pending}
             className="!text-[var(--color-danger)] hover:!bg-[var(--color-danger-soft)] mr-auto"
           >
-            Удалить слот
+            {t("slots.form.delete_slot")}
           </Button>
         )}
         <Button
@@ -173,14 +176,14 @@ export function SlotForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "Сохранение…"
+            ? t("btn.saving")
             : mode === "create"
-              ? "Создать"
-              : "Сохранить"}
+              ? t("slots.form.submit_create")
+              : t("btn.save")}
         </Button>
       </div>
     </form>

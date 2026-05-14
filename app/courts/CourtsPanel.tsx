@@ -7,19 +7,20 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
-  COURT_STATUS_LABEL_RU,
-  COURT_SURFACE_LABEL_RU,
-} from "@/lib/constants";
+  COURT_STATUS_KEY,
+  COURT_STATUS_VALUES,
+  COURT_SURFACE_KEY,
+  COURT_SURFACE_VALUES,
+} from "@/lib/i18n/court-keys";
 import type { Court, CourtStatus, CourtSurface } from "@/lib/types";
 import { createCourtAction } from "./create-court-action";
 import { CourtCard } from "./CourtCard";
 
-const SURFACES = Object.keys(COURT_SURFACE_LABEL_RU) as CourtSurface[];
-const STATUSES = Object.keys(COURT_STATUS_LABEL_RU) as CourtStatus[];
-
 export function CourtsPanel({ courts }: { courts: Court[] }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [surface, setSurface] = useState<CourtSurface>("artificial_grass");
@@ -58,10 +59,10 @@ export function CourtsPanel({ courts }: { courts: Court[] }) {
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <Card className="flex flex-col gap-4">
-        <h2 className="font-semibold text-black">Новый корт</h2>
+        <h2 className="font-semibold text-black">{t("courts.new_card_title")}</h2>
         <div className="grid gap-3 sm:grid-cols-[1fr_5rem]">
           <Input
-            placeholder="Название (например, Корт 1)"
+            placeholder={t("courts.placeholder.name")}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -80,9 +81,9 @@ export function CourtsPanel({ courts }: { courts: Court[] }) {
             value={surface}
             onChange={(e) => setSurface(e.target.value as CourtSurface)}
           >
-            {SURFACES.map((s) => (
+            {COURT_SURFACE_VALUES.map((s) => (
               <option key={s} value={s}>
-                {COURT_SURFACE_LABEL_RU[s]}
+                {t(COURT_SURFACE_KEY[s])}
               </option>
             ))}
           </Select>
@@ -90,21 +91,21 @@ export function CourtsPanel({ courts }: { courts: Court[] }) {
             value={status}
             onChange={(e) => setStatus(e.target.value as CourtStatus)}
           >
-            {STATUSES.map((s) => (
+            {COURT_STATUS_VALUES.map((s) => (
               <option key={s} value={s}>
-                {COURT_STATUS_LABEL_RU[s]}
+                {t(COURT_STATUS_KEY[s])}
               </option>
             ))}
           </Select>
         </div>
         <Textarea
-          placeholder="Заметки (необязательно)"
+          placeholder={t("courts.placeholder.notes")}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
         <div>
           <Button disabled={pending || !name.trim()} onClick={submit}>
-            {pending ? "Сохранение…" : "Добавить корт"}
+            {pending ? t("btn.saving") : t("courts.add_cta")}
           </Button>
         </div>
         {error ? (
@@ -124,11 +125,10 @@ export function CourtsPanel({ courts }: { courts: Court[] }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <h2 className="text-xl font-semibold text-black">
-              Кортов пока нет
+              {t("courts.empty_title")}
             </h2>
             <p className="text-muted text-sm max-w-sm">
-              Добавьте первый корт в форме выше. Корты используются при
-              создании турниров и распределении матчей по кортам.
+              {t("courts.empty_copy")}
             </p>
           </div>
         </Card>

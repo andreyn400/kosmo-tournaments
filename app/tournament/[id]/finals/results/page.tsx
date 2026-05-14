@@ -9,9 +9,11 @@ import { getLeagueSeason } from "@/lib/queries/league-seasons";
 import { listBracketMatches } from "@/lib/queries/bracket-matches";
 import { listPlayers } from "@/lib/queries/players";
 import { listCourtsByIds } from "@/lib/queries/courts";
-import { formatDateRu } from "@/lib/format-date";
+import { getServerLang } from "@/lib/i18n/server";
+import { translate } from "@/lib/i18n";
+import { formatDate } from "@/lib/i18n/format";
+import { SCORING_SYSTEM_LABEL_KEY } from "@/lib/i18n/scoring-keys";
 import {
-  SCORING_SYSTEM_LABEL_RU,
   scoringGroup,
   setsSummary,
   isSetsDetail,
@@ -69,41 +71,54 @@ export default async function FinalsResultsPage({
 
   const finalSummary = finalMatch ? formatFinalSummary(finalMatch, scoringSystem) : null;
 
+  const lang = await getServerLang();
+  const tr = (
+    key: Parameters<typeof translate>[1],
+    vars?: Parameters<typeof translate>[2],
+  ) => translate(lang, key, vars);
+
   const header = (
     <Link href={`/tournament/${id}`}>
       <Button variant="secondary" size="md">
-        К лиге
+        {tr("finals.back_to_league_short")}
       </Button>
     </Link>
   );
 
   return (
-    <PageShell title={`Итоги финала · ${tournament.name}`} action={header}>
+    <PageShell
+      title={tr("finals.results.title", { name: tournament.name })}
+      action={header}
+    >
       <div className="flex flex-col gap-6">
         <Card className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <Badge tone="status-completed">Финал завершён</Badge>
+            <Badge tone="status-completed">
+              {tr("finals.bracket_completed")}
+            </Badge>
             {league.finals_date ? (
               <span className="text-sm text-muted">
-                {formatDateRu(league.finals_date)}
+                {formatDate(league.finals_date, lang)}
               </span>
             ) : null}
           </div>
           {championPair ? (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs uppercase tracking-[0.08em] text-muted">
-                Чемпионы
+                {tr("finals.results.champions")}
               </span>
               <p className="text-xl font-bold text-black">
                 {championPair.label}
               </p>
               {finalSummary ? (
-                <p className="text-sm text-muted">Счёт финала: {finalSummary}</p>
+                <p className="text-sm text-muted">
+                  {tr("finals.results.final_score", { summary: finalSummary })}
+                </p>
               ) : null}
             </div>
           ) : (
             <p className="text-sm text-muted">
-              Не удалось определить чемпионов.
+              {tr("finals.results.unknown_champions")}
             </p>
           )}
         </Card>
@@ -112,7 +127,7 @@ export default async function FinalsResultsPage({
           {runnerUpPair ? (
             <Card className="flex flex-col gap-1.5">
               <span className="text-xs uppercase tracking-[0.08em] text-muted">
-                Финалисты
+                {tr("finals.results.runners_up")}
               </span>
               <p className="text-base font-semibold text-black">
                 {runnerUpPair.label}
@@ -123,7 +138,7 @@ export default async function FinalsResultsPage({
           {thirdPlacePairs.length > 0 ? (
             <Card className="flex flex-col gap-1.5">
               <span className="text-xs uppercase tracking-[0.08em] text-muted">
-                Полуфиналисты
+                {tr("finals.results.semifinalists")}
               </span>
               <ul className="flex flex-col gap-0.5">
                 {thirdPlacePairs.map((p, idx) => (
@@ -141,9 +156,11 @@ export default async function FinalsResultsPage({
 
         <Card className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-black">Сетка финала</h2>
+            <h2 className="font-semibold text-black">
+              {tr("finals.bracket_title")}
+            </h2>
             <span className="text-xs text-muted">
-              {SCORING_SYSTEM_LABEL_RU[scoringSystem]}
+              {tr(SCORING_SYSTEM_LABEL_KEY[scoringSystem])}
             </span>
           </div>
           <Bracket

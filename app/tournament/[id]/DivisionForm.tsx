@@ -8,16 +8,17 @@ import {
 } from "./check-division-court-conflicts-action";
 import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
-  DIVISION_CATEGORY_LABEL_RU,
-  FORMAT_LABEL_RU,
-  PADEL_LEVELS,
-} from "@/lib/constants";
+  DIVISION_CATEGORY_KEY,
+  SCORING_GROUP_LABEL_KEY,
+  SCORING_SYSTEM_HELPER_KEY,
+  SCORING_SYSTEM_LABEL_KEY,
+} from "@/lib/i18n/scoring-keys";
+import { TOURNAMENT_FORMAT_KEY } from "@/lib/i18n/tournament-keys";
+import { PADEL_LEVELS } from "@/lib/constants";
 import {
   DEFAULT_SCORING_SYSTEM,
-  SCORING_GROUP_LABEL_RU,
-  SCORING_SYSTEM_HELPER_RU,
-  SCORING_SYSTEM_LABEL_RU,
   SCORING_SYSTEMS,
   scoringGroup,
 } from "@/lib/scoring-systems";
@@ -114,6 +115,7 @@ export function DivisionForm({
   onSubmit: (values: DivisionFormValues) => void;
   onCancel: () => void;
 }) {
+  const { t, tPlural } = useTranslation();
   const [values, setValues] = useState<DivisionFormValues>(initial);
   const [siblingConflicts, setSiblingConflicts] = useState<
     DivisionCourtConflict[]
@@ -126,7 +128,7 @@ export function DivisionForm({
     if (!hasCourts) return;
     const ids = courtIdsKey.split(",");
     let cancelled = false;
-    const t = setTimeout(async () => {
+    const tm = setTimeout(async () => {
       try {
         const res = await checkDivisionCourtConflictsAction({
           tournamentId,
@@ -140,7 +142,7 @@ export function DivisionForm({
     }, 300);
     return () => {
       cancelled = true;
-      clearTimeout(t);
+      clearTimeout(tm);
     };
   }, [hasCourts, courtIdsKey, tournamentId, divisionId]);
 
@@ -174,19 +176,28 @@ export function DivisionForm({
     values.court_ids.size > 0 &&
     !courtsShortfall;
 
+  const courtsWord = (n: number) =>
+    tPlural(n, {
+      one: "division_form.courts.one",
+      few: "division_form.courts.few",
+      many: "division_form.courts.many",
+    });
+
+  const courtPrefix = t("court.prefix");
+
   return (
     <div className="flex flex-col gap-5 rounded-[var(--radius-card)] border border-border bg-subtle/40 p-5">
-      <Field label="Название" required>
+      <Field label={t("division_form.field.name")} required>
         <Input
           value={values.name}
           onChange={(e) => set("name", e.target.value)}
           maxLength={120}
-          placeholder="Например: Мужчины Д1 Американо"
+          placeholder={t("division_form.name_placeholder")}
         />
       </Field>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Категория">
+        <Field label={t("division_form.field.category")}>
           <Select
             value={values.category}
             onChange={(e) =>
@@ -195,19 +206,19 @@ export function DivisionForm({
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {DIVISION_CATEGORY_LABEL_RU[c]}
+                {t(DIVISION_CATEGORY_KEY[c])}
               </option>
             ))}
           </Select>
         </Field>
-        <Field label="Формат">
+        <Field label={t("division_form.field.format")}>
           <Select
             value={values.format}
             onChange={(e) => set("format", e.target.value as TournamentFormat)}
           >
             {FORMATS.map((f) => (
               <option key={f} value={f}>
-                {FORMAT_LABEL_RU[f]}
+                {t(TOURNAMENT_FORMAT_KEY[f])}
               </option>
             ))}
           </Select>
@@ -215,8 +226,8 @@ export function DivisionForm({
       </div>
 
       <Field
-        label="Система счёта"
-        hint={SCORING_SYSTEM_HELPER_RU[values.scoring_system]}
+        label={t("division_form.field.scoring")}
+        hint={t(SCORING_SYSTEM_HELPER_KEY[values.scoring_system])}
       >
         <Select
           value={values.scoring_system}
@@ -224,31 +235,31 @@ export function DivisionForm({
             set("scoring_system", e.target.value as ScoringSystem)
           }
         >
-          <optgroup label={SCORING_GROUP_LABEL_RU.points}>
+          <optgroup label={t(SCORING_GROUP_LABEL_KEY.points)}>
             {SCORING_GROUPED.points.map((s) => (
               <option key={s} value={s}>
-                {SCORING_SYSTEM_LABEL_RU[s]}
+                {t(SCORING_SYSTEM_LABEL_KEY[s])}
               </option>
             ))}
           </optgroup>
-          <optgroup label={SCORING_GROUP_LABEL_RU.games}>
+          <optgroup label={t(SCORING_GROUP_LABEL_KEY.games)}>
             {SCORING_GROUPED.games.map((s) => (
               <option key={s} value={s}>
-                {SCORING_SYSTEM_LABEL_RU[s]}
+                {t(SCORING_SYSTEM_LABEL_KEY[s])}
               </option>
             ))}
           </optgroup>
-          <optgroup label={SCORING_GROUP_LABEL_RU.combined}>
+          <optgroup label={t(SCORING_GROUP_LABEL_KEY.combined)}>
             {SCORING_GROUPED.combined.map((s) => (
               <option key={s} value={s}>
-                {SCORING_SYSTEM_LABEL_RU[s]}
+                {t(SCORING_SYSTEM_LABEL_KEY[s])}
               </option>
             ))}
           </optgroup>
-          <optgroup label={SCORING_GROUP_LABEL_RU.sets}>
+          <optgroup label={t(SCORING_GROUP_LABEL_KEY.sets)}>
             {SCORING_GROUPED.sets.map((s) => (
               <option key={s} value={s}>
-                {SCORING_SYSTEM_LABEL_RU[s]}
+                {t(SCORING_SYSTEM_LABEL_KEY[s])}
               </option>
             ))}
           </optgroup>
@@ -256,12 +267,12 @@ export function DivisionForm({
       </Field>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Уровень от">
+        <Field label={t("division_form.field.level_min")}>
           <Select
             value={values.level_min}
             onChange={(e) => set("level_min", e.target.value)}
           >
-            <option value="">Любой</option>
+            <option value="">{t("level.any")}</option>
             {PADEL_LEVELS.map((l) => (
               <option key={l} value={l}>
                 {l}
@@ -269,12 +280,12 @@ export function DivisionForm({
             ))}
           </Select>
         </Field>
-        <Field label="Уровень до">
+        <Field label={t("division_form.field.level_max")}>
           <Select
             value={values.level_max}
             onChange={(e) => set("level_max", e.target.value)}
           >
-            <option value="">Любой</option>
+            <option value="">{t("level.any")}</option>
             {PADEL_LEVELS.map((l) => (
               <option key={l} value={l}>
                 {l}
@@ -284,7 +295,10 @@ export function DivisionForm({
         </Field>
       </div>
 
-      <Field label="Макс. игроков" hint="Кратно 4. Оставьте пустым — без лимита.">
+      <Field
+        label={t("division_form.field.max_players")}
+        hint={t("division_form.max_players_hint")}
+      >
         <Input
           type="number"
           min={4}
@@ -296,18 +310,22 @@ export function DivisionForm({
       </Field>
 
       <Field
-        label="Корты"
+        label={t("division_form.field.courts")}
         required
         hint={
           courtsNeeded == null
-            ? "Выберите корты этого дивизиона из кортов турнира."
-            : `Для ${parsedMax} игроков нужно ${courtsNeeded} ${courtsNeeded === 1 ? "корт" : courtsNeeded < 5 ? "корта" : "кортов"}.`
+            ? t("division_form.courts_hint_pick")
+            : t("division_form.courts_hint_needed", {
+                players: parsedMax,
+                n: courtsNeeded,
+                word: courtsWord(courtsNeeded),
+              })
         }
       >
         <div className="flex flex-col gap-1.5 border border-border rounded-[var(--radius-button)] bg-surface p-2.5">
           {tournamentCourts.length === 0 ? (
             <p className="text-xs text-muted px-2 py-1">
-              У турнира не выбрано ни одного корта.
+              {t("division_form.no_tournament_courts")}
             </p>
           ) : (
             tournamentCourts.map((c) => (
@@ -333,17 +351,24 @@ export function DivisionForm({
         </div>
         {courtsShortfall ? (
           <span className="text-xs text-[var(--color-danger)]">
-            Для {parsedMax} игроков необходимо минимум {courtsNeeded}{" "}
-            {courtsNeeded === 1 ? "корт" : courtsNeeded! < 5 ? "корта" : "кортов"}.
+            {t("division_form.courts_shortfall", {
+              players: parsedMax,
+              n: courtsNeeded!,
+              word: courtsWord(courtsNeeded!),
+            })}
           </span>
         ) : null}
         {visibleConflicts.length > 0 ? (
           <div className="flex flex-col gap-1 text-xs text-[var(--color-warning)]">
             {visibleConflicts.map((c, idx) => (
               <span key={idx}>
-                ⚠ Корт{" "}
-                {c.courtNumber !== null ? `К${c.courtNumber}` : "?"} уже
-                используется дивизионом «{c.divisionName}» (идёт).
+                {t("division_form.conflict", {
+                  courtLabel:
+                    c.courtNumber !== null
+                      ? `${courtPrefix}${c.courtNumber}`
+                      : "?",
+                  name: c.divisionName,
+                })}
               </span>
             ))}
           </div>
@@ -361,10 +386,10 @@ export function DivisionForm({
 
       <div className="flex items-center justify-end gap-2">
         <Button variant="secondary" disabled={pending} onClick={onCancel}>
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button disabled={!canSubmit} onClick={() => onSubmit(values)}>
-          {pending ? "Сохранение…" : submitLabel}
+          {pending ? t("btn.saving") : submitLabel}
         </Button>
       </div>
     </div>

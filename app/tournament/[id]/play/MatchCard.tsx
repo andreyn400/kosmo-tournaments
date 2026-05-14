@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   isSetsDetail,
   scoringGroup,
@@ -32,10 +33,11 @@ export function MatchCard({
   scoringSystem: ScoringSystem;
   editable: boolean;
 }) {
+  const { t } = useTranslation();
   const court = match.court_id ? courtById.get(match.court_id) : null;
   const courtLabel = court
     ? court.name
-    : `Корт ${match.court_number ?? "—"}`;
+    : t("match.court_fallback", { n: match.court_number ?? "—" });
   const isCompleted = match.status === "completed";
 
   const team1Players = [match.team1_player1_id, match.team1_player2_id]
@@ -64,9 +66,9 @@ export function MatchCard({
           {courtLabel}
         </Badge>
         {isCompleted ? (
-          <Badge tone="status-completed">Завершён</Badge>
+          <Badge tone="status-completed">{t("match.badge.completed")}</Badge>
         ) : (
-          <Badge tone="status-progress">Идёт</Badge>
+          <Badge tone="status-progress">{t("match.badge.in_progress")}</Badge>
         )}
       </div>
 

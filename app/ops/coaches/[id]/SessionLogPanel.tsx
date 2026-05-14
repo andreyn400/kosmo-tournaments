@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type {
   Coach,
   Court,
@@ -32,6 +33,7 @@ export function SessionLogPanel({
   month,
 }: SessionLogPanelProps) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -60,7 +62,9 @@ export function SessionLogPanel({
   return (
     <section className="flex flex-col gap-3">
       <header className="flex flex-wrap items-center gap-3">
-        <h2 className="text-sm font-semibold text-black">Лог сессий</h2>
+        <h2 className="text-sm font-semibold text-black">
+          {t("coach.session_log_title")}
+        </h2>
         <MonthSelector month={month} />
         <Button
           size="sm"
@@ -68,7 +72,7 @@ export function SessionLogPanel({
           disabled={creating}
           className="ml-auto"
         >
-          + Записать сессию
+          {t("coach.add_session_cta")}
         </Button>
       </header>
 
@@ -88,24 +92,37 @@ export function SessionLogPanel({
 
       {sessions.length === 0 && !creating ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-8 text-center">
-          <p className="text-sm text-muted">
-            В этом месяце нет сессий. Запишите первую — она появится здесь и в выплатах.
-          </p>
+          <p className="text-sm text-muted">{t("coach.empty_month_copy")}</p>
         </div>
       ) : sessions.length > 0 ? (
         <div className="rounded-card border border-border bg-surface overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-subtle/30 text-[10.5px] uppercase tracking-wider text-muted font-semibold">
-                <th className="pl-4 pr-2 py-2 text-left whitespace-nowrap">Дата</th>
-                <th className="px-2 py-2 text-left whitespace-nowrap">Время</th>
-                <th className="px-2 py-2 text-left">Программа</th>
-                <th className="px-2 py-2 text-right">Корты</th>
-                <th className="px-2 py-2 text-right" title="Игроков">И</th>
-                <th className="px-2 py-2 text-right whitespace-nowrap">Выручка</th>
-                <th className="px-2 py-2 text-right">Корт</th>
-                <th className="px-2 py-2 text-right">Тренировка</th>
-                <th className="pl-2 pr-4 py-2 text-right whitespace-nowrap">Тренеру</th>
+                <th className="pl-4 pr-2 py-2 text-left whitespace-nowrap">
+                  {t("coach.col.date")}
+                </th>
+                <th className="px-2 py-2 text-left whitespace-nowrap">
+                  {t("coach.col.time")}
+                </th>
+                <th className="px-2 py-2 text-left">{t("coach.col.program")}</th>
+                <th className="px-2 py-2 text-right">{t("coach.col.courts")}</th>
+                <th
+                  className="px-2 py-2 text-right"
+                  title={t("coach.col.players_long")}
+                >
+                  {t("coach.col.players_short")}
+                </th>
+                <th className="px-2 py-2 text-right whitespace-nowrap">
+                  {t("coach.col.revenue")}
+                </th>
+                <th className="px-2 py-2 text-right">{t("coach.col.court")}</th>
+                <th className="px-2 py-2 text-right">
+                  {t("coach.col.coaching")}
+                </th>
+                <th className="pl-2 pr-4 py-2 text-right whitespace-nowrap">
+                  {t("coach.col.payout")}
+                </th>
               </tr>
             </thead>
             <tbody>

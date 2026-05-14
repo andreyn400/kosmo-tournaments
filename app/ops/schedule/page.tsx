@@ -4,6 +4,7 @@ import { listRentalBlocksForRange } from "@/lib/queries/rentals";
 import { listActiveCourts } from "@/lib/queries/courts";
 import { listActivePrograms } from "@/lib/queries/programs";
 import { listCoaches } from "@/lib/queries/coaches";
+import { st } from "@/lib/i18n/server";
 import { SchedulerShell } from "./SchedulerShell";
 import {
   isValidIsoDate,
@@ -30,27 +31,25 @@ export default async function OpsSchedulePage({
   const view = sp.view === "week" ? "week" : "day";
   const date = isValidIsoDate(sp.date) ? sp.date : todayIso();
 
-  // Day view fetches one day; week view fetches Mon..Sun for the week
-  // containing `date`.
   const rangeFrom = view === "day" ? date : weekMondayIso(date);
   const rangeTo = view === "day" ? date : weekSundayIso(date);
 
-  const [sessions, rentalBlocks, courts, programs, coaches] = await Promise.all([
+  const [sessions, rentalBlocks, courts, programs, coaches, title] = await Promise.all([
     listSessionsForRange(rangeFrom, rangeTo),
     listRentalBlocksForRange(rangeFrom, rangeTo),
     listActiveCourts(),
     listActivePrograms(),
     listCoaches({ activeOnly: true }),
+    st("schedule.title"),
   ]);
 
-  // Week view needs a court selection — first active court if none in URL.
   const courtId =
     view === "week"
       ? courts.find((c) => c.id === sp.court)?.id ?? courts[0]?.id ?? null
       : null;
 
   return (
-    <PageShell title="Расписание">
+    <PageShell title={title}>
       <SchedulerShell
         view={view}
         date={date}

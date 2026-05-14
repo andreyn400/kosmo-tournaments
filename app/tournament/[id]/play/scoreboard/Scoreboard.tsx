@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   computeLiveLeaderboard,
   computePairLeaderboard,
@@ -32,6 +33,7 @@ export function Scoreboard({
   divisionName?: string;
   divisionFormat?: TournamentFormat;
 }) {
+  const { t } = useTranslation();
   const format = divisionFormat ?? tournament.format;
   const displayTitle = divisionName
     ? `${tournament.name} · ${divisionName}`
@@ -132,7 +134,7 @@ export function Scoreboard({
     <div className="min-h-dvh bg-black text-white flex flex-col relative">
       <Link
         href={closeHref}
-        aria-label="Закрыть табло"
+        aria-label={t("scoreboard.close")}
         className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white flex items-center justify-center text-xl leading-none"
       >
         ×
@@ -140,7 +142,7 @@ export function Scoreboard({
       <header className="flex items-center justify-between gap-6 px-10 py-6 border-b border-white/10">
         <div className="flex flex-col gap-1 min-w-0">
           <div className="text-white/60 uppercase tracking-[0.2em] text-xs">
-            Kosmo
+            {t("scoreboard.brand")}
           </div>
           <div className="text-3xl lg:text-5xl font-semibold truncate">
             {displayTitle}
@@ -148,7 +150,7 @@ export function Scoreboard({
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="text-white/60 uppercase tracking-[0.2em] text-xs">
-            Раунд
+            {t("scoreboard.round_label")}
           </div>
           <div className="text-3xl lg:text-5xl font-bold tabular-nums">
             {currentRound?.round_number ?? completedRounds}
@@ -163,19 +165,23 @@ export function Scoreboard({
       <main className="flex-1 px-10 py-8">
         {rowsLength === 0 ? (
           <div className="h-full flex items-center justify-center text-white/50 text-2xl">
-            Счёт появится после первого матча
+            {t("scoreboard.empty_pre_first_match")}
           </div>
         ) : (
           <table className="w-full text-left tabular-nums">
             <thead>
               <tr className="text-white/40 text-xs lg:text-sm uppercase tracking-widest">
                 <th className="py-3 pr-6 w-16">#</th>
-                <th className="py-3 pr-6">Игрок</th>
+                <th className="py-3 pr-6">{t("scoreboard.col.player")}</th>
                 <th className="py-3 pr-6 w-24 text-right">
-                  {showWins ? "Поб." : "Матч."}
+                  {showWins
+                    ? t("scoreboard.col.wins")
+                    : t("scoreboard.col.matches")}
                 </th>
                 <th className="py-3 pr-6 w-28 text-right">+/−</th>
-                <th className="py-3 w-32 text-right">Очки</th>
+                <th className="py-3 w-32 text-right">
+                  {t("scoreboard.col.points")}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/10">

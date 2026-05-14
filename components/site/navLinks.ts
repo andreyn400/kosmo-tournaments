@@ -1,49 +1,51 @@
+import type { TranslationKey } from "@/lib/i18n";
+
 export type NavLink = {
   href: string;
-  label: string;
+  labelKey: TranslationKey;
   icon?: string;
 };
 
 export type NavSection = {
-  title: string;
+  titleKey: TranslationKey;
   dividerAbove?: boolean;
   links: NavLink[];
 };
 
 export const NAV_SECTIONS: NavSection[] = [
   {
-    title: "КОРТЫ",
+    titleKey: "nav.section.courts",
     links: [
-      { href: "/ops/schedule", label: "Расписание" },
-      { href: "/ops/rentals", label: "Аренда" },
-      { href: "/calendar", label: "Календарь" },
-      { href: "/courts", label: "Корты" },
-      { href: "/ops/report", label: "Отчёт" },
+      { href: "/ops/schedule", labelKey: "nav.schedule" },
+      { href: "/ops/rentals", labelKey: "nav.rentals" },
+      { href: "/calendar", labelKey: "nav.calendar" },
+      { href: "/courts", labelKey: "nav.courts" },
+      { href: "/ops/report", labelKey: "nav.report" },
     ],
   },
   {
-    title: "ТУРНИРЫ",
+    titleKey: "nav.section.tournaments",
     links: [
-      { href: "/", label: "Турниры и лиги" },
-      { href: "/players", label: "Игроки" },
-      { href: "/analytics", label: "Аналитика" },
+      { href: "/", labelKey: "nav.tournaments_and_leagues" },
+      { href: "/players", labelKey: "nav.players" },
+      { href: "/analytics", labelKey: "nav.analytics" },
     ],
   },
   {
-    title: "ПЕРСОНАЛ",
+    titleKey: "nav.section.staff",
     links: [
-      { href: "/ops/coaches", label: "Тренеры" },
-      { href: "/ops/organizers", label: "Организаторы" },
+      { href: "/ops/coaches", labelKey: "nav.coaches" },
+      { href: "/ops/organizers", labelKey: "nav.organizers" },
     ],
   },
   {
-    title: "ПРОГРАММЫ",
-    links: [{ href: "/ops/programs", label: "Программы" }],
+    titleKey: "nav.section.programs",
+    links: [{ href: "/ops/programs", labelKey: "nav.programs" }],
   },
   {
-    title: "СИСТЕМА",
+    titleKey: "nav.section.system",
     dividerAbove: true,
-    links: [{ href: "/display", label: "Дисплей", icon: "📺" }],
+    links: [{ href: "/display", labelKey: "nav.display", icon: "📺" }],
   },
 ];
 

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { getWeekdayShortLabels } from "@/lib/i18n/format";
 import type { CalendarEvent } from "@/lib/queries/calendar";
 import {
   isoDateList,
@@ -10,7 +12,6 @@ import {
 import { minutesFromHHMM } from "@/lib/calendar-layout";
 import { EventBlock } from "./EventBlock";
 
-const WEEKDAYS_SHORT_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MAX_PILLS = 3;
 
 type Cell = {
@@ -32,6 +33,8 @@ export function MonthView({
   onSelectEvent?: (event: CalendarEvent) => void;
   onNavigateToDay?: (iso: string) => void;
 }) {
+  const { t, lang } = useTranslation();
+  const weekdaysShort = getWeekdayShortLabels(lang);
   const today = todayIso();
   const currentMonth = Number(date.split("-")[1]);
 
@@ -66,7 +69,7 @@ export function MonthView({
   return (
     <div className="rounded-[var(--radius-card)] border border-border bg-surface overflow-hidden">
       <div className="grid grid-cols-7 border-b border-border bg-subtle">
-        {WEEKDAYS_SHORT_RU.map((w) => (
+        {weekdaysShort.map((w) => (
           <div
             key={w}
             className="px-2 py-2 text-[10.5px] font-semibold uppercase tracking-[0.05em] text-muted text-center"
@@ -121,7 +124,7 @@ export function MonthView({
                     onClick={() => onNavigateToDay?.(cell.iso)}
                     className="self-start text-[10.5px] text-muted hover:text-accent px-1"
                   >
-                    + ещё {hidden}
+                    {t("calendar.more_count", { count: hidden })}
                   </button>
                 ) : null}
               </div>

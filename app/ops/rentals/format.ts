@@ -1,21 +1,20 @@
 import type {
   Court,
-  RentalContractStatus,
-  RentalPaymentScheduleType,
   RentalSlot,
 } from "@/lib/types";
-import { DAY_LABELS_SHORT } from "../coaches/format";
+import type { Lang } from "@/lib/i18n/types";
+import { getWeekdayShortLabels } from "@/lib/i18n/format";
 
 /**
  * Format a list of weekly slots as a compact schedule summary.
- * Example: "Вт 19:00–21:00 · Чт 18:00–20:00 · К1+К2".
+ * Example: "Tue 19:00–21:00 · Thu 18:00–20:00".
  * Slots are grouped by (day_of_week, start_time, end_time); the same time on
- * multiple days collapses into one entry like "Пн, Ср 19:00–21:00".
+ * multiple days collapses into one entry like "Mon, Wed 19:00–21:00".
  */
-export function formatScheduleSummary(slots: RentalSlot[]): string {
+export function formatScheduleSummary(slots: RentalSlot[], lang: Lang): string {
   if (slots.length === 0) return "—";
 
-  // Group by (start, end) — same time across multiple days collapses.
+  const shortDays = getWeekdayShortLabels(lang);
   const byTime = new Map<string, { days: Set<number>; sample: RentalSlot }>();
   for (const s of slots) {
     const key = `${s.start_time.slice(0, 5)}-${s.end_time.slice(0, 5)}`;
@@ -30,17 +29,14 @@ export function formatScheduleSummary(slots: RentalSlot[]): string {
   const parts: string[] = [];
   for (const { days, sample } of byTime.values()) {
     const sortedDays = [...days].sort((a, b) => a - b);
-    const dayLabel = sortedDays.map((d) => DAY_LABELS_SHORT[d]).join(", ");
+    const dayLabel = sortedDays.map((d) => shortDays[d]).join(", ");
     const timeLabel = `${sample.start_time.slice(0, 5)}–${sample.end_time.slice(0, 5)}`;
     parts.push(`${dayLabel} ${timeLabel}`);
   }
   return parts.join(" · ");
 }
 
-/**
- * Distinct courts used by any slot on a contract. Returns "К1, К2" by court
- * number — falls back to "?" for courts no longer in the active list.
- */
+/** Distinct courts used by any slot on a contract. */
 export function formatCourtsList(
   slots: RentalSlot[],
   courts: Court[],
@@ -60,22 +56,6 @@ export function formatCourtsList(
   sortable.sort((a, b) => a.number - b.number);
   return sortable.map((c) => c.name).join(", ");
 }
-
-export const STATUS_LABELS: Record<RentalContractStatus, string> = {
-  draft: "Черновик",
-  active: "Активен",
-  paused: "Приостановлен",
-  ended: "Завершён",
-  cancelled: "Отменён",
-};
-
-export const PAYMENT_SCHEDULE_LABELS: Record<RentalPaymentScheduleType, string> =
-  {
-    one_time: "Единовременно",
-    monthly: "Ежемесячно",
-    quarterly: "Ежеквартально",
-    custom: "По договорённости",
-  };
 
 export function formatContractPeriod(
   startIso: string,
@@ -99,16 +79,3 @@ export function monthsBetween(startIso: string, endIso: string): number {
     1
   );
 }
-
-export const PAYMENT_TYPE_LABELS = {
-  payment: "Платёж",
-  deposit: "Депозит",
-  penalty: "Штраф",
-  refund: "Возврат",
-} as const;
-
-export const PAYMENT_METHOD_LABELS = {
-  cash: "Наличные",
-  card: "Карта",
-  transfer: "Перевод",
-} as const;

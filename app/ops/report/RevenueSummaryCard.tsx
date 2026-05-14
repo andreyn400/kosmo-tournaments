@@ -1,30 +1,37 @@
-import { Card } from "@/components/ui/Card";
-import type { WeeklyReport } from "@/lib/queries/report";
-import { formatRub } from "./format";
+"use client";
 
-const TOURNAMENT_NOTE =
-  "Сумма entry_fee × число регистраций для турниров с датой начала в этой неделе. Не учитывает фактическую оплату.";
+import { Card } from "@/components/ui/Card";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub } from "@/lib/i18n/format";
+import type { WeeklyReport } from "@/lib/queries/report";
 
 export function RevenueSummaryCard({
   revenue,
 }: {
   revenue: WeeklyReport["revenue"];
 }) {
+  const { t, lang } = useTranslation();
   return (
     <Card padded={false} className="p-5 flex flex-col gap-4">
       <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-        Доход за неделю
+        {t("report.revenue.title")}
       </div>
       <div className="text-3xl font-semibold text-black tabular-nums">
-        {formatRub(revenue.total_rub)}
+        {formatRub(revenue.total_rub, lang)}
       </div>
       <dl className="flex flex-col gap-1.5 text-sm">
-        <Row label="Аренда" value={formatRub(revenue.rentals_rub)} />
-        <Row label="Сессии" value={formatRub(revenue.scheduler_rub)} />
         <Row
-          label="Турниры (расчётно)"
-          value={formatRub(revenue.tournaments_estimated_rub)}
-          note={TOURNAMENT_NOTE}
+          label={t("report.revenue.rentals")}
+          value={formatRub(revenue.rentals_rub, lang)}
+        />
+        <Row
+          label={t("report.revenue.sessions")}
+          value={formatRub(revenue.scheduler_rub, lang)}
+        />
+        <Row
+          label={t("report.revenue.tournaments_estimated")}
+          value={formatRub(revenue.tournaments_estimated_rub, lang)}
+          note={t("report.revenue.tournaments_estimated_tooltip")}
         />
       </dl>
     </Card>

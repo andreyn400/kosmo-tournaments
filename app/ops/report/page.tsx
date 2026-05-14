@@ -5,6 +5,7 @@ import {
   todayIso,
 } from "@/lib/calendar-range";
 import { getWeeklyReport } from "@/lib/queries/report";
+import { st } from "@/lib/i18n/server";
 import { CoachPayoutsTable } from "./CoachPayoutsTable";
 import { CourtUtilizationCard } from "./CourtUtilizationCard";
 import { ReportWeekHeader } from "./ReportWeekHeader";
@@ -21,10 +22,13 @@ export default async function OpsReportPage({
   const requested =
     params.week && isValidIsoDate(params.week) ? params.week : null;
   const weekStart = startOfWeekMon(requested ?? todayIso());
-  const report = await getWeeklyReport(weekStart);
+  const [report, title] = await Promise.all([
+    getWeeklyReport(weekStart),
+    st("report.title"),
+  ]);
 
   return (
-    <PageShell title="Отчёт">
+    <PageShell title={title}>
       <div className="flex flex-col gap-5">
         <ReportWeekHeader
           weekStartIso={report.weekStartIso}

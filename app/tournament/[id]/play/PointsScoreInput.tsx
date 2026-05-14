@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   scoringGroup,
   scoringTarget,
@@ -35,6 +36,7 @@ export function PointsScoreInput({
   isCompleted: boolean;
   editable: boolean;
 }) {
+  const { t } = useTranslation();
   const [t1, setT1] = useState<string>(
     initialT1 != null ? String(initialT1) : "",
   );
@@ -47,13 +49,19 @@ export function PointsScoreInput({
   const target = scoringTarget(scoringSystem);
   const group = scoringGroup(scoringSystem);
   const unit =
-    group === "points" ? "очков" : group === "combined" ? "в сумме" : "геймов";
-  const helper = target ? `До ${target} ${unit}` : "";
+    group === "points"
+      ? t("match.unit.points")
+      : group === "combined"
+        ? t("match.unit.combined")
+        : t("match.unit.games");
+  const helper = target
+    ? t("match.helper.target_with_unit", { target, unit })
+    : "";
 
   const submit = () => {
     setError(null);
     if (t1 === "" || t2 === "") {
-      setError("Введите счёт для обеих команд");
+      setError(t("match.error.enter_both"));
       return;
     }
     const a = Number(t1);
@@ -65,7 +73,7 @@ export function PointsScoreInput({
           ? validateCombinedScore(scoringSystem, a, b)
           : validateGamesScore(scoringSystem, a, b);
     if (!v.ok) {
-      setError(v.error);
+      setError(t(v.error.key, v.error.vars));
       return;
     }
 
@@ -110,7 +118,7 @@ export function PointsScoreInput({
           inputId={`${matchId}-t1`}
         />
         <div className="text-[11px] text-fade uppercase tracking-[0.12em]">
-          против
+          {t("match.vs")}
         </div>
         <TeamRow
           name={team2Players}
@@ -134,10 +142,10 @@ export function PointsScoreInput({
           ) : null}
           <Button size="lg" fullWidth disabled={pending} onClick={submit}>
             {pending
-              ? "Сохранение…"
+              ? t("match.saving")
               : isCompleted
-                ? "Обновить счёт"
-                : "Сохранить счёт"}
+                ? t("match.update_score")
+                : t("match.save_score")}
           </Button>
         </div>
       ) : null}

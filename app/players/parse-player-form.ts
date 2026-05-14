@@ -5,6 +5,7 @@ import type {
   MembershipStatus,
   PadelLevel,
 } from "@/lib/types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 import type { PlayerFormValues } from "./PlayerFields";
 
 export type ParsedPlayer = {
@@ -33,26 +34,26 @@ function trimOrNull(v: string): string | null {
 
 export function parsePlayerForm(
   input: PlayerFormValues,
-): { value: ParsedPlayer } | { error: string } {
+): { value: ParsedPlayer } | { error: FieldError } {
   const name = input.name.trim();
-  if (!name) return { error: "Введите имя игрока" };
+  if (!name) return { error: fieldErr("error.required.player_name") };
   if (!(PADEL_LEVELS as string[]).includes(input.level))
-    return { error: "Неизвестный уровень" };
+    return { error: fieldErr("error.invalid.level_unknown") };
 
   const gender = input.gender.trim();
   if (gender && !(GENDERS as string[]).includes(gender))
-    return { error: "Неизвестное значение поля «Пол»" };
+    return { error: fieldErr("error.invalid.gender_unknown") };
 
   if (!(MEMBERSHIPS as string[]).includes(input.membership_status))
-    return { error: "Неизвестный статус членства" };
+    return { error: fieldErr("error.invalid.membership_unknown") };
 
   const hand = input.dominant_hand.trim();
   if (hand && !(HANDS as string[]).includes(hand))
-    return { error: "Неизвестное значение поля «Рабочая рука»" };
+    return { error: fieldErr("error.invalid.handedness_unknown") };
 
   const dob = input.date_of_birth.trim();
   if (dob && !DATE_RE.test(dob))
-    return { error: "Дата рождения в формате ГГГГ-ММ-ДД" };
+    return { error: fieldErr("error.invalid.date_of_birth_format") };
 
   return {
     value: {

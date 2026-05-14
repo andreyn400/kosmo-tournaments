@@ -6,21 +6,26 @@ import {
   listRegistrationsByDivision,
 } from "@/lib/queries/registrations";
 import { getDivision } from "@/lib/queries/divisions";
+import { getServerDict } from "@/lib/i18n/server";
 
 export async function addPlayerAction(input: {
   tournamentId: string;
   playerId: string;
   divisionId?: string | null;
 }): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   try {
     if (input.divisionId) {
       const div = await getDivision(input.divisionId);
-      if (!div) return { error: "Дивизион не найден" };
+      if (!div) return { error: dict["error.not_found.division"] };
       if (div.max_players) {
         const existing = await listRegistrationsByDivision(input.divisionId);
         if (existing.length >= div.max_players) {
           return {
-            error: `Достигнут лимит игроков (${div.max_players}) в дивизионе`,
+            error: dict["error.division.players_limit_reached"].replace(
+              "{limit}",
+              String(div.max_players),
+            ),
           };
         }
       }
@@ -31,8 +36,13 @@ export async function addPlayerAction(input: {
       division_id: input.divisionId ?? null,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
-    return { error: `Не удалось добавить игрока: ${msg}` };
+    const reason = e instanceof Error ? e.message : dict["error.unknown"];
+    return {
+      error: dict["error.failed.add_player_with_reason"].replace(
+        "{reason}",
+        reason,
+      ),
+    };
   }
   revalidatePath(`/tournament/${input.tournamentId}`);
   if (input.divisionId) {

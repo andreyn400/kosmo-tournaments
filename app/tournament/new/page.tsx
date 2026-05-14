@@ -3,18 +3,22 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PageShell } from "@/components/site/PageShell";
 import { listActiveCourts } from "@/lib/queries/courts";
+import { getServerDict } from "@/lib/i18n/server";
 import { CreateTournamentForm } from "./CreateTournamentForm";
 
 export default async function NewTournamentPage() {
-  const courts = await listActiveCourts();
+  const [courts, dict] = await Promise.all([
+    listActiveCourts(),
+    getServerDict(),
+  ]);
 
   return (
     <PageShell
-      title="Новый турнир"
+      title={dict["tournament.new.title"]}
       action={
         <Link href="/">
           <Button variant="secondary" size="md">
-            Назад
+            {dict["btn.back"]}
           </Button>
         </Link>
       }
@@ -27,15 +31,14 @@ export default async function NewTournamentPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <h2 className="text-xl font-semibold text-black">
-                Сначала добавьте корты
+                {dict["tournament.new.no_courts_title"]}
               </h2>
               <p className="text-muted text-sm max-w-sm">
-                Турнир не может быть создан без активных кортов. Добавьте хотя
-                бы один корт на странице «Корты».
+                {dict["tournament.new.no_courts_copy"]}
               </p>
             </div>
             <Link href="/courts">
-              <Button>Перейти к кортам</Button>
+              <Button>{dict["tournament.new.go_to_courts"]}</Button>
             </Link>
           </Card>
         ) : (

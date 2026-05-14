@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import { todayIso } from "../../coaches/format";
 import type { RawExceptionInput } from "./slot-input";
 
@@ -17,6 +18,7 @@ export function ExceptionForm({
   onSubmit,
   pending,
 }: ExceptionFormProps) {
+  const { t } = useTranslation();
   const [state, setState] = useState<RawExceptionInput>({
     exception_type: "cancellation",
     from_date: todayIso(),
@@ -46,18 +48,18 @@ export function ExceptionForm({
     >
       <div>
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted block mb-1.5">
-          Тип
+          {t("exception.field.type")}
         </span>
         <div className="flex gap-2">
           <TypeButton
-            label="Отмена на день"
-            description="Один пропуск"
+            label={t("exception.type.cancellation_label")}
+            description={t("exception.type.cancellation_hint")}
             active={state.exception_type === "cancellation"}
             onClick={() => set("exception_type", "cancellation")}
           />
           <TypeButton
-            label="Пауза на период"
-            description="Несколько дней подряд"
+            label={t("exception.type.pause_label")}
+            description={t("exception.type.pause_hint")}
             active={state.exception_type === "pause"}
             onClick={() => {
               setState((s) => ({ ...s, exception_type: "pause" }));
@@ -69,7 +71,9 @@ export function ExceptionForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           label={
-            state.exception_type === "cancellation" ? "Дата" : "С даты"
+            state.exception_type === "cancellation"
+              ? t("exception.field.date")
+              : t("exception.field.from_date")
           }
         >
           <Input
@@ -80,7 +84,6 @@ export function ExceptionForm({
               setState((s) => ({
                 ...s,
                 from_date: v,
-                // Cancellation forces same-day to_date.
                 to_date:
                   s.exception_type === "cancellation"
                     ? v
@@ -93,7 +96,7 @@ export function ExceptionForm({
           />
         </Field>
         {state.exception_type === "pause" && (
-          <Field label="По дату">
+          <Field label={t("exception.field.to_date")}>
             <Input
               type="date"
               value={state.to_date}
@@ -104,11 +107,11 @@ export function ExceptionForm({
         )}
       </div>
 
-      <Field label="Причина (необязательно)">
+      <Field label={t("exception.field.reason")}>
         <Input
           value={state.reason}
           onChange={(e) => set("reason", e.target.value)}
-          placeholder="Отпуск клиента, праздник, …"
+          placeholder={t("exception.placeholder.reason")}
           className="!h-9"
         />
       </Field>
@@ -123,10 +126,10 @@ export function ExceptionForm({
           onClick={onCancel}
           disabled={pending}
         >
-          Отмена
+          {t("btn.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={pending}>
-          {pending ? "Добавление…" : "Добавить"}
+          {pending ? t("exception.submitting") : t("exception.submit")}
         </Button>
       </div>
     </form>

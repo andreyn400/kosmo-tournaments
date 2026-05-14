@@ -4,6 +4,7 @@ import type {
   RentalContractStatus,
   RentalPaymentScheduleType,
 } from "@/lib/types";
+import { fieldErr, type FieldError } from "@/lib/i18n/error-helpers";
 
 export interface RawContractInput {
   client_name: string;
@@ -29,45 +30,54 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type ValidatedContract =
   | { ok: true; value: RentalContractInput }
-  | { ok: false; error: string };
+  | { ok: false; error: FieldError };
 
 export function validateContractInput(
   raw: RawContractInput,
 ): ValidatedContract {
   const name = raw.client_name.trim();
-  if (!name) return { ok: false, error: "Введите название клиента" };
+  if (!name) return { ok: false, error: fieldErr("error.required.client_name") };
 
   if (!DATE_RE.test(raw.start_date)) {
-    return { ok: false, error: "Укажите дату начала" };
+    return { ok: false, error: fieldErr("error.required.date_start") };
   }
   if (!DATE_RE.test(raw.end_date)) {
-    return { ok: false, error: "Укажите дату окончания" };
+    return { ok: false, error: fieldErr("error.required.date_end") };
   }
   if (raw.end_date < raw.start_date) {
-    return { ok: false, error: "Дата окончания должна быть не раньше начала" };
+    return {
+      ok: false,
+      error: fieldErr("error.invalid.date_end_before_start"),
+    };
   }
 
   const total = Number.parseInt(raw.total_value_rub, 10);
   if (!Number.isFinite(total) || total < 0) {
-    return { ok: false, error: "Стоимость контракта: целое число ≥ 0" };
+    return {
+      ok: false,
+      error: fieldErr("error.invalid.contract_value_non_negative_int"),
+    };
   }
   if (total > 1_000_000_000) {
-    return { ok: false, error: "Стоимость выглядит слишком большой" };
+    return { ok: false, error: fieldErr("error.invalid.price_too_large") };
   }
 
   const deposit = Number.parseInt(raw.deposit_rub, 10) || 0;
   if (deposit < 0) {
-    return { ok: false, error: "Депозит: целое число ≥ 0" };
+    return {
+      ok: false,
+      error: fieldErr("error.invalid.deposit_non_negative_int"),
+    };
   }
 
   const email = raw.contact_email.trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, error: "Неверный формат email" };
+    return { ok: false, error: fieldErr("error.invalid.email_format") };
   }
 
   const inn = raw.inn.trim();
   if (inn && !/^\d{10}$|^\d{12}$/.test(inn)) {
-    return { ok: false, error: "ИНН: 10 цифр (юрлицо) или 12 (ИП)" };
+    return { ok: false, error: fieldErr("error.invalid.inn_format") };
   }
 
   return {

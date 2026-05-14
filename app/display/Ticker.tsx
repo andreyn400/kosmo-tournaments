@@ -1,27 +1,19 @@
-import { FORMAT_LABEL_RU } from "@/lib/constants";
+"use client";
+
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { TOURNAMENT_FORMAT_KEY } from "@/lib/i18n/tournament-keys";
+import { formatShortDateWithWeekday } from "@/lib/i18n/format";
+import type { Lang } from "@/lib/i18n/types";
 import type { TickerEvent } from "@/lib/queries/display";
 
-const WEEKDAY_SHORT_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
-const MONTH_GEN_RU = [
-  "янв",
-  "фев",
-  "мар",
-  "апр",
-  "мая",
-  "июн",
-  "июл",
-  "авг",
-  "сен",
-  "окт",
-  "ноя",
-  "дек",
-];
-
-function relativeDateLabel(iso: string, todayIso: string): string {
-  if (iso === addDays(todayIso, 1)) return "Завтра";
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  return `${WEEKDAY_SHORT_RU[dt.getDay()]} ${d} ${MONTH_GEN_RU[m - 1]}`;
+function relativeDateLabel(
+  iso: string,
+  todayIso: string,
+  tomorrowLabel: string,
+  lang: Lang,
+): string {
+  if (iso === addDays(todayIso, 1)) return tomorrowLabel;
+  return formatShortDateWithWeekday(iso, lang);
 }
 
 function addDays(iso: string, n: number): string {
@@ -34,10 +26,10 @@ function addDays(iso: string, n: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
-function courtsSummary(nums: number[]): string {
+function courtsSummary(nums: number[], prefix: string): string {
   if (nums.length === 0) return "";
-  if (nums.length === 1) return `К${nums[0]}`;
-  return `К${nums[0]}–К${nums[nums.length - 1]}`;
+  if (nums.length === 1) return `${prefix}${nums[0]}`;
+  return `${prefix}${nums[0]}–${prefix}${nums[nums.length - 1]}`;
 }
 
 type TickerProps = {
@@ -55,7 +47,10 @@ function Dot() {
 }
 
 export function Ticker({ events, todayIso: today }: TickerProps) {
+  const { t, lang } = useTranslation();
   const anchor = today ?? new Date().toISOString().slice(0, 10);
+  const tomorrowLabel = t("display.ticker.tomorrow");
+  const courtPrefix = t("tournament.card.court_short_prefix");
 
   return (
     <div
@@ -64,7 +59,7 @@ export function Ticker({ events, todayIso: today }: TickerProps) {
     >
       {events.length === 0 ? (
         <div className="px-8 text-sm text-muted">
-          Ближайших событий на неделе нет
+          {t("display.ticker.empty")}
         </div>
       ) : (
         <div className="flex gap-8 whitespace-nowrap px-8 animate-[ticker_90s_linear_infinite]">
@@ -74,11 +69,11 @@ export function Ticker({ events, todayIso: today }: TickerProps) {
               className="inline-flex items-center gap-3 text-sm text-muted"
             >
               <span className="font-semibold text-secondary">
-                {relativeDateLabel(e.date, anchor)}:
+                {relativeDateLabel(e.date, anchor, tomorrowLabel, lang)}:
               </span>
               <span className="text-black">{e.name}</span>
               <Dot />
-              <span>{FORMAT_LABEL_RU[e.format]}</span>
+              <span>{t(TOURNAMENT_FORMAT_KEY[e.format])}</span>
               {e.startTime && (
                 <>
                   <Dot />
@@ -88,7 +83,7 @@ export function Ticker({ events, todayIso: today }: TickerProps) {
               {e.courtNumbers.length > 0 && (
                 <>
                   <Dot />
-                  <span>{courtsSummary(e.courtNumbers)}</span>
+                  <span>{courtsSummary(e.courtNumbers, courtPrefix)}</span>
                 </>
               )}
             </span>

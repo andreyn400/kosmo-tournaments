@@ -7,6 +7,7 @@ import { listPlayers } from "@/lib/queries/players";
 import { listRegistrationsByDivision } from "@/lib/queries/registrations";
 import { totalRoundsFor } from "@/lib/total-rounds";
 import { pairsFromRegistrations } from "@/lib/pairs-from-registrations";
+import { getServerDict } from "@/lib/i18n/server";
 import { Scoreboard } from "../../../../play/scoreboard/Scoreboard";
 
 export default async function DivisionScoreboardPage({
@@ -22,13 +23,16 @@ export default async function DivisionScoreboardPage({
   if (!tournament || !division || division.tournament_id !== id) notFound();
 
   if (division.status !== "in_progress" && division.status !== "completed") {
+    const dict = await getServerDict();
     return (
       <div className="min-h-dvh bg-black text-white flex items-center justify-center p-10 text-center">
         <div className="flex flex-col gap-3">
           <div className="text-3xl font-semibold">
             {tournament.name} · {division.name}
           </div>
-          <div className="text-lg text-white/60">Дивизион ещё не запущен</div>
+          <div className="text-lg text-white/60">
+            {dict["play.division_not_started"]}
+          </div>
         </div>
       </div>
     );

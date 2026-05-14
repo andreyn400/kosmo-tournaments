@@ -2,8 +2,10 @@
 
 import { Fragment, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/components/i18n/useTranslation";
+import { formatRub, formatShortDateWithWeekday } from "@/lib/i18n/format";
+import { ORGANIZER_PAYMENT_TYPE_KEY } from "@/lib/i18n/organizer-keys";
 import type { Organizer, OrganizerPayment } from "@/lib/types";
-import { formatDateRu, formatRub } from "../../coaches/format";
 import { PaymentForm } from "./PaymentForm";
 import { updatePaymentAction } from "./update-payment-action";
 import { deletePaymentAction } from "./delete-payment-action";
@@ -25,6 +27,7 @@ export function LedgerRow({
   zebra,
 }: LedgerRowProps) {
   const router = useRouter();
+  const { t, lang } = useTranslation();
   const [pending, startTransition] = useTransition();
 
   function handleSave(input: RawPaymentInput): Promise<{ error?: string }> {
@@ -45,7 +48,7 @@ export function LedgerRow({
   }
 
   function handleDelete() {
-    if (!confirm("Удалить эту запись? Баланс пересчитается сразу.")) return;
+    if (!confirm(t("organizer.ledger.delete_confirm"))) return;
     startTransition(async () => {
       const res = await deletePaymentAction(organizer.id, payment.id);
       if (res.error) {
@@ -56,8 +59,6 @@ export function LedgerRow({
     });
   }
 
-  // Sign: payments add to debt (+), deposits and refunds subtract (−).
-  // Amount color follows that — red for charges, green for incoming, warning for refunds.
   const isCharge = payment.type === "payment";
   const isDeposit = payment.type === "deposit";
   const sign = isCharge ? "+" : "−";
@@ -82,7 +83,7 @@ export function LedgerRow({
         style={{ height: "44px" }}
       >
         <td className="pl-4 pr-2 align-middle text-xs tabular-nums whitespace-nowrap text-black">
-          {formatDateRu(payment.date)}
+          {formatShortDateWithWeekday(payment.date, lang)}
         </td>
         <td className="px-2 align-middle">
           <TypePill type={payment.type} />
@@ -102,7 +103,7 @@ export function LedgerRow({
           className={`pl-2 pr-4 align-middle text-sm font-bold tabular-nums text-right whitespace-nowrap ${amountCls}`}
         >
           {sign}
-          {formatRub(payment.amount_rub)}
+          {formatRub(payment.amount_rub, lang)}
         </td>
       </tr>
       {expanded && (
@@ -124,19 +125,17 @@ export function LedgerRow({
 }
 
 function TypePill({ type }: { type: OrganizerPayment["type"] }) {
+  const { t } = useTranslation();
   const map = {
     payment: {
-      label: "Начисление",
       bg: "bg-[var(--color-danger-soft)]",
       text: "text-[var(--color-danger)]",
     },
     deposit: {
-      label: "Депозит",
       bg: "bg-[var(--color-success-soft)]",
       text: "text-[var(--color-success)]",
     },
     refund: {
-      label: "Возврат",
       bg: "bg-[var(--color-warning-soft)]",
       text: "text-[var(--color-warning)]",
     },
@@ -146,7 +145,7 @@ function TypePill({ type }: { type: OrganizerPayment["type"] }) {
     <span
       className={`inline-flex items-center px-2 h-6 rounded text-[10.5px] font-semibold uppercase tracking-wider ${cfg.bg} ${cfg.text}`}
     >
-      {cfg.label}
+      {t(ORGANIZER_PAYMENT_TYPE_KEY[type])}
     </span>
   );
 }

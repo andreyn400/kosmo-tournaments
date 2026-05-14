@@ -9,6 +9,8 @@ import {
   updateScheduleEntry,
 } from "@/lib/queries/rentals";
 import { generateSchedule } from "@/lib/rental-schedule-gen";
+import { getServerDict, getServerLang } from "@/lib/i18n/server";
+import { resolveErrorWithDict } from "@/lib/i18n/error-helpers";
 import {
   validateScheduleEntryInput,
   type RawScheduleEntryInput,
@@ -23,15 +25,19 @@ export async function createScheduleEntryAction(
   contractId: string,
   raw: RawScheduleEntryInput,
 ): Promise<{ id?: string; error?: string }> {
+  const dict = await getServerDict();
   const v = validateScheduleEntryInput(raw);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
   try {
     const e = await createScheduleEntry({ ...v.value, contract_id: contractId });
     revalidate(contractId);
     return { id: e.id };
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось создать запись.",
+      error:
+        e instanceof Error
+          ? e.message
+          : dict["error.failed.create.schedule_record"],
     };
   }
 }
@@ -41,15 +47,19 @@ export async function updateScheduleEntryAction(
   entryId: string,
   raw: RawScheduleEntryInput,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   const v = validateScheduleEntryInput(raw);
-  if (!v.ok) return { error: v.error };
+  if (!v.ok) return { error: resolveErrorWithDict(v.error, dict) };
   try {
     await updateScheduleEntry(entryId, { ...v.value, contract_id: contractId });
     revalidate(contractId);
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось обновить запись.",
+      error:
+        e instanceof Error
+          ? e.message
+          : dict["error.failed.update.schedule_record"],
     };
   }
 }
@@ -58,13 +68,17 @@ export async function deleteScheduleEntryAction(
   contractId: string,
   entryId: string,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
   try {
     await deleteScheduleEntry(entryId);
     revalidate(contractId);
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось удалить запись.",
+      error:
+        e instanceof Error
+          ? e.message
+          : dict["error.failed.delete.schedule_record"],
     };
   }
 }
@@ -78,21 +92,30 @@ export async function deleteScheduleEntryAction(
 export async function regenerateScheduleAction(
   contractId: string,
 ): Promise<{ error?: string }> {
+  const dict = await getServerDict();
+  const lang = await getServerLang();
   try {
     const contract = await getContract(contractId);
-    if (!contract) return { error: "Контракт не найден" };
+    if (!contract) return { error: dict["error.not_found.contract"] };
     const entries = generateSchedule({
       start_date: contract.start_date,
       end_date: contract.end_date,
       total_value_rub: contract.total_value_rub,
       payment_schedule_type: contract.payment_schedule_type,
+      labels: {
+        fullPayment: dict["rental.schedule.full_payment_label"],
+        lang,
+      },
     });
     await replaceSchedule(contractId, entries);
     revalidate(contractId);
     return {};
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "Не удалось пересчитать график.",
+      error:
+        e instanceof Error
+          ? e.message
+          : dict["error.failed.recompute.schedule"],
     };
   }
 }

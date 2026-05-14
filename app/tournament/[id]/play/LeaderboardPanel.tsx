@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
   computeLiveLeaderboard,
   computePairLeaderboard,
@@ -32,11 +33,14 @@ export function LeaderboardPanel({
   scoringSystem: ScoringSystem;
   pairs?: ReadonlyArray<Pair>;
 }) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
   const strategy = sortStrategyForFormat(format);
   const isTeamFormat = pairs && pairs.length > 0;
   const isSets = scoringGroup(scoringSystem) === "sets";
-  const pointsLabel = isSets ? "Сеты" : "Очки";
+  const pointsLabel = isSets
+    ? t("leaderboard.sets_label")
+    : t("leaderboard.points_or_sets");
 
   const pairRows = useMemo<PairLeaderboardRow[]>(
     () =>
@@ -64,26 +68,28 @@ export function LeaderboardPanel({
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-black">Таблица</h2>
+        <h2 className="font-semibold text-black">{t("leaderboard.title")}</h2>
         <Button
           size="sm"
           variant="ghost"
           onClick={() => setCollapsed((v) => !v)}
           className="md:hidden"
         >
-          {collapsed ? "Показать" : "Скрыть"}
+          {collapsed ? t("match.show") : t("match.hide")}
         </Button>
       </div>
 
       <div className={collapsed ? "hidden md:block" : "block"}>
         {!hasRows ? (
-          <p className="text-sm text-muted">Пока нет завершённых матчей.</p>
+          <p className="text-sm text-muted">{t("leaderboard.empty")}</p>
         ) : (
           <div className="border border-border rounded-[var(--radius-button)] overflow-hidden">
             <div className="bg-subtle px-3 py-2 grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 items-center text-[10px] font-semibold text-muted uppercase tracking-[0.08em]">
               <span className="w-5 text-right">#</span>
-              <span>Игрок</span>
-              <span className="w-8 text-right">М</span>
+              <span>{t("leaderboard.col.player")}</span>
+              <span className="w-8 text-right">
+                {t("leaderboard.col.matches")}
+              </span>
               <span className="hidden sm:inline w-12 text-right">+/−</span>
               <span className="w-10 text-right">{pointsLabel}</span>
             </div>
@@ -95,7 +101,6 @@ export function LeaderboardPanel({
                       idx={idx}
                       name={r.displayName}
                       primary={strategy === "wins" ? r.wins : r.matchesPlayed}
-                      primaryLabel={strategy === "wins" ? null : ""}
                       plusMinus={r.plusMinus}
                       points={r.points}
                       wrap
@@ -107,7 +112,6 @@ export function LeaderboardPanel({
                       idx={idx}
                       name={r.playerName}
                       primary={strategy === "wins" ? r.wins : r.matchesPlayed}
-                      primaryLabel={strategy === "wins" ? null : ""}
                       plusMinus={r.plusMinus}
                       points={r.points}
                     />
@@ -131,7 +135,6 @@ function Row({
   idx: number;
   name: string;
   primary: number;
-  primaryLabel: string | null;
   plusMinus: number;
   points: number;
   wrap?: boolean;

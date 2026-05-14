@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import type { Player } from "@/lib/types";
 import { addPairAction } from "./add-pair-action";
 
@@ -19,6 +20,7 @@ export function AddPairPanel({
   divisionId?: string | null;
 }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [queryA, setQueryA] = useState("");
   const [queryB, setQueryB] = useState("");
   const [selectedA, setSelectedA] = useState<Player | null>(null);
@@ -73,7 +75,7 @@ export function AddPairPanel({
     <div className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <PickerColumn
-          title="Игрок 1"
+          title={t("add_pair.player1")}
           query={queryA}
           onQueryChange={setQueryA}
           selected={selectedA}
@@ -85,7 +87,7 @@ export function AddPairPanel({
           }}
         />
         <PickerColumn
-          title="Партнёр"
+          title={t("add_pair.partner")}
           query={queryB}
           onQueryChange={setQueryB}
           selected={selectedB}
@@ -101,7 +103,7 @@ export function AddPairPanel({
 
       <div>
         <Button disabled={!canAdd} onClick={submit}>
-          {pending ? "Добавление…" : "Добавить пару"}
+          {pending ? t("add_pair.adding") : t("add_pair.add_cta")}
         </Button>
       </div>
 
@@ -114,10 +116,7 @@ export function AddPairPanel({
         </div>
       ) : null}
 
-      <p className="text-xs text-muted">
-        Нового игрока можно создать на странице «Игроки», затем добавить его в
-        пару здесь.
-      </p>
+      <p className="text-xs text-muted">{t("add_pair.create_hint")}</p>
     </div>
   );
 }
@@ -141,6 +140,7 @@ function PickerColumn({
   onPick: (p: Player) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-2">
       <span className="text-xs text-muted uppercase tracking-wider">
@@ -155,14 +155,16 @@ function PickerColumn({
             </span>
           </div>
           <Button size="sm" variant="ghost" onClick={onClear}>
-            Изменить
+            {t("add_pair.change_cta")}
           </Button>
         </div>
       ) : (
         <>
           <Input
             placeholder={
-              disabled ? "Сначала выберите игрока 1" : "Поиск игрока…"
+              disabled
+                ? t("add_pair.pick_player1_first")
+                : t("add_pair.search_placeholder")
             }
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
@@ -183,19 +185,17 @@ function PickerColumn({
                       {p.level} · {p.elo_rating}
                     </span>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onPick(p)}
-                  >
-                    Выбрать
+                  <Button size="sm" variant="ghost" onClick={() => onPick(p)}>
+                    {t("add_pair.pick_cta")}
                   </Button>
                 </li>
               ))}
             </ul>
           ) : !disabled ? (
             <p className="text-xs text-muted">
-              {query.trim() ? "Игроки не найдены." : "Начните вводить имя…"}
+              {query.trim()
+                ? t("add_pair.no_results")
+                : t("add_pair.start_typing")}
             </p>
           ) : null}
         </>

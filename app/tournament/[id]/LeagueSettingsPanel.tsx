@@ -4,13 +4,13 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { useTranslation } from "@/components/i18n/useTranslation";
 import {
-  SCORING_GROUP_LABEL_RU,
-  SCORING_SYSTEM_HELPER_RU,
-  SCORING_SYSTEM_LABEL_RU,
-  SCORING_SYSTEMS,
-  scoringGroup,
-} from "@/lib/scoring-systems";
+  SCORING_GROUP_LABEL_KEY,
+  SCORING_SYSTEM_HELPER_KEY,
+  SCORING_SYSTEM_LABEL_KEY,
+} from "@/lib/i18n/scoring-keys";
+import { SCORING_SYSTEMS, scoringGroup } from "@/lib/scoring-systems";
 import type { ScoringSystem, FinalsStatus } from "@/lib/types";
 import { updateLeagueSettingsAction } from "./update-league-settings-action";
 
@@ -37,6 +37,7 @@ export function LeagueSettingsPanel({
   finalsScoringSystem: ScoringSystem | null;
   finalsStatus: FinalsStatus;
 }) {
+  const { t } = useTranslation();
   const initialScoring: ScoringSystem = finalsScoringSystem ?? "sets_best3";
   const [open, setOpen] = useState(false);
   const [spots, setSpots] = useState<string>(String(qualificationSpots));
@@ -78,14 +79,14 @@ export function LeagueSettingsPanel({
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
-          <h2 className="font-semibold text-black">Настройки сезона</h2>
-          <p className="text-xs text-muted">
-            Квалификация, дата и система счёта финала
-          </p>
+          <h2 className="font-semibold text-black">
+            {t("league_settings.title")}
+          </h2>
+          <p className="text-xs text-muted">{t("league_settings.subtitle")}</p>
         </div>
         {!open ? (
           <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-            Редактировать
+            {t("league_settings.edit_cta")}
           </Button>
         ) : null}
       </div>
@@ -93,29 +94,28 @@ export function LeagueSettingsPanel({
       {!open ? (
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3 text-sm">
           <InfoItem
-            label="Квалификационных мест"
+            label={t("league_settings.field.spots")}
             value={String(qualificationSpots)}
           />
           <InfoItem
-            label="Дата финала"
+            label={t("league_settings.field.finals_date")}
             value={finalsDate ?? "—"}
           />
           <InfoItem
-            label="Система счёта финала"
-            value={SCORING_SYSTEM_LABEL_RU[initialScoring]}
+            label={t("league_settings.field.scoring")}
+            value={t(SCORING_SYSTEM_LABEL_KEY[initialScoring])}
           />
         </dl>
       ) : (
         <div className="flex flex-col gap-4 pt-2 border-t border-border">
           {lockedBecauseCreated ? (
             <p className="text-xs text-warning">
-              Финальная сетка уже создана. Изменения в этих настройках не повлияют
-              на существующую сетку.
+              {t("league_settings.locked_warning")}
             </p>
           ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Квалификационных мест" required>
+            <Field label={t("league_settings.field.spots")} required>
               <Select value={spots} onChange={(e) => setSpots(e.target.value)}>
                 {[2, 4, 8, 16, 32].map((n) => (
                   <option key={n} value={n}>
@@ -125,7 +125,7 @@ export function LeagueSettingsPanel({
               </Select>
             </Field>
 
-            <Field label="Дата финала">
+            <Field label={t("league_settings.field.finals_date")}>
               <Input
                 type="date"
                 value={date}
@@ -135,38 +135,38 @@ export function LeagueSettingsPanel({
           </div>
 
           <Field
-            label="Система счёта финала"
-            hint={SCORING_SYSTEM_HELPER_RU[scoring]}
+            label={t("league_settings.field.scoring")}
+            hint={t(SCORING_SYSTEM_HELPER_KEY[scoring])}
           >
             <Select
               value={scoring}
               onChange={(e) => setScoring(e.target.value as ScoringSystem)}
             >
-              <optgroup label={SCORING_GROUP_LABEL_RU.sets}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.sets)}>
                 {SCORING_GROUPED.sets.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label={SCORING_GROUP_LABEL_RU.games}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.games)}>
                 {SCORING_GROUPED.games.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label={SCORING_GROUP_LABEL_RU.combined}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.combined)}>
                 {SCORING_GROUPED.combined.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
-              <optgroup label={SCORING_GROUP_LABEL_RU.points}>
+              <optgroup label={t(SCORING_GROUP_LABEL_KEY.points)}>
                 {SCORING_GROUPED.points.map((s) => (
                   <option key={s} value={s}>
-                    {SCORING_SYSTEM_LABEL_RU[s]}
+                    {t(SCORING_SYSTEM_LABEL_KEY[s])}
                   </option>
                 ))}
               </optgroup>
@@ -184,10 +184,10 @@ export function LeagueSettingsPanel({
 
           <div className="flex items-center gap-3">
             <Button onClick={submit} disabled={pending}>
-              {pending ? "Сохранение…" : "Сохранить"}
+              {pending ? t("btn.saving") : t("btn.save")}
             </Button>
             <Button variant="secondary" onClick={cancel} disabled={pending}>
-              Отмена
+              {t("btn.cancel")}
             </Button>
           </div>
         </div>
