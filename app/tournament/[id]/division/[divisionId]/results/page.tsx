@@ -25,7 +25,7 @@ import {
 } from "@/lib/i18n/tournament-keys";
 import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
 import { statusTone } from "@/lib/status-tone";
-import { ShareButton } from "../../../results/ShareButton";
+import { SharePanel } from "@/components/share/SharePanel";
 
 export default async function DivisionResultsPage({
   params,
@@ -100,17 +100,19 @@ export default async function DivisionResultsPage({
     <PageShell
       title={title}
       action={
-        <div className="flex items-center gap-2">
-          <ShareButton />
-          <Link href={backHref}>
-            <Button variant="secondary" size="md">
-              {tr("results.back_to_division")}
-            </Button>
-          </Link>
-        </div>
+        <Link href={backHref}>
+          <Button variant="secondary" size="md">
+            {tr("results.back_to_division")}
+          </Button>
+        </Link>
       }
     >
       <div className="flex flex-col gap-6 max-w-3xl">
+        <SharePanel
+          shortCode={tournament.short_code}
+          tournamentName={tournament.name}
+        />
+
         <Card className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="neutral">

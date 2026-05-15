@@ -2384,3 +2384,310 @@ Deletions: ideally `lib/format-date.ts` (folded into `lib/i18n/format.ts`); conf
 Total surface: ~210 files modified + 10 new, ~600–800 translation keys, expected ~2000–3000 lines net change. Largest single phase to date; the section-by-section gate is the safety mechanism.
 
 ---
+
+# Phase 14 — Public tournament pages
+
+Every tournament and league season gets a public, login-free shareable URL with three states (upcoming / live / completed). The operator shares it via WhatsApp / Telegram / QR. Public pages have their own minimal shell (no sidebar, no nav, no PageShell) and use an explicit `?lang=` query param + browser Accept-Language — independent of the operator's cookie.
+
+## 14.0 Open decisions (resolve with user before code)
+
+These shape the rest of the phase. Flag each explicitly; do **not** start 14.1 until the user has confirmed (or amended) each.
+
+- **14.0.1 `/t/[code]/live` sub-route — keep or drop?**
+  Plan briefly describes both `/t/[code]` (auto-detects state) and `/t/[code]/live` (redirects back to `/t/[code]` if not in progress). The redirect-back makes the dedicated `/live` purely decorative — same content, same auto-refresh behaviour as state-2 of `/t/[code]`.
+  **Recommendation:** drop `/t/[code]/live`. One canonical URL per tournament, dynamic content by status. Re-add later only if a future feature needs a sticky "live wall" mode (e.g. hide registration roster after start).
+
+- **14.0.2 Public-page language: route group with isolated layout, or reuse root LanguageProvider?**
+  The existing root layout (`app/layout.tsx`) mounts `LanguageProvider` which reads the `kosmo_lang` cookie. Public pages need: `?lang=` overrides everything → else `Accept-Language` header → else default `ru`. They should **not** read or write the operator's cookie.
+  **Recommendation:** route group `app/(public)/t/[code]/...` with its own `layout.tsx` (no PageShell, no sidebar, no cookie-based provider). A small `PublicLanguageToggle` mutates the URL query param via `router.replace()`. Server components compute `lang` from `searchParams.lang ?? headers().get('accept-language')` and pass dict by props. This keeps the cookie scoped to the operator UI.
+
+- **14.0.3 `/admin/backfill-codes` access control.**
+  App has no auth today. Options:
+  - (a) **Plain unlisted route** — anyone with the URL can run it. Acceptable since the action is idempotent and only assigns codes to NULL rows.
+  - (b) **Env-gated**: check `process.env.ADMIN_TOKEN` against a `?token=` query param. One-line guard.
+  - (c) **Skip the admin route entirely** — run the backfill as a one-shot Supabase SQL block instead and never ship it as a route.
+  **Recommendation:** (c). Backfill is a one-time op; shipping an unauthenticated admin route is unnecessary surface area. If user disagrees, default to (b).
+
+- **14.0.4 Refresh strategy on the live state.**
+  Plan mentions both "auto-refreshes every 10 seconds via `router.refresh()`" and "Supabase Realtime subscription". The richer pattern is Realtime-triggered (event-driven `router.refresh()`), no wall clock.
+  **Recommendation:** Realtime-only, no 10s polling. Falls back gracefully when Realtime drops (shows "reconnecting…"). Add a manual refresh button for paranoia. If user prefers belt-and-braces, add a 30s heartbeat refresh in addition.
+
+- **14.0.5 QR code library.**
+  Plan says `qrcode` npm package, client-side. Confirm package choice:
+  - `qrcode` (~50KB, supports `toDataURL`, `toString` for SVG) — generic, no React.
+  - `qrcode.react` (~20KB) — React component, SVG/canvas out of the box, dead-simple API.
+  **Recommendation:** `qrcode.react` for the inline render in `SharePanel`. Smaller, idiomatic, no manual canvas wrangling.
+
+- **14.0.6 Public base URL.**
+  Plan example: `kosmo-tournaments.vercel.app/t/[code]`. Need a single source of truth at runtime. Use `process.env.NEXT_PUBLIC_PUBLIC_BASE_URL` (set to `https://kosmo-tournaments.vercel.app` in prod, `http://localhost:3000` in dev). Add it to `.env.local` and document in CLAUDE.md.
+  **Recommendation:** explicit env var, no `window.location.origin` fallback (operator may share from localhost during demo). If user prefers, derive from request `host` header server-side as a fallback for the dev case.
+
+- **14.0.7 Footer string.**
+  Plan: "Powered by Kosmo Tournaments". Translate or keep English-only? "Powered by Kosmo Tournaments" reads fine in both languages as a brand line. Recommend keeping it English-only (brand chrome). Add as `public.footer_brand` key anyway in case the user wants RU variant later.
+
+- **14.0.8 Live-state visibility of registration roster.**
+  When tournament is `in_progress`, should the upcoming roster still be reachable on the public page, or is it replaced entirely by the leaderboard?
+  **Recommendation:** Replace entirely. The leaderboard already shows every active player. Don't double-render the roster.
+
+- **14.0.9 League public page when `in_progress` with no active session.**
+  League tournaments have a `status` plus sessions with their own statuses. If the league is `in_progress` but no individual session is live right now (between sessions), state-2 has no live data to show. Options:
+  - Show cumulative standings + "Next session: …" — treat between-session as still "live".
+  - Fall back to state-1 (upcoming) layout — confusing.
+  **Recommendation:** Show cumulative standings + next-session card. Always preferable to a blank board.
+
+## 14.1 SQL — add `short_code` to tournaments (USER RUNS)
+
+Give the user the SQL to paste into Supabase SQL Editor, then wait for "ran clean" before continuing.
+
+```sql
+alter table tournaments add column short_code text unique;
+create index idx_tournaments_short_code on tournaments(short_code);
+```
+
+Backfill plan resolved by 14.0.3. If 14.0.3 = (c), append the backfill block to the same SQL:
+
+```sql
+-- backfill: assign 6-char codes to any existing tournaments
+do $$
+declare
+  r record;
+  candidate text;
+begin
+  for r in select id from tournaments where short_code is null loop
+    loop
+      candidate := substr(md5(random()::text || clock_timestamp()::text), 1, 6);
+      exit when not exists (select 1 from tournaments where short_code = candidate);
+    end loop;
+    update tournaments set short_code = candidate where id = r.id;
+  end loop;
+end $$;
+```
+
+(Plan version reflects 14.0.3 = (c). If user picks (a) or (b), drop the do-block from the SQL and ship the admin route instead.)
+
+## 14.2 Short-code generator + write paths
+
+- [ ] 14.2.1 Add `lib/short-code.ts`:
+  ```ts
+  export const SHORT_CODE_LEN = 6;
+  const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+  export function generateShortCode(): string {
+    let out = "";
+    const bytes = new Uint8Array(SHORT_CODE_LEN);
+    crypto.getRandomValues(bytes);
+    for (let i = 0; i < SHORT_CODE_LEN; i++) out += ALPHABET[bytes[i] % ALPHABET.length];
+    return out;
+  }
+  ```
+  Pure, no Supabase import. Tested informally — 36^6 ≈ 2.2B; collisions handled by DB unique constraint + retry on caller.
+
+- [ ] 14.2.2 Extend `Tournament` type: add `short_code: string` to `lib/types.ts` (non-null after backfill — guaranteed by 14.1).
+
+- [ ] 14.2.3 Update `createTournament` in `lib/queries/tournaments.ts` to:
+  - Generate a code and insert with it.
+  - On unique-violation (`error.code === '23505'`), retry up to 5x with fresh codes.
+  - Surface `error.failed.create.tournament` after exhausting retries.
+
+- [ ] 14.2.4 Update `app/league/new/action.ts` — its `createTournament` call already routes through 14.2.3, so nothing extra unless the league season needs its own code (it doesn't — the league shares the parent `tournaments.short_code`).
+
+- [ ] 14.2.5 Build + lint clean.
+
+## 14.3 Public route shell — `app/(public)/`
+
+- [ ] 14.3.1 New directory `app/(public)/`.
+  - `layout.tsx` — root replacement for this group: dm-sans font, language-aware `<html lang>`, **no** `LanguageProvider`, no sidebar. Compute `lang` from `searchParams.lang ?? Accept-Language ?? 'ru'`. Pass children through. (Per 14.0.2; if user picks "reuse root provider", this layout becomes thinner.)
+  - `PublicHeader.tsx` (client) — left: `<Logo>` (existing) reading lang via props; right: `PublicLanguageToggle`.
+  - `PublicLanguageToggle.tsx` (client) — uses `useSearchParams` + `useRouter().replace()` to flip `?lang=ru` ↔ `?lang=en`. No cookie writes.
+  - `PublicFooter.tsx` — single line "Powered by Kosmo Tournaments", muted, centered.
+
+- [ ] 14.3.2 Language detection helper `lib/i18n/public.ts`:
+  ```ts
+  import { headers } from "next/headers";
+  import type { Lang } from "./types";
+  export async function resolvePublicLang(searchParamsLang: string | undefined): Promise<Lang> {
+    if (searchParamsLang === "ru" || searchParamsLang === "en") return searchParamsLang;
+    const al = (await headers()).get("accept-language") ?? "";
+    return al.toLowerCase().startsWith("en") ? "en" : "ru";
+  }
+  ```
+
+- [ ] 14.3.3 Build + lint clean.
+
+## 14.4 Public tournament query
+
+- [ ] 14.4.1 Add `lib/queries/public.ts` with `getTournamentByShortCode(code: string)`:
+  - Selects tournament by `short_code`.
+  - Returns `null` if not found.
+  - Caller's responsibility to `notFound()` on null.
+
+- [ ] 14.4.2 Add a typed `PublicTournamentView` aggregate that loads everything one page needs in a single helper:
+  - Tournament + registrations (with player) + sessions + active session's rounds/matches + (for leagues) season + cumulative standings.
+  - Decide caching: server component, no `cache: 'force-cache'` — these are live data; rely on Realtime-triggered `router.refresh()` for invalidation. (Resolved by 14.0.4.)
+
+## 14.5 Public page — `app/(public)/t/[code]/page.tsx`
+
+- [ ] 14.5.1 Async server component.
+  - Resolve `lang` via `resolvePublicLang(searchParams.lang)`.
+  - Fetch via `getTournamentByShortCode(params.code)`; `notFound()` if absent.
+  - Branch on tournament `status` and `type` into one of three state components (below). Pass `lang`, `dict`, and the loaded data.
+
+- [ ] 14.5.2 State components, one per file:
+  - `app/(public)/t/[code]/UpcomingState.tsx` — name, format/status badges, date/time, courts, fee, roster grid (avatar + name + level), spots remaining. For leagues: also session-date list with per-session status.
+  - `app/(public)/t/[code]/LiveState.tsx` — wraps server-rendered leaderboard in a `<LiveRefreshWrapper>` client component (14.6). Shows current round indicator + "LIVE" pulsing dot.
+  - `app/(public)/t/[code]/CompletedState.tsx` — top-3 podium card (🥇🥈🥉 visual, no emoji if user wants brand-clean — flag), full results table (rank, player, level, +/−, points, ELO change). For leagues: cumulative standings with qualification badge.
+
+- [ ] 14.5.3 Style notes (no new CSS variables):
+  - Background `--bg-page`, white cards `--bg-surface`, `--shadow-md`.
+  - Tournament name: `text-2xl font-bold` (DM Sans).
+  - Leaderboard table 44px compact rows (existing convention).
+  - Mobile-first: state components stack on narrow viewports; podium uses CSS grid that collapses to a single column under 480px.
+
+- [ ] 14.5.4 Re-use existing primitives:
+  - `Badge` for status/format/level.
+  - `Avatar` (verify component exists; if only inline initials are used elsewhere, build `components/ui/Avatar.tsx` — single file, photo with initials fallback).
+  - **Do not** import `PageShell` — the public layout already provides the shell.
+
+- [ ] 14.5.5 Build + lint clean.
+
+## 14.6 Realtime refresh on live state
+
+- [ ] 14.6.1 `app/(public)/t/[code]/LiveRefreshWrapper.tsx` (client):
+  - Mirrors the operator-side pattern (`LivePlayBoard.tsx:68–104`): subscribe to `matches` + `rounds` UPDATE events for the active session.
+  - On any event, call `router.refresh()` to re-fetch the server component.
+  - Debounce: ignore events arriving within 500ms of the last refresh.
+  - Connection status pill (small, top-right of the leaderboard card): "Updates live" / "Reconnecting…" / "Disconnected".
+  - No 10s polling clock (per 14.0.4).
+
+- [ ] 14.6.2 Confirm Realtime is enabled on `matches` and `rounds` in Supabase. (Phase 1.2 said yes — verify at build time, not in the plan.)
+
+- [ ] 14.6.3 Build + lint clean.
+
+## 14.7 Sharing widget on operator side
+
+- [ ] 14.7.1 New `components/share/SharePanel.tsx` (client) — replaces the existing inline `ShareButton.tsx` on the results page and adds the same UX to the tournament detail page.
+  - Collapsible. Closed by default. Click "Поделиться" → expand panel below it.
+  - Renders:
+    - Public URL (`{PUBLIC_BASE_URL}/t/{short_code}`) in a read-only input.
+    - "Copy link" button → `navigator.clipboard.writeText`, transient "Copied!" feedback (existing pattern).
+    - QR code, rendered with `qrcode.react` (per 14.0.5), 180×180.
+    - WhatsApp link: `https://wa.me/?text=${encodeURIComponent(message)}` (opens new tab).
+    - Telegram link: `https://t.me/share/url?url=${url}&text=${title}` (opens new tab).
+  - All strings via `useTranslation()`.
+  - One component per file, ~150 lines target.
+
+- [ ] 14.7.2 Wire into operator UI:
+  - `app/tournament/[id]/page.tsx` — embed `<SharePanel />` near the existing action row.
+  - `app/tournament/[id]/results/page.tsx` — replace `<ShareButton />` import with `<SharePanel />`.
+  - League detail page (which is `app/tournament/[id]/page.tsx` for `type === 'league_season'`) is covered by the same embed.
+  - **Delete** `app/tournament/[id]/results/ShareButton.tsx` after migration.
+
+- [ ] 14.7.3 Required env: read `NEXT_PUBLIC_PUBLIC_BASE_URL` (per 14.0.6). Plan to set it in Vercel project settings and `.env.local`.
+
+- [ ] 14.7.4 Translation keys to add (in both `ru.ts` and `en.ts`):
+  - `share.title` — "Поделиться" / "Share"
+  - `share.copy_link` — "Скопировать ссылку" / "Copy link"
+  - `share.copied` — "Скопировано!" / "Copied!"
+  - `share.qr_alt` — "QR-код для турнира {name}" / "QR code for {name}"
+  - `share.whatsapp` — "WhatsApp"
+  - `share.telegram` — "Telegram"
+  - `share.message_template` — interpolation: name + URL (one each, RU/EN)
+
+- [ ] 14.7.5 Build + lint clean.
+
+## 14.8 Backfill route (only if 14.0.3 ≠ (c))
+
+If user picks (a) or (b) in 14.0.3:
+
+- [ ] 14.8.1 `app/admin/backfill-codes/page.tsx` — single button. Form submits to a server action.
+- [ ] 14.8.2 `app/admin/backfill-codes/action.ts` — `"use server"`. Reads all `tournaments` with `short_code IS NULL`, loops, calls `generateShortCode()` + insert-retry, returns count.
+- [ ] 14.8.3 If (b): guard first line of action: `if (formData.get('token') !== process.env.ADMIN_BACKFILL_TOKEN) return { error: 'forbidden' };`
+- [ ] 14.8.4 No nav link from anywhere; route is unlisted.
+
+(If 14.0.3 = (c), skip this whole sub-phase — backfill happened in the 14.1 SQL block.)
+
+## 14.9 Public page — language keys
+
+New translation keys (concentrated under `public.*`):
+- `public.live_badge` — "Идёт" / "Live"
+- `public.completed_badge` — "Завершён" / "Completed"
+- `public.upcoming_badge` — "Регистрация" / "Registration"
+- `public.round_indicator` — "Раунд {current} из {total}" / "Round {current} of {total}"
+- `public.spots_remaining` — pluralized: "{n} место/места/мест осталось" / "{n} spot/spots remaining"
+- `public.players_registered` — header for roster
+- `public.top_3` — "Топ-3" / "Top 3"
+- `public.results_title` — "Финальные результаты" / "Final results"
+- `public.session_dates_header` — for league upcoming state
+- `public.next_session` — for league between-sessions case (per 14.0.9)
+- `public.cumulative_standings` — for league completed state
+- `public.qualification_badge` — for finals-qualified rows
+- `public.elo_change_header` — column header on completed results
+- `public.connection.live` / `public.connection.reconnecting` / `public.connection.disconnected` — refresh wrapper pill
+- `public.updates_live_note` — small caption "Обновляется автоматически" / "Updates automatically"
+- `public.footer_brand` — per 14.0.7
+- `public.not_found_title` / `public.not_found_body` — for `notFound()` UI (separate `not-found.tsx` in the route group)
+
+Estimated ~25 new keys total. All added to both `ru.ts` and `en.ts`; the existing `Dictionary` type derivation enforces parity at compile time.
+
+## 14.10 Browser sweep + commit
+
+- [ ] 14.10.1 `npm run build` + `npm run lint` — must be clean.
+- [ ] 14.10.2 Browser sweep in dev:
+  - Create a one-day tournament, open `/t/[code]` while `draft` → should show upcoming with empty roster.
+  - Add players → roster fills.
+  - Open registration, start the tournament → status flips to live; open `/t/[code]` in a second tab, enter scores in tab 1 → tab 2 updates without manual reload.
+  - Complete the tournament → state-3 podium + ELO column visible.
+  - Repeat for a league: verify session-date list, between-session "next session" card, cumulative standings on completion.
+  - Toggle `?lang=en` ↔ `?lang=ru` on each state; confirm no cookie leakage into the operator UI in a third tab.
+  - QR code: scan with phone, confirm it opens the public URL.
+  - WhatsApp / Telegram links: click each, confirm correct URL + message body.
+  - 404 path: visit `/t/zzzzzz` → confirm `not-found.tsx` renders inside the public shell, not the operator shell.
+- [ ] 14.10.3 Single commit titled `Phase 14: public tournament pages` with HEREDOC body listing: SQL migration, short-code generator, public route group, three state components, Realtime wrapper, share panel, key additions. Push to `origin/main`.
+
+## Out of scope for Phase 14
+
+- No QR code download (`right-click → save image` is sufficient).
+- No social-preview Open Graph images per tournament (would need OG image route — future).
+- No analytics on public pages (no PostHog/GA).
+- No SEO sitemap or robots.txt rules — public pages are intentionally shareable but not indexed-first.
+- No custom domains per organizer.
+- No write actions on public pages (no spectator chat, no reactions, no upvotes).
+- No auth-gating of any kind on public pages.
+- No archival/expiry of short codes — they live forever once issued.
+- No admin UI for regenerating a code (treat codes as permanent identifiers).
+- No localization of public URL path itself (still `/t/[code]` in both languages — URL doesn't change per spec).
+
+## Files touched (expected)
+
+New:
+- `lib/short-code.ts`
+- `lib/queries/public.ts`
+- `lib/i18n/public.ts`
+- `components/share/SharePanel.tsx`
+- `components/ui/Avatar.tsx` (only if not already present)
+- `app/(public)/layout.tsx`
+- `app/(public)/PublicHeader.tsx`
+- `app/(public)/PublicLanguageToggle.tsx`
+- `app/(public)/PublicFooter.tsx`
+- `app/(public)/t/[code]/page.tsx`
+- `app/(public)/t/[code]/UpcomingState.tsx`
+- `app/(public)/t/[code]/LiveState.tsx`
+- `app/(public)/t/[code]/LiveRefreshWrapper.tsx`
+- `app/(public)/t/[code]/CompletedState.tsx`
+- `app/(public)/t/[code]/not-found.tsx`
+- (Conditional 14.0.3) `app/admin/backfill-codes/page.tsx`, `action.ts`
+
+Modified:
+- `lib/types.ts` (+`short_code`)
+- `lib/queries/tournaments.ts` (`createTournament` + retry)
+- `lib/i18n/ru.ts`, `lib/i18n/en.ts` (~25 new keys)
+- `app/tournament/[id]/page.tsx` (embed SharePanel)
+- `app/tournament/[id]/results/page.tsx` (swap ShareButton → SharePanel)
+- `package.json` (+`qrcode.react`)
+- `.env.local` and `CLAUDE.md` (document `NEXT_PUBLIC_PUBLIC_BASE_URL`)
+
+Deletions:
+- `app/tournament/[id]/results/ShareButton.tsx`
+
+Net surface: ~16 new files + ~7 modified, ~800 lines of new code. Roughly mid-sized phase.
+
+---

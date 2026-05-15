@@ -28,7 +28,7 @@ import {
 } from "@/lib/i18n/tournament-keys";
 import { DIVISION_CATEGORY_KEY } from "@/lib/i18n/scoring-keys";
 import { statusTone } from "@/lib/status-tone";
-import { ShareButton } from "./ShareButton";
+import { SharePanel } from "@/components/share/SharePanel";
 
 export default async function ResultsPage({
   params,
@@ -51,14 +51,11 @@ export default async function ResultsPage({
       <PageShell
         title={tournament.name}
         action={
-          <div className="flex items-center gap-2">
-            <ShareButton />
-            <Link href={`/tournament/${id}`}>
-              <Button variant="secondary" size="md">
-                {tr("results.back_to_tournament")}
-              </Button>
-            </Link>
-          </div>
+          <Link href={`/tournament/${id}`}>
+            <Button variant="secondary" size="md">
+              {tr("results.back_to_tournament")}
+            </Button>
+          </Link>
         }
       >
         <div className="flex flex-col gap-6 max-w-3xl">
@@ -78,6 +75,11 @@ export default async function ResultsPage({
               {tr("results.divisions_count", { n: divisions.length })}
             </p>
           </Card>
+
+          <SharePanel
+            shortCode={tournament.short_code}
+            tournamentName={tournament.name}
+          />
 
           <Card className="flex flex-col gap-3">
             <h2 className="font-semibold text-black">
@@ -182,14 +184,11 @@ export default async function ResultsPage({
     <PageShell
       title={tournament.name}
       action={
-        <div className="flex items-center gap-2">
-          <ShareButton />
-          <Link href={`/tournament/${id}`}>
-            <Button variant="secondary" size="md">
-              {tr("results.back_to_tournament")}
-            </Button>
-          </Link>
-        </div>
+        <Link href={`/tournament/${id}`}>
+          <Button variant="secondary" size="md">
+            {tr("results.back_to_tournament")}
+          </Button>
+        </Link>
       }
     >
       <div className="flex flex-col gap-6 max-w-3xl">
@@ -211,6 +210,11 @@ export default async function ResultsPage({
             })}
           </p>
         </Card>
+
+        <SharePanel
+          shortCode={tournament.short_code}
+          tournamentName={tournament.name}
+        />
 
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-black">

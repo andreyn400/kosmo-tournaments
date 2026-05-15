@@ -34,6 +34,7 @@ import { DangerZone } from "./DangerZone";
 import { DivisionsPanel } from "./DivisionsPanel";
 import { EditTournamentPanel } from "./EditTournamentPanel";
 import { LeagueSettingsPanel } from "./LeagueSettingsPanel";
+import { SharePanel } from "@/components/share/SharePanel";
 
 export default async function TournamentDetailPage({
   params,
@@ -226,6 +227,8 @@ export default async function TournamentDetailPage({
             <EditTournamentPanel tournament={t} allCourts={activeCourts} />
           </Card>
 
+          <SharePanel shortCode={t.short_code} tournamentName={t.name} />
+
           {league ? (
             <Card>
               <LeagueSettingsPanel
@@ -378,6 +381,8 @@ export default async function TournamentDetailPage({
     <PageShell title={t.name} action={headerAction}>
       <div className="flex flex-col gap-6 max-w-3xl">
         {infoCard}
+
+        <SharePanel shortCode={t.short_code} tournamentName={t.name} />
 
         {t.status === "draft" ? (
           <Card className="flex flex-col gap-3">

@@ -98,6 +98,7 @@ export interface Player {
 
 export interface Tournament {
   id: string;
+  short_code: string;
   name: string;
   type: TournamentType;
   format: TournamentFormat;

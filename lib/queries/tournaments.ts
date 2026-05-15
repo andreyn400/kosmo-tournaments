@@ -1,5 +1,8 @@
 import { createClient } from "../supabase/server";
+import { generateShortCode } from "../short-code";
 import type { ScoringSystem, Tournament } from "../types";
+
+const SHORT_CODE_MAX_RETRIES = 5;
 
 export async function listTournaments(): Promise<Tournament[]> {
   const supabase = await createClient();
@@ -42,14 +45,24 @@ export async function createTournament(input: {
   duration_hours?: number;
 }): Promise<Tournament> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .insert({ ...input, status: "draft" })
-    .select("*")
-    .single();
 
-  if (error) throw new Error(error.message);
-  return data as Tournament;
+  for (let attempt = 0; attempt < SHORT_CODE_MAX_RETRIES; attempt++) {
+    const short_code = generateShortCode();
+    const { data, error } = await supabase
+      .from("tournaments")
+      .insert({ ...input, status: "draft", short_code })
+      .select("*")
+      .single();
+
+    if (!error) return data as Tournament;
+    const isShortCodeCollision =
+      error.code === "23505" &&
+      (error.message.includes("short_code") ||
+        error.details?.includes("short_code"));
+    if (!isShortCodeCollision) throw new Error(error.message);
+  }
+
+  throw new Error("short_code collision after max retries");
 }
 
 export async function updateTournamentStatus(

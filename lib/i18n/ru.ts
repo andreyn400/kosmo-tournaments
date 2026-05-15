@@ -1341,8 +1341,6 @@ export const ru = {
 
   // results / scoreboard
   "results.title": "Итоги турнира",
-  "results.share_cta": "Поделиться",
-  "results.share_copied": "Скопировано",
   "results.back_to_tournament": "К турниру",
   "scoreboard.close": "Закрыть табло",
   "scoreboard.no_active_session": "Нет активной сессии",
@@ -1912,6 +1910,61 @@ export const ru = {
   "error.score.supertiebreak_invalid":
     "Неверный супер тай-брейк (до 10, +2)",
   "error.score.third_set_invalid": "Неверный счёт третьего сета",
+
+  // ── 14.9 public tournament pages ─────────────────────────────────────
+  "public.live_badge": "Идёт",
+  "public.completed_badge": "Завершён",
+  "public.upcoming_badge": "Регистрация",
+  "public.draft_badge": "Черновик",
+  "public.round_indicator": "Раунд {current} из {total}",
+  "public.spots_remaining.one": "{count} место осталось",
+  "public.spots_remaining.few": "{count} места осталось",
+  "public.spots_remaining.many": "{count} мест осталось",
+  "public.players_count.one": "{count} игрок",
+  "public.players_count.few": "{count} игрока",
+  "public.players_count.many": "{count} игроков",
+  "public.players_registered": "Зарегистрированные игроки",
+  "public.no_players_yet": "Пока никто не записался",
+  "public.entry_fee_label": "Взнос",
+  "public.courts_label": "Корты",
+  "public.session_dates_header": "Расписание сессий",
+  "public.next_session": "Следующая сессия: {date}",
+  "public.session_number": "Сессия {n}",
+  "public.session.scheduled": "Запланирована",
+  "public.session.in_progress": "Идёт",
+  "public.session.completed": "Завершена",
+  "public.top_3": "Топ-3",
+  "public.results_title": "Финальные результаты",
+  "public.leaderboard_title": "Турнирная таблица",
+  "public.cumulative_standings": "Общий зачёт сезона",
+  "public.qualification_badge": "Финал",
+  "public.rank_header": "Место",
+  "public.player_header": "Игрок",
+  "public.level_header": "Уровень",
+  "public.points_header": "Очки",
+  "public.plus_minus_header": "+/−",
+  "public.matches_header": "Матчей",
+  "public.elo_change_header": "ELO",
+  "public.connection.live": "Обновляется в реальном времени",
+  "public.connection.reconnecting": "Переподключение…",
+  "public.connection.disconnected": "Связь потеряна",
+  "public.updates_live_note": "Обновляется автоматически",
+  "public.not_found_title": "Турнир не найден",
+  "public.not_found_body":
+    "Возможно, ссылка устарела или организатор удалил турнир.",
+  "public.no_active_session":
+    "Активная сессия скоро начнётся. Обновите страницу позже.",
+
+  // ── 14.7 share panel ─────────────────────────────────────────────────
+  "share.title": "Поделиться",
+  "share.close": "Свернуть",
+  "share.subtitle": "Публичная ссылка для игроков и зрителей",
+  "share.copy_link": "Скопировать ссылку",
+  "share.copied": "Скопировано",
+  "share.qr_alt": "QR-код для турнира {name}",
+  "share.whatsapp": "WhatsApp",
+  "share.telegram": "Telegram",
+  "share.message_template": "{name} — следите за результатами: {url}",
 } as const;
 
 export type Dictionary = Record<keyof typeof ru, string>;
